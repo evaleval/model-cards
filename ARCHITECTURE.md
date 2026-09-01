@@ -1,242 +1,239 @@
 # Architecture
 
-The system generates one evidence-bound Model Card for one specific model release. It
-freezes the source material first, keeps every proposed value in a binding ledger, and
-projects the public JSON card from accepted bindings. The binding ledger is the primary
-record. The public card is its derived projection.
+The system generates one JSON Model Card for one exact model revision. Its source
+state, stage inputs, decisions, and outputs are content-addressed so a completed run
+can be replayed without changing the evidence beneath the card.
 
 ```text
-selected model release
+MODEL[@REVISION]
         |
         v
-frozen local source bundle --> model and referent frame
+exact Hugging Face bundle ---- declared official links
         |                              |
-        +------------------------------+
-                       |
-                       v
-        structured extraction + quoted candidates
-                       |
-                       v
-          evidence and assignment bindings
-                       |
-                       v
-       composition + risk identification + audits
-                       |
-                       v
-             append-only review and repair
-                       |
-                       v
-             source-clean public card.json
+        |                       bounded collection
+        +---------------+--------------+
+                        v
+              immutable source state
+                        |
+                        v
+        structured extraction + optional quotes
+                        |
+                        v
+             four-part claim support gate
+                        |
+                        v
+               evidence-only composition
+                        |
+                        v
+       FactReasoner + omission + conflict checks
+                        |
+                        v
+             targeted repair / withholding
+                        |
+                        v
+           risk gate + final audits + privacy
+                        |
+                        v
+         CardArtifact --------> public-card.json
 ```
 
-## System invariants
+## Invariants
 
-- The target is a canonical model ID paired with the release being documented.
-- Each source-derived filled field traces to a verified source span or structured
-  pointer.
-- Each binding names the entity described by the evidence and its relation to the
-  target. Exact wording alone cannot establish the correct assignment.
-- A base model, model family, sibling checkpoint, derivative, or comparison model does
-  not populate an exact-target field unless the field policy permits that relation.
-- Unsupported values remain `Not specified`. Fields that do not apply use
-  `Not applicable`.
-- Conflicting accepted values block projection for that field. Projection never picks
-  the last value silently.
-- Public cards are JSON. Source bodies, binding ledgers, model traces, and review logs
-  remain in local source bundles and retained artifacts.
+- The target is a Hugging Face namespace/name plus a resolved 40-character commit.
+- Every populated source-derived field is backed by a replayable JSON pointer or
+  exact text coordinates in the frozen source state.
+- Each candidate names the entity it describes and its relation to the target.
+  Similar names do not establish an exact-target relation.
+- Claims must pass coordinate integrity, entity scope, field fit, and value support
+  before they can enter composition.
+- Composition receives accepted candidates, not an unrestricted source corpus.
+- Conflicting accepted values do not use last-write-wins behavior; the affected field
+  is withheld.
+- Unsupported fields remain `Not specified`. `Not applicable` is reserved for fields
+  shown not to apply.
+- Provider-free and provider-assisted runs are different admitted modes and cannot
+  overwrite or resume one another.
+- Public cards contain portable source references and locators, never frozen source
+  bodies, credentials, prompts, raw provider payloads, run paths, or journals.
 
-## Pipeline and data model
+## 1. Exact source collection
 
-### 1. Select the model release and preserve the sources
+`source_bundle.py` parses `MODEL[@REVISION]`, resolves the requested revision once,
+and freezes a bounded set of Hugging Face inputs. The manifest records every
+collected, missing, gated, or unavailable source and binds all stored bytes to the
+exact target and collection limits. Replay rehashes the objects and reconstructs the
+manifest identity.
 
-Before extraction, the workflow records the canonical model ID and the release being
-documented. Source adapters then collect the relevant publisher and evaluation
-material for that model. Each source record stores a logical source ID, authority
-role, source version, model scope, and retrieval information. The saved source files
-stay local so later checks can replay the same input.
+For a normal networked generation, `official_discovery.py` examines declarations in
+the frozen Hub material. It normalizes URLs, restricts them to configured publication,
+code, and publisher-owned hosts, and records candidates without treating discovery as
+evidence. `official_http.py` performs bounded, credential-free HTTPS retrieval with
+manual redirect validation. `official_sources.py` checks authority, ownership,
+relation, media type, byte bounds, redirect trace, and ancestry before collected
+official material becomes evidence-eligible.
 
-The source set does not change during generation. A changed README, report,
-configuration, or evaluation record starts a new collection instead of changing the
-evidence behind an existing card.
+`official_documents.py` converts eligible JSON, HTML, Markdown, and plain text into
+typed documents. Unsupported PDFs and malformed or unavailable material remain
+explicit load records. The current bridge does not extract PDF text.
 
-### 2. Build the model and referent frame
+## 2. One immutable source state
 
-The model frame identifies the target, declared base models, family aliases, siblings,
-derivatives, comparison models, benchmarks, and metrics. Extraction and validation use
-this frame to resolve what each statement describes. It also prevents a family-wide
-training statement or a comparison score from being assigned to the target checkpoint.
+`source_state.py` binds the Hugging Face bundle and, when supplied, the
+ancestry-matched official bundle into one immutable identity. `combined_sources.py`
+then combines their typed document catalogs. The same catalog digest is used by
+extraction, claim gates, composition, FactReasoner, omissions, risk mapping, and run
+verification.
 
-### 3. Extract candidates through two channels
+An offline Hugging Face bundle alone creates `hf_only` state. Adding a verified
+official bundle creates `hf_and_official` state. Resume cannot switch between them.
+Provider-assisted orchestration re-verifies the complete source state after provider
+decisions and before pipeline composition.
 
-Deterministic extractors read structured metadata, configuration, weight metadata,
-tables, and evaluation records. Model-assisted extractors propose values from verbatim
-source spans. Bounded gap retrieval can inspect a missing section when the initial pass
-finds no candidate.
+## 3. Extraction and claim support
 
-Both channels emit candidates into the same binding interface. A candidate contains a
-schema field path, proposed value, claimed entity, target relation, source evidence,
-and any benchmark or protocol scope needed to interpret the value.
+`extraction.py` creates structured candidates from exact metadata pointers and
+materializes optional quoted candidates against saved source coordinates. It records
+unavailable source windows and rejected proposals instead of silently dropping them.
 
-### 4. Bind evidence to fields
+`claim_gate.py` applies the same ordered interface to every candidate:
 
-Each binding joins a proposed value to its schema field, claimed entity, target
-relation, and evaluation scope. Evidence contains either exact quote coordinates or a
-structured pointer whose fragment can be replayed. Entity-Attribution Verification
-(EAV) audits whether selected passages actually describe the claimed entity and
-support the proposed field. It can record a referent correction before deterministic
-relation gates run.
+1. `coordinate_integrity` replays the pointer or quote.
+2. `entity_scope` enforces the claimed entity and target relation.
+3. `field_fit` checks that the evidence belongs in the proposed contract field.
+4. `value_support` checks that the complete proposed value follows from that evidence.
 
-The policy gate checks the evidence, field, relation, referent, row anchor, and source
-scope together. It assigns a stable disposition and reason code. Accepted bindings may
-enter the card. Withheld and rejected bindings remain in the ledger for inspection.
+The first two gates are deterministic. Structured values also receive deterministic
+field and value checks. Provider-assisted quote candidates receive normalized semantic
+decisions for the latter gates. A withheld gate remains in `claim-gates.json` but
+cannot enter the composition plan.
 
-### 5. Compose the card
+## 4. Composition, audits, and repair
 
-Composition reads accepted bindings only. It fills the JSON schema, retains
-the two absence sentinels, derives provenance and coverage fields, and withholds fields
-with unresolved conflicts. Narrative fields may be composed from accepted evidence.
-Numeric benchmark rows come from deterministic table extraction and reconciliation.
-The model-assisted composer cannot create or alter scores.
+`composer.py` builds a complete contract-shaped card from projection-eligible claims.
+It preserves field-scoped provenance and refuses conflicting values. The pre-repair
+projection is saved in `composition-original.json`.
 
-The internal `CardArtifact` contains the exact target, immutable generated bindings,
-append-only review events, and the current card projection. The public card contains
-the projection only.
+`factreasoner.py` records atomic claim checks against the same source catalog.
+Supported, contradicted, neutral, and unavailable outcomes remain distinct. If a
+checker is unavailable for claims that require it, the pipeline records that state and
+does not count those claims as passed.
 
-### 6. Identify model-use risks
+`findings.py` compares source-present candidate fields with the composed card and
+records omissions and conflicts. `field_repair.py` operates only on affected fields,
+replays all proposed evidence, and emits typed repair records. Contradicted or neutral
+claims are withheld without an additional semantic submission; unavailable checks
+remain visible for later review. The pipeline saves both the original and post-repair
+composition, FactReasoner, and omission artifacts.
 
-Source-reported intended uses, limitations, biases, risks, and mitigations enter the
-normal evidence-binding path. They must satisfy the same referent and source checks as
-other card fields.
+## 5. Risks
 
-The pipeline also runs model-assisted risk identification through AI Atlas Nexus
-against a selected IBM AI Risk Atlas release. Each candidate mapping records the
-taxonomy risk ID and release, use context, applicability rationale, supporting card
-fields, identification method, and review status. The
-`use_and_risk.identified_risks` entries label their
-`identification_origin`, so a taxonomy-identified risk cannot be mistaken for a
-publisher statement. A mapping does not receive a severity or confidence value unless
-a separate assessment supports it.
+Publisher-reported uses, limitations, biases, risks, and mitigations use the normal
+evidence-binding path. They are not interchangeable with taxonomy inferences.
 
-### 7. Validate the complete artifact
+`risk_mapping.py` provides an optional adapter for AI Atlas Nexus 1.2.4 and its pinned
+IBM AI Risk Atlas snapshot. The Nexus dependency is loaded only when the exact package
+version is installed on Python 3.11 or newer. Taxonomy candidates require accepted use
+context, a valid risk identifier, an applicability rationale, supporting field
+references, and an applicability decision. Public entries label their origin as
+`taxonomy_identified`; they cannot masquerade as publisher statements or confirmed
+harms. An unavailable dependency or checker produces an unavailable stage, not a
+replacement taxonomy result.
 
-Validation runs after composition because a supported candidate can still become an
-unsupported final claim, and a well-supported set of fields can still omit a fact that
-the frozen sources contain.
+## 6. Lifecycle and export
 
-| Layer | Operates on | Question answered | Failure action |
-| --- | --- | --- | --- |
-| Source replay | Source manifest and evidence coordinates | Do the saved sources, spans, pointers, and derivations reproduce? | Reject the affected binding |
-| Schema checks | Public projection | Are sections, field types, enums, absence values, and required metadata valid? | Block release |
-| Entity-Attribution Verification | Candidate bindings | Does this value describe this entity, field, row, and protocol? | Withhold or reassign |
-| Numeric reconciliation | Score rows and quantitative fields | Do value, unit, metric, setting, split, and source row agree? | Withhold the row |
-| Final-claim audit | Composed card claims and their own citations | Does the final wording follow from the evidence attached to that field? | Repair or withhold the field |
-| FactReasoner | Atomic claims and the frozen source bundle | What support or contradiction does retrieval find for each claim? | Flag unsupported claims for repair or review |
-| Conflict checks | Accepted bindings | Do accepted values disagree for the same scoped field? | Leave the field unfilled |
-| Omission audit | Saved sources and projected card | Which relevant source facts are missing from the card? | Add candidates and rerun the affected gates |
-| Risk-mapping gate | Candidate risk mappings | Does the risk ID exist in the selected taxonomy release, and do the use context, rationale, field references, and review state support the mapping? | Reject or retain as unreviewed |
+`artifact.py` constructs the typed `CardArtifact` from accepted bindings, validation
+checks, optional taxonomy derivations, and append-only review events. The final
+lifecycle becomes `generated_validated` only when all of these automated conditions
+hold:
 
-These layers have separate jobs. Entity-Attribution Verification establishes
-assignment before composition. The final-claim audit checks the wording produced after
-composition. FactReasoner decomposes narrative output into atomic claims, retrieves
-matching passages from the frozen bundle, and records support and contradiction
-probabilities. It does not decide whether a taxonomy risk applies to a use case. The
-omission audit searches for source-present content that no projected claim covers.
+- every included claim passes the claim-support gate;
+- required FactReasoner checks pass;
+- the public projection satisfies the JSON Schema;
+- the risk stage passes;
+- the privacy scan passes;
+- no unresolved conflict or source-present omission remains.
 
-### 8. Repair, review, and release
+Otherwise the lifecycle is `generated_unreviewed`. These values describe automated
+pipeline state, not human review or release approval.
 
-Validators emit field-level findings with stable codes. A repair pass reads only the
-affected fields and evidence, adds a new candidate or review event, and reruns the
-relevant gates. Supported fields remain unchanged. This makes repair bounded and keeps
-the generation history inspectable.
+`public_export.py` projects the typed artifact to one JSON card and validates the
+projection against the packaged Draft 2020-12 schema. `privacy.py` independently
+audits proposed public files for schema drift, non-finite or ambiguous JSON, source
+bodies, credentials, authenticated URLs, machine paths, provider material, forbidden
+file types, and unsafe symlinks.
 
-Human review is append-only. A reviewer can accept, withhold, or reassign a binding and
-must record a reason. Release approval records the reviewer identity and the artifact
-version reviewed. High-risk use mappings can require a second signoff. Export runs only
-after the release gates pass.
+## 7. Provider-assisted orchestration
 
-## Local and public artifacts
+`orchestration.py` is invoked only by `generate --provider PROVIDER`. The documented
+route is `--provider Baidu`; every assisted call uses exactly
+`deepseek/deepseek-v4-flash-0731` through OpenRouter. It extracts bounded quote
+candidates from each eligible text document once, obtains normalized field-fit and
+value-support decisions, supplies a FactReasoner checker, and, when the pinned risk
+dependency is available, supplies the Nexus risk interfaces.
 
-| Artifact | Contents | Location |
+`provider.py` and `run_ledger.py` enforce a single append-only `usage.jsonl` ledger,
+the USD 25 and 300-call run caps, route freshness, structured JSON output, and at most
+two retries after explicit 429/5xx responses. A transport outcome that may have sent a
+paid request becomes `uncertain` and cannot be sent again. There is no model or route
+fallback. Prompts and raw responses are not ledger fields; normalized decisions are
+stored separately and addressed by digest.
+
+Provider mode is intentionally absent from the batch command. This prevents separate
+targets from fragmenting the one-run global accounting boundary.
+
+## 8. Run state and replay
+
+`run_state.py` owns the immutable run manifest and append-only stage journal. Every
+stage records its input digests, output digest, status, reason code, and closed
+metrics. `pipeline-result.json` references the canonical stage artifacts and is
+verified against the journal and filesystem before reuse.
+
+`run_summary.py` produces `audit-view.json` and `usage-summary.json`. They expose stage
+counts, repair counts, validation status, and cost/latency totals without source text,
+prompts, or raw ledger rows. `quality_report.py` re-verifies complete batch artifact
+chains and aggregates the same body-free measures. With a paired replay it also
+compares value, artifact, decision, validation, risk, omission, privacy, and
+cost/latency surfaces.
+
+## Artifact layout
+
+| Artifact | Role | Public-card content? |
 | --- | --- | --- |
-| Frozen source bundle | Saved source files, source versions, and collection metadata | Local only |
-| Full `CardArtifact` | Target, generated card, binding ledger, evidence coordinates, validation findings, and review history | Local only |
-| Public Model Card | Source-clean JSON projection with public provenance metadata | Repository `cards/` directory |
+| `source-bundle/`, `official-source-bundle/` | Frozen bytes and closed manifests | No |
+| `source-state.json`, `source-catalog.json` | Combined immutable source identity | No |
+| `extraction.json`, `claim-gates.json` | Candidates and support decisions | No |
+| `composition*.json`, `factreasoner*.json`, `omissions*.json` | Before/after repair projections and audits | No |
+| `repairs.json`, `risk-mapping.json`, `privacy.json` | Repair, taxonomy, and publication checks | No |
+| `card-artifact.json` | Bindings, reviews, validation, and derived card | No |
+| `public-card.json` | Contract-valid source-clean projection | Yes |
+| `run-manifest.json`, `journal.jsonl`, `pipeline-result.json` | Run and artifact integrity chain | No |
+| `audit-view.json`, `usage-summary.json` | Body-free operational summaries | No |
+| `quality-report.json` | Body-free batch or paired-replay aggregate | Separate publishable report |
 
-The repository export excludes source bodies, local filesystem paths, credentials,
-working notes, prompts and responses, provider traces, and private audit records. Its
-field-to-source index contains public source references, precise locators, the entity
-described, and its relation to the documented model. It never contains the source
-set, evidence text, or full binding ledger.
+## Package map
 
-`public_export.py` writes one JSON file without Markdown or audit sidecars. Release
-validation checks the public metadata, source locators, cross-references, taxonomy
-records, and the complete card for private material.
-
-## Package modules
-
-The `src/model_cards` package holds the source-free policy and artifact core. The
-modules form the stable interface used by collection, composition, audit, and release
-orchestration.
-
-| Module | Responsibility |
+| Modules | Responsibility |
 | --- | --- |
-| `models.py` | Typed targets, sources, evidence, bindings, dispositions, and review events |
-| `quote.py` | Text normalization and exact substring matching for quoted evidence |
-| `bindings.py` | Quote and structured binding construction, stable IDs, JSON Pointer replay, and source verification |
-| `policy.py` | Fail-closed field, source-role, revision, and target-relation rules |
-| `artifact.py` | Immutable artifacts, review folding, conflict handling, and deterministic card projection |
-| `schema.py` | Field vocabulary, value shapes, list indexing, and absence semantics |
-| `review.py` | Append-only accept, withhold, and reassign operations |
-| `render.py` | Deterministic internal JSON and static HTML inspection views |
-| `public_export.py` | JSON-only public export plus privacy and integrity checks |
-| `cli.py` | Offline build, inspect, render, and review commands |
+| `contract.py`, `schema.py` | Neutral public contract, absence values, and runtime validation |
+| `source_bundle.py`, `hf_adapter.py` | Exact-revision Hugging Face collection and replay |
+| `official_discovery.py`, `official_http.py`, `official_sources.py`, `official_documents.py` | Declared official-source boundary |
+| `source_state.py`, `combined_sources.py`, `source_documents.py` | Immutable source state and typed catalogs |
+| `extraction.py`, `claim_gate.py`, `composer.py` | Candidate extraction, support checks, and evidence-only projection |
+| `factreasoner.py`, `findings.py`, `field_repair.py` | Atomic factuality, omission/conflict audits, and targeted repair |
+| `risk_mapping.py` | Pinned taxonomy integration and applicability gate |
+| `provider.py`, `provider_adapters.py`, `run_ledger.py`, `orchestration.py` | Exact provider route, bounded calls, normalized decisions, and accounting |
+| `artifact.py`, `review.py`, `public_export.py`, `privacy.py` | Typed artifact, append-only review, export, and publication boundary |
+| `run_state.py`, `pipeline.py`, `run_summary.py`, `quality_report.py` | End-to-end execution, resume, summaries, and batch aggregation |
+| `cli.py` | `collect`, `generate`, `batch`, `report`, inspection, review, repair-record, validation, and export commands |
 
-The full collector, model-assisted composer, validation orchestration, risk mapping,
-and release workflow integrate through these interfaces. The public exporter
-determines the contents of each generated card.
-
-## Developer commands
-
-Python 3.9 or newer is supported. The core runs offline and has no runtime dependency
-on a model provider.
+## Verification
 
 ```sh
-python3 -m pip install -e .
-python3 -m unittest discover -s tests -v
-python3 -m model_cards --help
+PYTHONPATH=src python3 -m pytest -q
+PYTHONPATH=src python3 -m model_cards schema > build/model-card.schema.json
+PYTHONPATH=src python3 -m model_cards validate cards/olmo-2-1124-7b.json
 ```
 
-The synthetic fixture exercises exact-target scope, withheld evidence, projection,
-inspection, and review without using research sources.
-
-```sh
-python3 -m model_cards build tests/fixtures/synthetic-input.json \
-  --json build/synthetic-artifact.json \
-  --html build/synthetic-artifact.html
-
-python3 -m model_cards inspect build/synthetic-artifact.json
-python3 -m model_cards inspect build/synthetic-artifact.json \
-  --field training_context.training_data_size
-```
-
-Review creates a new artifact and leaves the input untouched.
-
-```sh
-python3 -m model_cards review INPUT.json BINDING_ID \
-  --action withhold \
-  --reason needs_check \
-  --output REVIEWED.json
-```
-
-Public export accepts a retained full artifact and writes one source-clean card.
-
-```sh
-python3 -m model_cards.public_export LOCAL_ARTIFACT.json cards/model-name.json
-```
-
-Run directly from the source tree when an editable install is not available.
-
-```sh
-PYTHONPATH=src python3 -m unittest discover -s tests -v
-PYTHONPATH=src python3 -m model_cards --help
-```
+The default suite uses fixtures and injected transports. It does not issue paid
+provider calls. The repository's example publishing path is described in
+[README.md](README.md) and implemented by `scripts/publish_examples.py`.

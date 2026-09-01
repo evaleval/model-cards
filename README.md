@@ -1,246 +1,235 @@
 # Model Cards
 
-Model Cards turns primary documentation about an AI model into a structured JSON
-record. Its sources can include official model pages, technical reports, configuration
-files, evaluation results, and safety documentation. Each populated field points to
-evidence about the model it describes. Unsupported fields remain `Not specified`.
+`modelcards` generates one evidence-bound JSON Model Card for one exact Hugging
+Face model revision. It freezes bounded source inputs, extracts only replayable
+claims, composes from claims that pass field-scoped gates, runs post-composition
+checks, and writes a source-clean public card plus an auditable run record.
 
-Each card describes a specific model release. Information about a base model, related
-checkpoint, model family, or comparison system is kept separate unless a source
-explicitly connects it to the documented model.
+The package is deliberately conservative. Unsupported fields remain
+`Not specified`; evidence about a base model, sibling checkpoint, family, or
+comparison model cannot silently populate an exact-target field. Automated output
+uses only `generated_unreviewed` or `generated_validated`. Neither status means that
+a person reviewed, approved, or released the card.
 
 ![Model Card generation pipeline](assets/model-card-pipeline.png)
 
-*The pipeline selects a model release, collects its sources, links proposed values to
-supporting evidence, and composes the card from verified claims. The vector
-[PDF](assets/model-card-pipeline.pdf) and
-[LaTeX source](assets/model-card-pipeline.tex) are included.*
+The vector [PDF](assets/model-card-pipeline.pdf) and
+[LaTeX source](assets/model-card-pipeline.tex) for the figure are included.
 
-## What the pipeline produces
+## Install
 
-The resulting JSON Model Card is organized into the following sections.
-
-| Section | Contents |
-| --- | --- |
-| Identity | Model ID, developer, model type, release, license, and summary |
-| Lineage | Base models, family membership, and derivatives, with explicit relations |
-| Specifications | Architecture, parameter count, context length, precision, modalities, and model stage |
-| Training context | Training data, scale, cutoff, and adaptations |
-| Access and adoption | Access conditions and available adoption indicators |
-| Evaluation | Results for the documented model, related-model results, human and safety evaluations, and evaluation sources |
-| Links | Model card, system card, technical report, and code repository |
-| Uses and risks | Intended and out-of-scope uses, limitations, known biases, candidate risks, and mitigations |
-| Provenance and quality | Source references, flagged and missing fields, coverage, and generation details |
-
-Field-to-source references connect each documented claim to a stable public source.
-The local research record keeps the supporting evidence, conflicts, excluded
-candidates, and review history needed to reproduce decisions. Source copies, prompts,
-provider traces, audit material, and local execution records remain private.
-
-## Pipeline
-
-### 1. Select the model release
-
-Generation begins by selecting the model release or checkpoint to document. The
-workflow records its canonical identifier and verifies throughout the pipeline that
-sources, evaluation results, and review decisions refer to that model.
-
-### 2. Collect and preserve the sources
-
-The collector retrieves the available primary sources and saves a fixed local copy of
-each source with version and retrieval information. A typical source set contains the
-Hugging Face model page, README, configuration and weight metadata, a relevant
-technical report, developer documentation, and the matching EvalEval record. EvalEval
-contributes identifiers and discovery links. It cannot establish model scores without
-evidence for the documented release. Collection failures and unavailable source types
-remain visible during validation and review.
-
-### 3. Map model lineage and evaluations
-
-Before extracting values, the workflow identifies the documented model, base models,
-family, sibling variants, comparison systems, benchmarks, metrics, datasets, and named
-evaluation settings. Relations enter the map only when supported by source evidence
-or explicit metadata. Similar names alone do not establish a model relation. This map
-prevents a score for an instruction-tuned variant or a training quantity for a model
-family from being assigned to the documented checkpoint without explicit support.
-
-### 4. Extract evidence through two channels
-
-Structured extraction reads fields from version-specific metadata, configuration
-files, weight metadata, model-index records, and matching evaluation records.
-Model-assisted extraction proposes verbatim passages from prose sources such as model
-READMEs, reports, and developer documentation. Missing core fields can trigger further
-retrieval from approved source types.
-
-Each quotation must occur exactly in the saved source. Each structured claim must
-resolve to a recorded pointer and value. Extraction proposes evidence. It does not
-decide that the evidence belongs in the card.
-
-### 5. Verify evidence and assign fields
-
-Every candidate records its destination field, the model or entity it describes, its
-relation to the documented model, its source location, and the relevant section or
-table. Evaluation candidates also record the benchmark, subset, split, metric,
-protocol, and table row when the source provides them.
-
-Entity-Attribution Verification checks whether a passage is actually about the
-named model and whether it supports the proposed field. Deterministic checks then
-verify the model relation, source suitability, table context, and evaluation setting.
-Valid corrections are recorded. Wrong, ambiguous, or unsupported assignments remain
-in the ledger but do not enter the card.
-
-### 6. Compose the JSON card
-
-The composer receives only evidence that passed the previous checks. It does not
-receive the unfiltered source set. It fills the JSON fields, preserves `Not specified`
-for unsupported information, and uses `Not applicable` only when a field genuinely
-does not apply. A controlled repair loop checks parsing, field types, allowed values,
-list structure, citations, and absence markers.
-
-Benchmark rows are extracted and reconciled against their table and evaluation
-setting. Free-form model output does not create or alter scores.
-
-### 7. Identify use-context risks
-
-Source-reported intended uses, limitations, biases, risks, and mitigations enter the
-same evidence-binding process as other card facts. A separate model-assisted
-[AI Atlas Nexus](https://github.com/IBM/ai-atlas-nexus) stage maps the documented model
-and intended deployment context to candidate risks from the
-[IBM AI Risk Atlas](https://www.ibm.com/docs/en/watsonx/saas?topic=ai-risk-atlas),
-whose taxonomy and tooling are described in the
-[AI Risk Atlas paper](https://arxiv.org/abs/2503.05780).
-
-Taxonomy-identified risks remain distinct from publisher statements. Each mapping
-records the risk identifier, taxonomy release, use context, rationale, supporting
-evidence, review status, and relevant mitigations. The mapping explains why a risk may
-apply. It does not present the risk as a publisher statement or confirmed harm.
-
-The [JSON schema](schema/model-card.schema.json) defines this section alongside the
-rest of the card. An empty risk, limitation, or bias list means that no supported entry
-was recorded. It does not establish that none exists.
-
-### 8. Run layered validation
-
-Validation checks source presence, assignment, wording, completeness, and risk
-applicability separately. Claim failures create field-level findings. Model identity,
-schema, privacy, and publication-control failures block the card.
-
-### 9. Repair and re-audit
-
-Findings enter a targeted repair queue. A repair can add missing evidence, assign a
-candidate to the correct model or field, or exclude it. Existing supported fields are
-preserved. Each change is recorded in the repair history. The affected claims are
-checked against the same sources before the full audit runs again.
-
-### 10. Review and release
-
-A named reviewer inspects included values, withheld evidence, conflicts, and relevant
-source facts missing from the card. High-impact identity, lineage, licensing, training,
-evaluation, access, and risk decisions can require a second sign-off. Release occurs
-only after the schema, source, review, privacy, licensing, and quotation gates pass.
-The release output is JSON. Internal source sets and evidence ledgers stay local.
-
-## Validation
-
-No single score establishes that a card follows its sources. The validation phase
-combines replayable checks with separate model-based assessments.
-
-| Gate | Question answered |
-| --- | --- |
-| Model and source replay | Do source references, quoted passages, structured values, and derived fields still match the collected sources? |
-| Schema and absence checks | Does the card satisfy the required fields, types, allowed values, and absence rules? |
-| Assignment policy | Is the evidence about the correct model or checkpoint, and may that source-relation pair populate this field? |
-| Evaluation scope | Does each result retain the correct benchmark, row, metric, split, protocol, and comparison scope? |
-| Entity-Attribution Verification | Does the evidence support this field for the entity named by the binding? |
-| Claim support | Does the card's final wording follow from that claim's own citations? |
-| FactReasoner | When narrative claims are split into atomic claims, what support, contradiction, or neutral evidence is found in the saved sources? Low-support claims return to repair or review. |
-| Conflict and numeric checks | Do accepted values disagree, and do scores and derived quantities reconcile without last-write-wins behavior? |
-| Omission audit | Which relevant facts are present in the sources but absent from the card? |
-| Risk-mapping gate | Does the risk exist in the selected taxonomy release, and is its rationale grounded in the stated use context and card fields? |
-| Release and privacy checks | Does the JSON contain only approved public fields and no source text, credentials, local paths, prompts, or provider traces? |
-| Review, licensing, and quotation checks | Are required decisions signed off, and may the selected source references and short quotations be released? |
-
-The [FactReasoner paper](https://aclanthology.org/2025.findings-emnlp.785/) and
-[reference implementation](https://github.com/IBM/FactReasoner) describe the
-post-composition claim-support method. It decomposes text into atomic claims,
-retrieves relevant context, and estimates support against that context. This
-complements exact span checks and Entity-Attribution Verification. Risk mappings use
-a separate gate because a taxonomy-derived risk is an inference over model and use
-context, not a publisher quotation.
-
-## Sources
-
-The workflow admits sources according to what they can establish for the documented
-model release.
-
-| Source | Role | Constraint |
-| --- | --- | --- |
-| Hugging Face metadata, model README, config, and weight metadata | Identity, architecture, parameters, precision, links, and publisher documentation | Saved from the documented model release |
-| Developer paper or technical report | Training, methods, limitations, and evaluation details | Verified as relevant to the documented model or linked through an explicit model relation |
-| Developer GitHub documentation | Code, release, and supplementary model documentation | Taken from a fixed version of a developer-owned repository |
-| Official model, system, and safety cards | Intended use, limitations, safety evaluations, and mitigations | Tied to the documented model or an explicit model relation |
-| Official provider documentation and changelogs | Capabilities, access, versions, and API behavior | Version and product scope must be recoverable |
-| Original independent evaluation reports | External evaluation claims | Exact model version and protocol must be identified |
-| Evaluation configurations and result artifacts | Benchmark scores and settings | Documented model, benchmark version, metric, split, and protocol must be recoverable |
-| Official dataset cards | Dataset identity, version, composition, and restrictions | Must describe the dataset version actually used |
-| EvalEval evaluation record | Matching model links and source discovery | Not authority for model scores by itself |
-
-Third-party summaries, mirrors, and leaderboards may support discovery, but they are
-not treated as primary evidence for the documented model. Evidence from a base model
-or family keeps that relation unless the source explicitly states that it also applies
-to the documented model.
-
-## Example cards
-
-These JSON cards are examples produced by the workflow. Their private source bundles
-and evidence ledgers remain local.
-
-| Card | What it illustrates | Field coverage |
-| --- | --- | ---: |
-| [OLMo-2-1124-7B](cards/olmo-2-1124-7b.json) | Model identity, training context, and nine publisher-reported benchmark rows | 66.7% |
-| [OLMo-2-1124-7B-Instruct](cards/olmo-2-1124-7b-instruct.json) | A derivative checkpoint with explicit base-model relations and eight benchmark rows | 63.6% |
-
-Coverage reports how many documentation fields are populated from the available
-evidence. It is not a correctness score. The examples illustrate the JSON format and
-the treatment of model identity, lineage, training information, and evaluation
-results. They have not completed human release review.
-
-## Repository and code
-
-The repository contains the public schema, generated JSON examples, pipeline figure,
-Python package, tests, and architecture documentation. The code covers evidence and
-assignment records, source verification, relation and evaluation-scope policy,
-conflict handling, review events, rendering, and sanitized JSON export.
-
-```text
-assets/             LaTeX pipeline figure and rendered PDF/PNG
-cards/              Generated public JSON cards
-schema/             JSON Schema
-src/model_cards/    Python package
-tests/              Offline deterministic tests and synthetic fixtures
-ARCHITECTURE.md      Developer architecture and privacy boundary
-```
-
-Private source bundles, research notes, prompts, local paths, provider traces, and
-audit work products are excluded from this repository.
-
-## Install and inspect
-
-Python 3.9 or newer is sufficient for the public package.
+The core package supports Python 3.9 or newer.
 
 ```sh
 python3 -m pip install -e .
-python3 -m unittest discover -s tests -v
-
-python3 -m model_cards build tests/fixtures/synthetic-input.json \
-  --json build/synthetic-card.json \
-  --html build/synthetic-card.html
-python3 -m model_cards inspect build/synthetic-card.json
+modelcards --help
 ```
 
-The fixture is synthetic and tests evidence assignment and withholding behavior. See
-[ARCHITECTURE.md](ARCHITECTURE.md) for the data model, validation boundaries, and
-developer commands.
+The optional AI Atlas Nexus integration is pinned to `ai-atlas-nexus==1.2.4`.
+It requires Python 3.11 or newer and the `risk` extra:
+
+```sh
+python3 -m pip install -e '.[risk]'
+```
+
+Without that exact dependency, the taxonomy stage reports itself as unavailable;
+the core package does not substitute another taxonomy release.
+
+## Generate one card
+
+Pass a Hugging Face model ID, optionally followed by a branch, tag, ref, or exact
+commit. Collection resolves it once to a 40-character commit and binds all later
+artifacts to that exact target.
+
+```sh
+modelcards generate MODEL[@REVISION] --output RUN_DIR
+```
+
+The normal networked command performs two bounded collection steps:
+
+1. It freezes selected Hugging Face metadata and files for the resolved revision.
+2. It discovers links declared in that frozen material and attempts bounded HTTPS
+   collection from the allowlisted publication, code, and declared publisher hosts.
+
+Official-source discovery is declaration-driven. It is not a general web or
+scholarly search. Unsafe URLs, redirects, media types, ownership mismatches, size
+limits, and unavailable responses are recorded rather than treated as evidence.
+
+Generation without `--provider` does not make paid calls. If the FactReasoner
+checker required for the composed claims is unavailable, that gate is recorded as
+`unavailable` and the card remains `generated_unreviewed`; deterministic checks do
+not promote it past that missing gate.
+
+### Exact offline replay
+
+A verified frozen Hugging Face bundle can be replayed without network access. Add
+its ancestry-bound official bundle to replay the combined source state; omit it for
+an explicitly Hugging-Face-only replay.
+
+```sh
+modelcards generate MODEL@EXACT_COMMIT \
+  --offline-bundle HF_BUNDLE \
+  --offline-official-bundle OFFICIAL_BUNDLE \
+  --output REPLAY_RUN
+```
+
+The command rejects target, revision, bundle, source-state, and resume drift. A run
+directory admitted in provider-free or provider-assisted mode cannot be resumed in
+the other mode.
+
+### Explicit provider-assisted mode
+
+Provider-assisted extraction and semantic checking are opt-in:
+
+```sh
+OPENROUTER_API_KEY=... modelcards generate MODEL[@REVISION] \
+  --provider Baidu \
+  --output RUN_DIR
+```
+
+This mode uses OpenRouter with exactly
+`deepseek/deepseek-v4-flash-0731` and the explicitly requested `Baidu` route. The
+runtime has a global run cap of 300 paid calls and USD 25, permits at most two
+retries after an explicit HTTP 429 or 5xx response, and stops on an uncertain send
+instead of risking a duplicate. It has no automatic provider or model fallback.
+The API key, prompts, source text, and raw responses are not written to public
+cards or audit summaries.
+
+A missing key, invalid route, exhausted retry budget, spend cap, uncertain send,
+or stale resume fails closed. Provider mode is not exposed by `modelcards batch`;
+run provider-assisted targets individually so one run owns one global ledger.
+
+## Run artifacts
+
+Each successful run contains a content-addressed, replayable chain. The principal
+files are:
+
+| File | Purpose |
+| --- | --- |
+| `source-bundle/manifest.json` | Exact-revision Hugging Face source inventory |
+| `official-discovery.json` | Declared official-source candidates from a networked run |
+| `official-source-bundle/manifest.json` | Ancestry-bound official collection inventory, when used |
+| `source-state.json`, `source-catalog.json` | Immutable combined source identity and extractable document catalog |
+| `extraction.json`, `claim-gates.json` | Candidate claims and the four-part support gate |
+| `composition-original.json`, `factreasoner-original.json`, `omissions-original.json` | Pre-repair projection and audits |
+| `repairs.json`, `composition.json` | Field-targeted repair/withholding record and post-repair projection |
+| `risk-mapping.json`, `factreasoner.json`, `omissions.json`, `privacy.json` | Final risk, factuality, omission, and privacy checks |
+| `card-artifact.json`, `public-card.json` | Full typed artifact and source-clean public projection |
+| `pipeline-result.json`, `run-manifest.json`, `journal.jsonl` | Run identity, artifact hashes, and append-only stage history |
+| `audit-view.json`, `usage-summary.json` | Body-free audit and cost/latency summaries |
+
+Provider-assisted runs additionally retain `provider-orchestration.json`, a single
+`usage.jsonl` accounting ledger, normalized decision sidecars, and
+`provider-result.json` in the run directory. These are run records, not public-card
+content.
+
+## Inspect, validate, review, and repair records
+
+```sh
+modelcards validate RUN_DIR/public-card.json
+modelcards inspect RUN_DIR/card-artifact.json
+modelcards inspect RUN_DIR/card-artifact.json --field training.training_data
+```
+
+Generation performs targeted repair and withholding before export and records the
+result in `repairs.json`. The `repair` command validates and summarizes one extracted
+machine `FieldRepairRecord`; it does not turn that record into human review:
+
+```sh
+modelcards repair FIELD_REPAIR_RECORD.json
+```
+
+The `review` command appends one explicit decision to a new artifact and leaves its
+input untouched:
+
+```sh
+modelcards review INPUT_ARTIFACT.json BINDING_ID \
+  --action withhold \
+  --reason needs_check \
+  --output REVIEWED_ARTIFACT.json
+```
+
+`accept`, `withhold`, and evidence-preserving `reassign` actions are supported.
+Appending a decision does not by itself claim that an entire card was human-reviewed
+or released.
+
+## Batch generation and aggregate reports
+
+`targets.json` is a non-empty JSON array of unique `MODEL[@REVISION]` strings.
+
+```sh
+modelcards batch targets.json --output BATCH_A
+modelcards batch targets.json --output BATCH_B
+modelcards report BATCH_A \
+  --replay-batch BATCH_B \
+  --output quality-report.json
+```
+
+Offline batch replay accepts repeatable target-specific mappings:
+
+```sh
+modelcards batch targets.json --output BATCH_A \
+  --offline-bundle 'MODEL@COMMIT=HF_BUNDLE' \
+  --offline-official-bundle 'MODEL@COMMIT=OFFICIAL_BUNDLE'
+```
+
+The quality report verifies each typed artifact before aggregating claim outcomes,
+withholding, omissions, risk-stage status, usage, cost/latency, and paired replay
+stability. It contains hashes and closed counters, not source bodies or provider
+payloads. These are engineering validation measures, not human quality judgments or
+evidence that this generator is better than another system.
+
+## Example cards
+
+The repository contains three real public projections produced by the current
+pipeline from exact-revision canary bundles. All three passed schema, claim-support,
+conflict, omission, risk-stage, and privacy checks. Their FactReasoner gates were
+unavailable, so they correctly remain `generated_unreviewed` and intentionally sparse.
+
+| Card | Exact revision | Lifecycle |
+| --- | --- | --- |
+| [OLMo-2-1124-7B](cards/olmo-2-1124-7b.json) | `7df9a82518afdecae4e8c026b27adccc8c1f0032` | `generated_unreviewed` |
+| [OLMo-2-1124-7B-Instruct](cards/olmo-2-1124-7b-instruct.json) | `470b1fba1ae01581f270116362ee4aa1b97f4c84` | `generated_unreviewed` |
+| [Mistral-7B-v0.3](cards/mistral-7b-v0.3.json) | `caa1feb0e54d415e2df31207e5f4e273e33509b1` | `generated_unreviewed` |
+
+The examples are published mechanically, without factual hand edits. The publishing
+script validates the packaged schema and privacy boundary, then copies each generated
+card byte-for-byte:
+
+```sh
+PYTHONPATH=src python3 scripts/publish_examples.py --force \
+  GENERATED_A/public-card.json=cards/example-a.json \
+  GENERATED_B/public-card.json=cards/example-b.json
+```
+
+## Scope and current limitations
+
+- Official discovery follows declarations in the frozen Hugging Face material; it
+  does not independently search the literature.
+- Bounded official collection can freeze supported HTTPS responses, but the current
+  official-document bridge does not extract text from PDFs.
+- Provider-assisted batch execution is intentionally unavailable.
+- Missing provider credentials or an unavailable FactReasoner backend are reported;
+  they are not replaced with invented validation results.
+- The example cards are automated candidates. This repository reports no human study,
+  human annotation result, released card, independent-model comparison result, or
+  demonstrated quality improvement over another generator.
+- Empty or `Not specified` risk fields mean that no eligible entry was produced from
+  the retained source state and available checks. They do not establish absence of
+  risk.
+
+The [JSON Schema](schema/model-card.schema.json) is the public contract. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for the typed stages, replay invariants, provider
+boundary, and publication boundary.
+
+## Test
+
+```sh
+PYTHONPATH=src python3 -m pytest -q
+```
+
+The test suite is deterministic and uses fixtures or injected transports; paid
+provider calls are not part of the default tests.
 
 ## License
 
