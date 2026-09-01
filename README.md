@@ -1,142 +1,139 @@
 # EvalEval Model Cards
 
-EvalEval Model Cards is a small offline reference implementation for
-evaluation-focused cards about one exact model revision. It keeps the rendered
-card separate from an immutable field-level evidence ledger, so unsupported or
-wrong-scope candidates remain inspectable without becoming target facts.
+EvalEval Model Cards builds an evaluation-focused card for one exact model
+revision from a prepared source specification. Every proposed field keeps its
+source revision, digest, evidence location, and relation to the target model.
 
-This first baseline provides:
+> **Current status**
+>
+> The offline evidence, policy, review-event, and rendering core works. It
+> produces deterministic JSON and static HTML from prepared JSON inputs.
+> Source collection, candidate extraction, semantic claim-support checks, and
+> a human review protocol are still being built. The examples are fictional
+> demonstrations, not reviewed documentation of real models.
 
-- the complete 38-field Model Card schema v5;
-- exact `model_id` plus resolved 40-character revision identity;
-- typed quoted and structured evidence bindings;
-- explicit exact-target, base-model, derivative-model, family,
-  sibling-checkpoint, comparison-model, and unresolved relations;
-- fail-closed acceptance, withholding, and rejection;
-- deterministic projection and stable binding identifiers;
-- append-only review events with no invented reviewer identity;
-- JSON and self-contained static HTML output; and
-- a dependency-free offline command-line interface.
+![Model Card pipeline](docs/figures/model-card-pipeline.svg)
 
-It intentionally does not collect sources, search the web, call a model
-provider, or run evaluations. The included example is entirely synthetic.
+*Only policy-accepted bindings fill the card. Every constructed binding remains
+in the evidence ledger, including wrong-scope, conflicting, and unverifiable
+claims.*
 
-## Install and test
+## See the workflow
+
+The public core makes four decisions visible.
+
+1. **Fix the target.** A card belongs to one `namespace/model` at one resolved
+   40-character revision.
+2. **Bind evidence.** A candidate links a proposed value and schema field to an
+   exact quote or JSON Pointer. The binding also retains the source role,
+   revision, digest, and relation to the target.
+3. **Apply policy.** Field, source role, relation, and target scope determine
+   whether the binding is accepted, withheld, or rejected. Conflicting
+   accepted values leave the field unfilled.
+4. **Inspect the artifact.** The output contains the 38-field schema v5 card,
+   its evidence ledger, and append-only review events.
+
+The [pipeline note](docs/PIPELINE.md) gives the input contract, source roles,
+decision rules, quality boundary, and next build phase.
+
+## Look at the examples
+
+All three examples are fictional and run offline.
+
+| Example | Decision under test | Files |
+| --- | --- | --- |
+| Mixed evidence | Exact-target fields enter the card. A family quantity is withheld. A score-free comparison link is retained. | [input](examples/synthetic-input.json) · [JSON](examples/cards/mixed-evidence/card.json) · [HTML](examples/cards/mixed-evidence/card.html) |
+| Family scope | An explicit base model is accepted. A family-wide training quantity does not transfer to the checkpoint. | [input](examples/cards/family-scope/input.json) · [JSON](examples/cards/family-scope/card.json) · [HTML](examples/cards/family-scope/card.html) |
+| Conflicting sources | Two exact-revision sources disagree. The disputed field stays `Not specified` and both bindings remain visible. | [input](examples/cards/conflicting-sources/input.json) · [JSON](examples/cards/conflicting-sources/card.json) · [HTML](examples/cards/conflicting-sources/card.html) |
+
+The [example guide](examples/cards/README.md) records the expected result for
+each case. These cards test mechanism and policy. They are not evidence of
+real-world card quality.
+
+## Run it
 
 Python 3.9 or newer is sufficient. The package has no runtime dependencies.
 
 ```sh
 python3 -m pip install -e .
-```
-
-The single project test command is:
-
-```sh
 python3 -m unittest discover -s tests -v
 ```
 
-All tests and examples run offline.
-
-## Synthetic end-to-end example
-
-Build a JSON artifact and static inspection page:
+Build a fresh copy of the mixed-evidence example.
 
 ```sh
 python3 -m model_cards build examples/synthetic-input.json \
-  --json build/synthetic-card.json \
-  --html build/synthetic-card.html
+  --json build/mixed-evidence.json \
+  --html build/mixed-evidence.html
 ```
 
-Inspect the result or focus on one field:
+Inspect the artifact or one field.
 
 ```sh
-python3 -m model_cards inspect build/synthetic-card.json
-python3 -m model_cards inspect build/synthetic-card.json \
+python3 -m model_cards inspect build/mixed-evidence.json
+python3 -m model_cards inspect build/mixed-evidence.json \
   --field training_context.training_data_size
 ```
 
-The synthetic family-wide training quantity is deliberately retained as a
-withheld binding. It remains visible in both outputs while the exact-target
-field stays `Not specified`.
+The CLI refuses to overwrite an existing output.
 
-## Scientific contract
+## What is reliable today
 
-The card is a projection, not the primary evidence record. A candidate becomes
-an accepted target fact only when its source scope, relation, field policy, and
-evidence verification agree. Verified but non-target evidence is withheld;
-malformed or non-verbatim evidence is rejected. Neither state is silently
-dropped.
+- Exact target identity, revision-format checks, and declared-revision equality
+- Typed quoted and structured evidence coordinates
+- Source revision and SHA-256 retention
+- Narrow relation and source-role policy
+- Deterministic projection and stable binding identifiers
+- Conflict handling without last-write-wins
+- Append-only review events
+- JSON and self-contained static HTML output
+- Offline tests and examples
 
-Artifacts retain source revisions, SHA-256 digests, exact coordinates, and
-structured pointers without embedding full source documents. Call
-`verify_artifact_sources` with separately held sources to replay every quote
-and structured fragment before export.
+The source documents themselves are not embedded in an artifact. They can be
+held separately and replayed with `verify_artifact_sources` before export.
 
-The relation rules are intentionally narrow:
+## Current boundary
 
-- Target-owned identity, specification, training, access, evaluation, and link
-  fields require `exact_target` evidence from a source explicitly scoped to the
-  same model revision. Hugging Face metadata and snapshot sources must also use
-  that exact revision; developer-code sources must use a resolved commit.
-- `lineage.base_models` accepts an explicit structured `base_model` relation.
-- The v5 `lineage.derivatives` field is an exact-target aggregate; individual
-  derivative rows are not projected by this schema.
-- Family facts never transfer to a checkpoint. A target's declared membership
-  in a family is instead an exact-target claim about that target.
-- Comparison and sibling relations may populate only score-free external links
-  in `evaluation.related_model_scores`.
-- EEE is link and index evidence, not authority for checkpoint-specific scores.
+An exact quote match or resolved JSON Pointer proves where a fragment came
+from. It does not prove that the fragment supports the proposed value or that
+the value belongs in the chosen field. That semantic check is the main missing
+publication gate.
 
-Conflicting accepted values do not use last-write-wins. The field remains
-unfilled and the conflict appears in `provenance_and_quality.flagged_fields`.
-The five quality fields are computed directly from the substantive ledger and
-do not receive recursive evidence bindings.
+The current implementation also starts from prepared sources and candidates.
+It does not search, download model files, call a model provider, or run an
+evaluation. Schema v5 is fixed in code with 33 substantive fields and five
+computed quality fields. Review events exist, while reviewer roles and a human
+review protocol do not.
 
-## Source roles
+## Uses
 
-The baseline models these source roles without distributing collected source
-content:
+- Audit one prepared card for one model revision. Trace any projected value to
+  its source fragment, relation decision, and conflict state.
+- Study documentation gaps across a reviewed card collection. Compare which
+  fields are missing or disputed without discarding field-level provenance.
 
-| Role | Intended use |
-| --- | --- |
-| Exact Hugging Face metadata | Model identity and explicit structured facts at a resolved revision |
-| Selected Hugging Face snapshot file | Exact-revision developer text |
-| Developer report | A report explicitly associated with the target |
-| Pinned developer code | Developer-owned documentation with explicit target scope |
-| EEE index | Links and external-record discovery only |
-| Synthetic input | Redistributable tests and examples |
+The first use works with the current core. The second requires the real-model
+pilot, semantic support gate, and review protocol described below.
 
-Broad discovery, third-party commentary, mirrors, generic leaderboards, and
-API-only ingestion are outside this baseline.
+## Next build phase
 
-## Composer dependency decision
+1. Add a semantic claim-support gate with adversarial tests.
+2. Add a pinned Hugging Face adapter for exact-revision metadata and selected
+   snapshot files.
+3. Run a local three-model pilot, fix the failure classes, then expand to a
+   twelve-model evaluation set.
+4. Define the human review protocol and report field-level precision, scope
+   errors, abstentions, coverage, and review time.
+5. Separate schema profiles from the core so that new fields can be proposed
+   without weakening the provenance contract.
 
-The lean core needs exactly two Composer primitives:
+Useful contributions include source adapters, deterministic pointer-to-field
+mappings, adversarial scope fixtures, semantic support checks, schema-profile
+proposals, evaluation protocols, and research uses for a future card
+collection.
 
-- whitespace and typographic-punctuation normalization; and
-- case-sensitive exact substring verification.
+## License and provenance
 
-The public Auto-BenchmarkCards package does not expose the generic schema
-runtime used by the earlier prototype. Importing that larger runtime would also
-make this offline package unnecessarily heavy. The two required public
-MIT-licensed functions are therefore included as the small local kernel in
-`model_cards/quote.py`; see [NOTICE.md](NOTICE.md). There is no runtime Git or
-adjacent-repository dependency.
-
-## Review semantics
-
-A review command always writes a new artifact. It appends `accept`, `withhold`,
-or `reassign` and leaves the generated bindings and prior events unchanged:
-
-```sh
-python3 -m model_cards review INPUT.json BINDING_ID \
-  --action withhold --reason needs_check --output REVIEWED.json
-```
-
-This baseline records no person, team, or role on an event. A future review
-protocol can define those semantics separately without changing the scientific
-binding core.
-
-## License
-
-MIT. See [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md).
+The project is MIT licensed. See [LICENSE](LICENSE). Two small quote-matching
+primitives adapted from Auto-BenchmarkCards are documented in
+[NOTICE.md](NOTICE.md). The package has no runtime dependency on that project.

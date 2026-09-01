@@ -1,0 +1,146 @@
+{
+  "target": {
+    "model_id": "example-lab/synthetic-instruct-2b",
+    "revision": "4444444444444444444444444444444444444444"
+  },
+  "sources": [
+    {
+      "source_id": "family-scope-hf-metadata",
+      "role": "hugging_face_metadata",
+      "source_revision": "4444444444444444444444444444444444444444",
+      "target": {
+        "model_id": "example-lab/synthetic-instruct-2b",
+        "revision": "4444444444444444444444444444444444444444"
+      },
+      "synthetic": true,
+      "data": {
+        "model_id": "example-lab/synthetic-instruct-2b",
+        "revision": "4444444444444444444444444444444444444444",
+        "display_name": "Synthetic Instruct 2B",
+        "license": "Apache-2.0",
+        "model_family": "Synthetic 2B family",
+        "base_model": {
+          "model_id": "example-lab/synthetic-base-2b",
+          "relation": "base"
+        },
+        "config": {
+          "architecture_type": "dense decoder-only transformer",
+          "advertised_context_length": "8192 tokens",
+          "precision": "bfloat16",
+          "model_stage": "instruction tuned"
+        },
+        "model_card": "https://example.invalid/models/synthetic-instruct-2b"
+      }
+    },
+    {
+      "source_id": "family-scope-developer-report",
+      "role": "developer_report",
+      "source_revision": "synthetic-family-report-v2",
+      "target": {
+        "model_id": "example-lab/synthetic-2b-family",
+        "revision": "5555555555555555555555555555555555555555"
+      },
+      "synthetic": true,
+      "text": "The Synthetic 2B family was trained on 10 trillion invented tokens. This quantity is stated for the family, not for an individual checkpoint."
+    }
+  ],
+  "candidates": [
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "identity.model_id",
+      "pointer": "/model_id",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "identity.version",
+      "pointer": "/revision",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "identity.name",
+      "pointer": "/display_name",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "identity.license",
+      "pointer": "/license",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "lineage.model_family",
+      "pointer": "/model_family",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "lineage.base_models[0]",
+      "pointer": "/base_model",
+      "claim_entity": "example-lab/synthetic-base-2b",
+      "relation": "base_model"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "specifications.architecture_type",
+      "pointer": "/config/architecture_type",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "specifications.context_length",
+      "pointer": "/config/advertised_context_length",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "specifications.precision",
+      "pointer": "/config/precision",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "specifications.model_stage",
+      "pointer": "/config/model_stage",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "quote",
+      "source_id": "family-scope-developer-report",
+      "field_path": "training_context.training_data_size",
+      "value": "10 trillion invented tokens",
+      "quote": "The Synthetic 2B family was trained on 10 trillion invented tokens.",
+      "claim_entity": "Synthetic 2B family",
+      "relation": "model_family"
+    },
+    {
+      "kind": "structured",
+      "source_id": "family-scope-hf-metadata",
+      "field_path": "links.model_card",
+      "pointer": "/model_card",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "relation": "exact_target"
+    }
+  ]
+}

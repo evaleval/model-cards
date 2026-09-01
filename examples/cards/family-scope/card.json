@@ -1,0 +1,543 @@
+{
+  "bindings": [
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-58b46b905acde3c57d6ed7eb",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "example-lab/synthetic-instruct-2b",
+          "kind": "structured",
+          "pointer": "/model_id",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.model_id",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "example-lab/synthetic-instruct-2b"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-0088913413df3e129216d23a",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "4444444444444444444444444444444444444444",
+          "kind": "structured",
+          "pointer": "/revision",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.version",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "4444444444444444444444444444444444444444"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-a5c439897c80266fb54ce47a",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "Synthetic Instruct 2B",
+          "kind": "structured",
+          "pointer": "/display_name",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.name",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "Synthetic Instruct 2B"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-166d5160f5c0142fff0df5d7",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "Apache-2.0",
+          "kind": "structured",
+          "pointer": "/license",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.license",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "Apache-2.0"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-53847592f46bdd04de788305",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "Synthetic 2B family",
+          "kind": "structured",
+          "pointer": "/model_family",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "lineage.model_family",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "Synthetic 2B family"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-c31281d1127ecd0882091517",
+      "claim_entity": "example-lab/synthetic-base-2b",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": {
+            "model_id": "example-lab/synthetic-base-2b",
+            "relation": "base"
+          },
+          "kind": "structured",
+          "pointer": "/base_model",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "lineage.base_models[0]",
+      "origin": "structured",
+      "reason": "explicit_base_relation",
+      "relation": "base_model",
+      "value": {
+        "model_id": "example-lab/synthetic-base-2b",
+        "relation": "base"
+      }
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-3409015f3cfd45c03f1e4f77",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "dense decoder-only transformer",
+          "kind": "structured",
+          "pointer": "/config/architecture_type",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "specifications.architecture_type",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "dense decoder-only transformer"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-a4a375c20f9f1b2389fabd3b",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "8192 tokens",
+          "kind": "structured",
+          "pointer": "/config/advertised_context_length",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "specifications.context_length",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "8192 tokens"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-d4b5d7f6e771d664e44192cc",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "bfloat16",
+          "kind": "structured",
+          "pointer": "/config/precision",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "specifications.precision",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "bfloat16"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-2b8d06b417dce2b23a36054b",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "instruction tuned",
+          "kind": "structured",
+          "pointer": "/config/model_stage",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "specifications.model_stage",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "instruction tuned"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-22d58f33041bd53a20781cb6",
+      "claim_entity": "Synthetic 2B family",
+      "disposition": "withheld",
+      "evidence": [
+        {
+          "char_end": 67,
+          "char_start": 0,
+          "kind": "quote",
+          "quote": "The Synthetic 2B family was trained on 10 trillion invented tokens.",
+          "source_id": "family-scope-developer-report",
+          "source_revision": "synthetic-family-report-v2",
+          "source_role": "developer_report",
+          "source_sha256": "c2311174cb49981bda3c386aa067b2c0f3e6e5eee944f3d35ce3a92673f9cbd8",
+          "source_target": {
+            "model_id": "example-lab/synthetic-2b-family",
+            "revision": "5555555555555555555555555555555555555555"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "training_context.training_data_size",
+      "origin": "quoted",
+      "reason": "family_scope_not_target",
+      "relation": "model_family",
+      "value": "10 trillion invented tokens"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-2847b797f9e1eda055bddc7f",
+      "claim_entity": "example-lab/synthetic-instruct-2b@4444444444444444444444444444444444444444",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "https://example.invalid/models/synthetic-instruct-2b",
+          "kind": "structured",
+          "pointer": "/model_card",
+          "source_id": "family-scope-hf-metadata",
+          "source_revision": "4444444444444444444444444444444444444444",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "dfbfd6c216a79702f291fa3c05368cca768953ad169310ceae82dad0c4d287c5",
+          "source_target": {
+            "model_id": "example-lab/synthetic-instruct-2b",
+            "revision": "4444444444444444444444444444444444444444"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "links.model_card",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "https://example.invalid/models/synthetic-instruct-2b"
+    }
+  ],
+  "card": {
+    "access_and_adoption": {
+      "access_type": "Not specified",
+      "downloads": "Not specified"
+    },
+    "evaluation": {
+      "benchmark_scores": "Not specified",
+      "evaluation_sources": "Not specified",
+      "human_evals": "Not specified",
+      "related_model_scores": "Not specified",
+      "results_summary": "Not specified",
+      "safety_evals": "Not specified"
+    },
+    "identity": {
+      "developed_by": "Not specified",
+      "license": "Apache-2.0",
+      "model_id": "example-lab/synthetic-instruct-2b",
+      "model_type": "Not specified",
+      "name": "Synthetic Instruct 2B",
+      "release_date": "Not specified",
+      "summary": "Not specified",
+      "version": "4444444444444444444444444444444444444444"
+    },
+    "lineage": {
+      "base_models": [
+        {
+          "model_id": "example-lab/synthetic-base-2b",
+          "relation": "base"
+        }
+      ],
+      "derivatives": "Not specified",
+      "model_family": "Synthetic 2B family"
+    },
+    "links": {
+      "code_repository": "Not specified",
+      "model_card": "https://example.invalid/models/synthetic-instruct-2b",
+      "system_card": "Not specified",
+      "tech_report": "Not specified"
+    },
+    "provenance_and_quality": {
+      "card_info": {
+        "binding_count": 12,
+        "review_count": 0,
+        "schema_version": "5",
+        "target": {
+          "model_id": "example-lab/synthetic-instruct-2b",
+          "revision": "4444444444444444444444444444444444444444"
+        }
+      },
+      "coverage_score": 0.3333,
+      "flagged_fields": {
+        "training_context.training_data_size": [
+          {
+            "binding_id": "binding-22d58f33041bd53a20781cb6",
+            "disposition": "withheld",
+            "reason": "family_scope_not_target",
+            "relation": "model_family"
+          }
+        ]
+      },
+      "missing_fields": [
+        "identity.developed_by",
+        "identity.model_type",
+        "identity.release_date",
+        "identity.summary",
+        "lineage.derivatives",
+        "specifications.num_parameters",
+        "specifications.modalities",
+        "training_context.training_data",
+        "training_context.training_data_size",
+        "training_context.data_cutoff",
+        "training_context.adaptations",
+        "access_and_adoption.access_type",
+        "access_and_adoption.downloads",
+        "evaluation.results_summary",
+        "evaluation.benchmark_scores",
+        "evaluation.related_model_scores",
+        "evaluation.human_evals",
+        "evaluation.safety_evals",
+        "evaluation.evaluation_sources",
+        "links.system_card",
+        "links.tech_report",
+        "links.code_repository"
+      ],
+      "provenance": {
+        "identity.license": {
+          "binding_ids": [
+            "binding-166d5160f5c0142fff0df5d7"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "identity.model_id": {
+          "binding_ids": [
+            "binding-58b46b905acde3c57d6ed7eb"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "identity.name": {
+          "binding_ids": [
+            "binding-a5c439897c80266fb54ce47a"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "identity.version": {
+          "binding_ids": [
+            "binding-0088913413df3e129216d23a"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "lineage.base_models[0]": {
+          "binding_ids": [
+            "binding-c31281d1127ecd0882091517"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "lineage.model_family": {
+          "binding_ids": [
+            "binding-53847592f46bdd04de788305"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "links.model_card": {
+          "binding_ids": [
+            "binding-2847b797f9e1eda055bddc7f"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "specifications.architecture_type": {
+          "binding_ids": [
+            "binding-3409015f3cfd45c03f1e4f77"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "specifications.context_length": {
+          "binding_ids": [
+            "binding-a4a375c20f9f1b2389fabd3b"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "specifications.model_stage": {
+          "binding_ids": [
+            "binding-2b8d06b417dce2b23a36054b"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        },
+        "specifications.precision": {
+          "binding_ids": [
+            "binding-d4b5d7f6e771d664e44192cc"
+          ],
+          "source_ids": [
+            "family-scope-hf-metadata"
+          ]
+        }
+      }
+    },
+    "specifications": {
+      "architecture_type": "dense decoder-only transformer",
+      "context_length": "8192 tokens",
+      "modalities": "Not specified",
+      "model_stage": "instruction tuned",
+      "num_parameters": "Not specified",
+      "precision": "bfloat16"
+    },
+    "training_context": {
+      "adaptations": "Not specified",
+      "data_cutoff": "Not specified",
+      "training_data": "Not specified",
+      "training_data_size": "Not specified"
+    }
+  },
+  "reviews": [],
+  "schema_version": "5",
+  "target": {
+    "model_id": "example-lab/synthetic-instruct-2b",
+    "revision": "4444444444444444444444444444444444444444"
+  }
+}

@@ -1,0 +1,645 @@
+{
+  "bindings": [
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-875fbd8efa12b87b5ee246ef",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "example-lab/synthetic-model-1b",
+          "kind": "structured",
+          "pointer": "/model_id",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.model_id",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "example-lab/synthetic-model-1b"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-337bec56c014d0039c5fbf74",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "1111111111111111111111111111111111111111",
+          "kind": "structured",
+          "pointer": "/revision",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.version",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "1111111111111111111111111111111111111111"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-a454d7f1b4e2cc4f09876d5f",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "Synthetic Model 1B",
+          "kind": "structured",
+          "pointer": "/display_name",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.name",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "Synthetic Model 1B"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-2e8b81511bf13e2c2f393213",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "MIT",
+          "kind": "structured",
+          "pointer": "/license",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.license",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "MIT"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-83225aa03f6da17fd36bc22c",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "char_end": 112,
+          "char_start": 21,
+          "kind": "quote",
+          "quote": "Synthetic Model 1B is an instruction-tuned text model built for fictional offline examples.",
+          "source_id": "synthetic-model-page",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_snapshot",
+          "source_sha256": "39f81167675a58b334e72358fcdb2fcec37261b040ff85e6d09e209110c14445",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "identity.summary",
+      "origin": "quoted",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "Synthetic Model 1B is an instruction-tuned text model built for fictional offline examples."
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-ddaa25ac0a1621456e6340ad",
+      "claim_entity": "example-lab/synthetic-base-1b",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": {
+            "model_id": "example-lab/synthetic-base-1b",
+            "relation": "base"
+          },
+          "kind": "structured",
+          "pointer": "/base_model",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "lineage.base_models[0]",
+      "origin": "structured",
+      "reason": "explicit_base_relation",
+      "relation": "base_model",
+      "value": {
+        "model_id": "example-lab/synthetic-base-1b",
+        "relation": "base"
+      }
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-37d84303a03755e42fbcfc0d",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "dense decoder-only",
+          "kind": "structured",
+          "pointer": "/config/architecture_type",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "specifications.architecture_type",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "dense decoder-only"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-c0137d694c68551f6d3fc2ac",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "4096 tokens",
+          "kind": "structured",
+          "pointer": "/config/advertised_context_length",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "specifications.context_length",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "4096 tokens"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-164642c2654d94071b338cb8",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "char_end": 167,
+          "char_start": 113,
+          "kind": "quote",
+          "quote": "The exact checkpoint uses synthetic preference tuning.",
+          "source_id": "synthetic-model-page",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_snapshot",
+          "source_sha256": "39f81167675a58b334e72358fcdb2fcec37261b040ff85e6d09e209110c14445",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "training_context.adaptations",
+      "origin": "quoted",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "Synthetic preference tuning"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-209a0f532ee88691deda6244",
+      "claim_entity": "Synthetic Model family",
+      "disposition": "withheld",
+      "evidence": [
+        {
+          "char_end": 70,
+          "char_start": 0,
+          "kind": "quote",
+          "quote": "The Synthetic Model family was trained on 99 trillion invented tokens.",
+          "source_id": "synthetic-family-report",
+          "source_revision": "synthetic-family-v1",
+          "source_role": "developer_report",
+          "source_sha256": "4ab2191b412e01afdee26e6313a2022450396d5c3a9b83c7e3a12ba8f8f7a938",
+          "source_target": {
+            "model_id": "example-lab/synthetic-family",
+            "revision": "2222222222222222222222222222222222222222"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "training_context.training_data_size",
+      "origin": "quoted",
+      "reason": "family_scope_not_target",
+      "relation": "model_family",
+      "value": "99 trillion invented tokens"
+    },
+    {
+      "benchmark_scope": {
+        "benchmark": "Toy Reasoning",
+        "metric": "accuracy",
+        "setting": "zero-shot"
+      },
+      "binding_id": "binding-585d41247f45b2823b74da67",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "char_end": 81,
+          "char_start": 0,
+          "kind": "quote",
+          "quote": "Synthetic Model 1B reports 73.5 accuracy on Toy Reasoning in a zero-shot setting.",
+          "source_id": "synthetic-report",
+          "source_revision": "synthetic-report-v1",
+          "source_role": "developer_report",
+          "source_sha256": "ff0f8fb770566f852971e09bb4aa0c4e60f5bb82159f3030cbcea71a3616b718",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "evaluation.benchmark_scores[0]",
+      "origin": "quoted",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": {
+        "benchmark": "Toy Reasoning",
+        "metric": "accuracy",
+        "score": 73.5,
+        "setting": "zero-shot"
+      }
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-3378e36d8ac0ed75f81168c7",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "https://example.invalid/evaluations/synthetic-model-1b",
+          "kind": "structured",
+          "pointer": "/record",
+          "source_id": "synthetic-eee-record",
+          "source_revision": "synthetic-index-v1",
+          "source_role": "eee_index",
+          "source_sha256": "92d206da4f804da8c54bbb49d825b904f3d8242ae150988811cf3329ccd2f4e0",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "evaluation.evaluation_sources[0]",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "https://example.invalid/evaluations/synthetic-model-1b"
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-7c36c880d955b8119a3fb01e",
+      "claim_entity": "example-lab/synthetic-comparison-2b@3333333333333333333333333333333333333333",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": {
+            "link": "https://example.invalid/evaluations/synthetic-comparison-2b",
+            "model_id": "example-lab/synthetic-comparison-2b"
+          },
+          "kind": "structured",
+          "pointer": "/record",
+          "source_id": "synthetic-comparison-record",
+          "source_revision": "synthetic-index-v1",
+          "source_role": "eee_index",
+          "source_sha256": "8bdeeeefb214e534a26aaa089317b557d72a1fcba23a953ac8799465e69c0822",
+          "source_target": {
+            "model_id": "example-lab/synthetic-comparison-2b",
+            "revision": "3333333333333333333333333333333333333333"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "evaluation.related_model_scores[0]",
+      "origin": "structured",
+      "reason": "related_model_link",
+      "relation": "comparison_model",
+      "value": {
+        "link": "https://example.invalid/evaluations/synthetic-comparison-2b",
+        "model_id": "example-lab/synthetic-comparison-2b"
+      }
+    },
+    {
+      "benchmark_scope": null,
+      "binding_id": "binding-3eb880d56d443d6507348d9e",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "disposition": "accepted",
+      "evidence": [
+        {
+          "fragment": "https://example.invalid/models/synthetic-model-1b",
+          "kind": "structured",
+          "pointer": "/model_card",
+          "source_id": "synthetic-hf-metadata",
+          "source_revision": "1111111111111111111111111111111111111111",
+          "source_role": "hugging_face_metadata",
+          "source_sha256": "de0bd1fa6ab2ff715196622f84984a329d15db24e0051239fe33f85a4da78873",
+          "source_target": {
+            "model_id": "example-lab/synthetic-model-1b",
+            "revision": "1111111111111111111111111111111111111111"
+          },
+          "synthetic": true,
+          "verified": true
+        }
+      ],
+      "field_path": "links.model_card",
+      "origin": "structured",
+      "reason": "exact_target_supported",
+      "relation": "exact_target",
+      "value": "https://example.invalid/models/synthetic-model-1b"
+    }
+  ],
+  "card": {
+    "access_and_adoption": {
+      "access_type": "Not specified",
+      "downloads": "Not specified"
+    },
+    "evaluation": {
+      "benchmark_scores": [
+        {
+          "benchmark": "Toy Reasoning",
+          "metric": "accuracy",
+          "score": 73.5,
+          "setting": "zero-shot"
+        }
+      ],
+      "evaluation_sources": [
+        "https://example.invalid/evaluations/synthetic-model-1b"
+      ],
+      "human_evals": "Not specified",
+      "related_model_scores": [
+        {
+          "link": "https://example.invalid/evaluations/synthetic-comparison-2b",
+          "model_id": "example-lab/synthetic-comparison-2b"
+        }
+      ],
+      "results_summary": "Not specified",
+      "safety_evals": "Not specified"
+    },
+    "identity": {
+      "developed_by": "Not specified",
+      "license": "MIT",
+      "model_id": "example-lab/synthetic-model-1b",
+      "model_type": "Not specified",
+      "name": "Synthetic Model 1B",
+      "release_date": "Not specified",
+      "summary": "Synthetic Model 1B is an instruction-tuned text model built for fictional offline examples.",
+      "version": "1111111111111111111111111111111111111111"
+    },
+    "lineage": {
+      "base_models": [
+        {
+          "model_id": "example-lab/synthetic-base-1b",
+          "relation": "base"
+        }
+      ],
+      "derivatives": "Not specified",
+      "model_family": "Not specified"
+    },
+    "links": {
+      "code_repository": "Not specified",
+      "model_card": "https://example.invalid/models/synthetic-model-1b",
+      "system_card": "Not specified",
+      "tech_report": "Not specified"
+    },
+    "provenance_and_quality": {
+      "card_info": {
+        "binding_count": 14,
+        "review_count": 0,
+        "schema_version": "5",
+        "target": {
+          "model_id": "example-lab/synthetic-model-1b",
+          "revision": "1111111111111111111111111111111111111111"
+        }
+      },
+      "coverage_score": 0.3939,
+      "flagged_fields": {
+        "training_context.training_data_size": [
+          {
+            "binding_id": "binding-209a0f532ee88691deda6244",
+            "disposition": "withheld",
+            "reason": "family_scope_not_target",
+            "relation": "model_family"
+          }
+        ]
+      },
+      "missing_fields": [
+        "identity.developed_by",
+        "identity.model_type",
+        "identity.release_date",
+        "lineage.model_family",
+        "lineage.derivatives",
+        "specifications.num_parameters",
+        "specifications.precision",
+        "specifications.modalities",
+        "specifications.model_stage",
+        "training_context.training_data",
+        "training_context.training_data_size",
+        "training_context.data_cutoff",
+        "access_and_adoption.access_type",
+        "access_and_adoption.downloads",
+        "evaluation.results_summary",
+        "evaluation.human_evals",
+        "evaluation.safety_evals",
+        "links.system_card",
+        "links.tech_report",
+        "links.code_repository"
+      ],
+      "provenance": {
+        "evaluation.benchmark_scores[0]": {
+          "binding_ids": [
+            "binding-585d41247f45b2823b74da67"
+          ],
+          "source_ids": [
+            "synthetic-report"
+          ]
+        },
+        "evaluation.evaluation_sources[0]": {
+          "binding_ids": [
+            "binding-3378e36d8ac0ed75f81168c7"
+          ],
+          "source_ids": [
+            "synthetic-eee-record"
+          ]
+        },
+        "evaluation.related_model_scores[0]": {
+          "binding_ids": [
+            "binding-7c36c880d955b8119a3fb01e"
+          ],
+          "source_ids": [
+            "synthetic-comparison-record"
+          ]
+        },
+        "identity.license": {
+          "binding_ids": [
+            "binding-2e8b81511bf13e2c2f393213"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "identity.model_id": {
+          "binding_ids": [
+            "binding-875fbd8efa12b87b5ee246ef"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "identity.name": {
+          "binding_ids": [
+            "binding-a454d7f1b4e2cc4f09876d5f"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "identity.summary": {
+          "binding_ids": [
+            "binding-83225aa03f6da17fd36bc22c"
+          ],
+          "source_ids": [
+            "synthetic-model-page"
+          ]
+        },
+        "identity.version": {
+          "binding_ids": [
+            "binding-337bec56c014d0039c5fbf74"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "lineage.base_models[0]": {
+          "binding_ids": [
+            "binding-ddaa25ac0a1621456e6340ad"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "links.model_card": {
+          "binding_ids": [
+            "binding-3eb880d56d443d6507348d9e"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "specifications.architecture_type": {
+          "binding_ids": [
+            "binding-37d84303a03755e42fbcfc0d"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "specifications.context_length": {
+          "binding_ids": [
+            "binding-c0137d694c68551f6d3fc2ac"
+          ],
+          "source_ids": [
+            "synthetic-hf-metadata"
+          ]
+        },
+        "training_context.adaptations": {
+          "binding_ids": [
+            "binding-164642c2654d94071b338cb8"
+          ],
+          "source_ids": [
+            "synthetic-model-page"
+          ]
+        }
+      }
+    },
+    "specifications": {
+      "architecture_type": "dense decoder-only",
+      "context_length": "4096 tokens",
+      "modalities": "Not specified",
+      "model_stage": "Not specified",
+      "num_parameters": "Not specified",
+      "precision": "Not specified"
+    },
+    "training_context": {
+      "adaptations": "Synthetic preference tuning",
+      "data_cutoff": "Not specified",
+      "training_data": "Not specified",
+      "training_data_size": "Not specified"
+    }
+  },
+  "reviews": [],
+  "schema_version": "5",
+  "target": {
+    "model_id": "example-lab/synthetic-model-1b",
+    "revision": "1111111111111111111111111111111111111111"
+  }
+}

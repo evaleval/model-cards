@@ -1,0 +1,101 @@
+{
+  "target": {
+    "model_id": "example-lab/synthetic-conflict-3b",
+    "revision": "7777777777777777777777777777777777777777"
+  },
+  "sources": [
+    {
+      "source_id": "conflict-primary-metadata",
+      "role": "hugging_face_metadata",
+      "source_revision": "7777777777777777777777777777777777777777",
+      "target": {
+        "model_id": "example-lab/synthetic-conflict-3b",
+        "revision": "7777777777777777777777777777777777777777"
+      },
+      "synthetic": true,
+      "data": {
+        "model_id": "example-lab/synthetic-conflict-3b",
+        "revision": "7777777777777777777777777777777777777777",
+        "display_name": "Synthetic Conflict 3B",
+        "license": "MIT",
+        "config": {
+          "advertised_context_length": "4096 tokens"
+        },
+        "model_card": "https://example.invalid/models/synthetic-conflict-3b"
+      }
+    },
+    {
+      "source_id": "conflict-secondary-metadata",
+      "role": "hugging_face_metadata",
+      "source_revision": "7777777777777777777777777777777777777777",
+      "target": {
+        "model_id": "example-lab/synthetic-conflict-3b",
+        "revision": "7777777777777777777777777777777777777777"
+      },
+      "synthetic": true,
+      "data": {
+        "config": {
+          "advertised_context_length": "8192 tokens"
+        }
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "kind": "structured",
+      "source_id": "conflict-primary-metadata",
+      "field_path": "identity.model_id",
+      "pointer": "/model_id",
+      "claim_entity": "example-lab/synthetic-conflict-3b@7777777777777777777777777777777777777777",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "conflict-primary-metadata",
+      "field_path": "identity.version",
+      "pointer": "/revision",
+      "claim_entity": "example-lab/synthetic-conflict-3b@7777777777777777777777777777777777777777",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "conflict-primary-metadata",
+      "field_path": "identity.name",
+      "pointer": "/display_name",
+      "claim_entity": "example-lab/synthetic-conflict-3b@7777777777777777777777777777777777777777",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "conflict-primary-metadata",
+      "field_path": "identity.license",
+      "pointer": "/license",
+      "claim_entity": "example-lab/synthetic-conflict-3b@7777777777777777777777777777777777777777",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "conflict-primary-metadata",
+      "field_path": "specifications.context_length",
+      "pointer": "/config/advertised_context_length",
+      "claim_entity": "example-lab/synthetic-conflict-3b@7777777777777777777777777777777777777777",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "conflict-secondary-metadata",
+      "field_path": "specifications.context_length",
+      "pointer": "/config/advertised_context_length",
+      "claim_entity": "example-lab/synthetic-conflict-3b@7777777777777777777777777777777777777777",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "conflict-primary-metadata",
+      "field_path": "links.model_card",
+      "pointer": "/model_card",
+      "claim_entity": "example-lab/synthetic-conflict-3b@7777777777777777777777777777777777777777",
+      "relation": "exact_target"
+    }
+  ]
+}

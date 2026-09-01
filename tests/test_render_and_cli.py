@@ -21,7 +21,9 @@ class RenderAndCliTests(unittest.TestCase):
 
         html = render_html(artifact)
         self.assertTrue(html.startswith("<!doctype html>"))
+        self.assertIn("Synthetic example.", html)
         self.assertIn("Evidence bindings", html)
+        self.assertIn("normalized characters", html)
         self.assertIn("family_scope_not_target", html)
         self.assertNotIn("<script", html.lower())
 
