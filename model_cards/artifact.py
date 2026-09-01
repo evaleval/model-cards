@@ -25,7 +25,7 @@ from .schema import (
     get_field,
     parse_field_path,
     set_field,
-    validate_complete_card,
+    validate_core_card,
 )
 
 
@@ -226,7 +226,7 @@ class CardArtifact:
             reviews=tuple(ReviewEvent.from_dict(item) for item in value.get("reviews", [])),
         )
         if "card" in value:
-            validate_complete_card(value["card"])
+            validate_core_card(value["card"])
             if value["card"] != project_card(artifact):
                 raise ValueError("serialized card does not match its binding projection")
         return artifact
@@ -317,5 +317,5 @@ def project_card(artifact: CardArtifact) -> dict[str, dict[str, Any]]:
             "review_count": len(artifact.reviews),
         },
     )
-    validate_complete_card(card)
+    validate_core_card(card)
     return card

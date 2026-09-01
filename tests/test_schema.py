@@ -10,6 +10,7 @@ from model_cards.schema import (
     get_field,
     set_field,
     validate_complete_card,
+    validate_core_card,
 )
 
 
@@ -41,11 +42,12 @@ class SchemaTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     get_field(blank_card(), field_path)
 
-    def test_complete_card_enforces_field_types(self) -> None:
+    def test_core_card_enforces_binding_value_types(self) -> None:
         card = blank_card()
         card["identity"]["name"] = {"not": "a scalar"}
+        validate_complete_card(card)
         with self.assertRaises(ValueError):
-            validate_complete_card(card)
+            validate_core_card(card)
 
     def test_benchmark_rows_require_an_explicit_setting(self) -> None:
         card = blank_card()

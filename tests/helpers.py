@@ -7,7 +7,7 @@ from model_cards.bindings import build_artifact
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SYNTHETIC_INPUT = ROOT / "examples" / "synthetic-input.json"
+SYNTHETIC_INPUT = ROOT / "tests" / "fixtures" / "synthetic-input.json"
 
 
 def synthetic_specification() -> dict:

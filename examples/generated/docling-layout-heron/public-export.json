@@ -1,0 +1,22 @@
+{
+  "artifact_id": "card_b959424f7f28debaacbda988",
+  "audit_annotation_source": "not_applicable",
+  "audit_record_in_export": false,
+  "automated_audit": "not_run",
+  "binding_counts": {
+    "accept": 13,
+    "withhold": 2
+  },
+  "card_projection_sha256": "27a727be1643b06e6aa55d7bf16d997bcf6ec8d571332957b959faa5304045a9",
+  "coverage_score": 0.242424,
+  "exact_target": "docling-project/docling-layout-heron@54100edecdceb65a9d8204d2478ac4cc8d4ca68b",
+  "export_scope": "generated_card_projection_only",
+  "human_review": "not_run",
+  "note": "This sparse multimodal card comes from the six-target offline feasibility run. Two wrong-scope candidates were withheld instead of projected.",
+  "projection_profile": "historical_feasibility_v5",
+  "schema_validation": "complete_v5_38_field_structure",
+  "schema_version": "5",
+  "score_rows": 0,
+  "source_artifact_sha256": "b10fe4ec21ea3a5c1c2777719da901365e94d55d2434bad2a600890e96e3c411",
+  "status": "historical"
+}

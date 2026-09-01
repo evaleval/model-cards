@@ -1,141 +1,165 @@
-# EvalEval Model Cards
+# Model Cards
 
-EvalEval Model Cards is a small offline reference implementation for
-evaluation-focused cards about one exact model revision. It keeps the rendered
-card separate from an immutable field-level evidence ledger, so unsupported or
-wrong-scope candidates remain inspectable without becoming target facts.
+Model Cards is a research workflow for generating evaluation-focused documentation
+for one exact model revision. This repository contains real generated card
+projections, the project overview, and the source-free evidence and policy core. The
+collector and model-assisted composer used for the current candidates are not in this
+repository.
 
-This first baseline provides:
+The workflow combines pinned official sources, binds proposed values to the model,
+checkpoint, evaluation setting, and supporting evidence, and keeps conflicts or
+uncertain assignments visible instead of turning them into facts.
 
-- the complete 38-field Model Card schema v5;
-- exact `model_id` plus resolved 40-character revision identity;
-- typed quoted and structured evidence bindings;
-- explicit exact-target, base-model, derivative-model, family,
-  sibling-checkpoint, comparison-model, and unresolved relations;
-- fail-closed acceptance, withholding, and rejection;
-- deterministic projection and stable binding identifiers;
-- append-only review events with no invented reviewer identity;
-- JSON and self-contained static HTML output; and
-- a dependency-free offline command-line interface.
+The unit of analysis is `model_id@revision`. A result reported for a base model,
+sibling checkpoint, family, or comparison model does not become a fact about the
+target checkpoint. Unsupported fields remain `Not specified`.
 
-It intentionally does not collect sources, search the web, call a model
-provider, or run evaluations. The included example is entirely synthetic.
+![Model Card generation pipeline](docs/figures/model-card-pipeline.png)
 
-## Install and test
+*The system fixes one model revision, freezes the available source bundle, and binds
+candidate claims to their source and target relation. Accepted bindings populate 33
+documentation fields; five provenance and quality fields are derived. Withheld
+evidence stays in the full artifact's ledger. Human release review is not part of the
+completed pipeline yet. The figure is also available as
+[vector PDF](docs/figures/model-card-pipeline.pdf) and
+[LaTeX source](docs/figures/model-card-pipeline.tex).*
+
+## Real generated examples
+
+The files below were projected directly from artifacts produced by the working
+local research pipeline. They are not hand-written examples. The full artifacts,
+source bundles, prompts, audit records, and local execution metadata are not in this
+repository.
+
+### Current model-assisted candidates
+
+| Example | What it shows | Coverage | Status |
+| --- | --- | ---: | --- |
+| [OLMo-2-1124-7B](examples/generated/olmo-2-1124-7b/card.md) ([JSON](examples/generated/olmo-2-1124-7b/card.json)) | Nine publisher-reported score rows and six withheld bindings | 66.7% | No blocking support or scope finding among projected claims; omission checks and human review remain open |
+| [OLMo-2-1124-7B-Instruct](examples/audit-cases/olmo-2-1124-7b-instruct/card.md) ([JSON](examples/audit-cases/olmo-2-1124-7b-instruct/card.json)) | Eight score rows and eight withheld bindings | 63.6% | Audit blocked promotion because two source-present facts were omitted |
+
+### Historical feasibility outputs
+
+The earlier six-target offline feasibility run produced sparse engineering artifacts.
+Two representative outputs are included here and kept out of the current-candidate
+table.
+
+- [Whisper Large V3 MLX](examples/generated/whisper-large-v3-mlx/card.md)
+  ([JSON](examples/generated/whisper-large-v3-mlx/card.json)), 24.2% coverage and no
+  human review.
+- [Docling Layout Heron](examples/generated/docling-layout-heron/card.md)
+  ([JSON](examples/generated/docling-layout-heron/card.json)), 24.2% coverage, two
+  wrong-scope candidates withheld, and no human review.
+
+Every example directory contains a readable `card.md`, the unchanged generated
+`card.json` projection, and a small `public-export.json` record. The record binds the
+projection to its original artifact by SHA-256 without publishing the artifact or its
+sources. The examples preserve the generator's value shapes and are not rewritten to
+fit the narrower public binding core. Audit labels are export annotations; the audit
+records remain local. Synthetic data is used only in `tests/fixtures`.
+
+## Pipeline
+
+1. **Exact model revision.** Generation starts from one Hugging Face model ID and a
+   resolved 40-character revision. The target identity is fixed before any field is
+   filled.
+
+2. **Multi-source collection.** Available official sources are pinned and frozen
+   locally. The source bundle is an input to generation and audit, not a public
+   repository artifact.
+
+3. **Scoped-evidence binding.** Candidate values carry a source span or structured
+   pointer, a claimed entity, and a relation to the target. Deterministic span and
+   structure checks plus a field-level evidence verifier test support and assignment.
+   A verified quote about the wrong checkpoint is still the wrong evidence.
+
+4. **Evidence-limited composition.** Accepted bindings populate 33 documentation
+   fields. Conflicts, ambiguous assignments, and unsupported values stay withheld or
+   `Not specified`. Five provenance and quality fields are then derived. The result is
+   a generated card plus a field-level binding ledger.
+
+Human review and release approval follow generation. No example in this repository has
+completed that step.
+
+## Sources
+
+Four first-party and project-owned source classes are currently admitted.
+
+| Source | Current role | Constraint |
+| --- | --- | --- |
+| Hugging Face metadata, model card, config, and safetensors metadata | Identity, architecture, parameters, precision, links | Pinned to the exact model revision |
+| Developer paper or technical report | Training and evaluation details | The report must be verified as relevant to the target or an explicit related model |
+| Developer GitHub documentation | Code and supplementary model documentation | Pinned to a developer-owned commit |
+| EvalEval evaluation record | Exact-ID links and record discovery | Not authority for checkpoint-specific scores |
+
+The next useful additions are official system and safety cards, official provider
+documentation and changelogs for API models, original independent evaluation reports,
+evaluation configurations and result artifacts, and official dataset cards. Evaluation
+sources must identify the exact target and protocol. Dataset sources must identify the
+dataset and version actually used.
+
+Third-party summaries, mirrors, and unversioned leaderboards may help discovery but are
+not target authority. Base-model prose is not inherited unless the source states the
+relation explicitly.
+
+## Current state
+
+Status on 2026-09-01 is two model-assisted candidates and six earlier deterministic
+feasibility outputs. Planned targets beyond the OLMo pair have not been generated.
+
+- OLMo Base currently has the highest field coverage among the model-assisted
+  candidates. It fills 22 of 33 documentation fields and contains nine score rows. Its
+  automated audit found no blocking support or scope issue among projected claims, but
+  omission checks, human review, and public release checks remain open.
+- OLMo Instruct fills 21 of 33 substantive fields and contains eight score rows. Its
+  audit blocked promotion because source-present facts were lost during composition.
+- A separate earlier feasibility run produced six sparse deterministic cards. Those
+  artifacts test identity, scoping, abstention, and export behavior; they do not
+  establish final card quality.
+
+The complete collector and model-assisted composer are not in this repository. The
+public code validates supplied bindings, applies scope policy, projects cards, records
+review events, and renders outputs. It does not run the full pipeline end to end.
+
+## What the project is for
+
+- **Inspect and correct one card in the full workflow.** A reviewer with the retained
+  artifact can trace a field to its source and target relation, then accept, reassign,
+  or withhold the binding.
+- **Compare related checkpoints safely.** A Base/Instruct pair can be compared without
+  silently transferring training quantities or evaluation rows between checkpoints.
+- **Study documentation gaps.** A collection of cards can show which training,
+  evaluation, safety, or provenance fields are consistently undocumented.
+
+The checked-in card projections support comparison and gap inspection. They do not
+contain the private field-level evidence ledger.
+
+## Repository map
+
+- `examples/generated/` contains the three public generated examples.
+- `examples/audit-cases/` contains real outputs that failed a later audit.
+- `docs/figures/` contains the LaTeX pipeline figure, PDF, and PNG.
+- `model_cards/` contains the source-free evidence and policy core.
+- `tests/fixtures/` contains synthetic data used only for deterministic tests.
+- [docs/reference-core.md](docs/reference-core.md) documents the public core and CLI.
+
+## Run the public core
 
 Python 3.9 or newer is sufficient. The package has no runtime dependencies.
 
 ```sh
 python3 -m pip install -e .
-```
-
-The single project test command is:
-
-```sh
 python3 -m unittest discover -s tests -v
 ```
 
-All tests and examples run offline.
+The test suite runs offline. For the scientific contract, review semantics, and CLI
+examples, see [the reference-core documentation](docs/reference-core.md).
 
-## Synthetic end-to-end example
+## Next work
 
-Build a JSON artifact and static inspection page:
-
-```sh
-python3 -m model_cards build examples/synthetic-input.json \
-  --json build/synthetic-card.json \
-  --html build/synthetic-card.html
-```
-
-Inspect the result or focus on one field:
-
-```sh
-python3 -m model_cards inspect build/synthetic-card.json
-python3 -m model_cards inspect build/synthetic-card.json \
-  --field training_context.training_data_size
-```
-
-The synthetic family-wide training quantity is deliberately retained as a
-withheld binding. It remains visible in both outputs while the exact-target
-field stays `Not specified`.
-
-## Scientific contract
-
-The card is a projection, not the primary evidence record. A candidate becomes
-an accepted target fact only when its source scope, relation, field policy, and
-evidence verification agree. Verified but non-target evidence is withheld;
-malformed or non-verbatim evidence is rejected. Neither state is silently
-dropped.
-
-Artifacts retain source revisions, SHA-256 digests, exact coordinates, and
-structured pointers without embedding full source documents. Call
-`verify_artifact_sources` with separately held sources to replay every quote
-and structured fragment before export.
-
-The relation rules are intentionally narrow:
-
-- Target-owned identity, specification, training, access, evaluation, and link
-  fields require `exact_target` evidence from a source explicitly scoped to the
-  same model revision. Hugging Face metadata and snapshot sources must also use
-  that exact revision; developer-code sources must use a resolved commit.
-- `lineage.base_models` accepts an explicit structured `base_model` relation.
-- The v5 `lineage.derivatives` field is an exact-target aggregate; individual
-  derivative rows are not projected by this schema.
-- Family facts never transfer to a checkpoint. A target's declared membership
-  in a family is instead an exact-target claim about that target.
-- Comparison and sibling relations may populate only score-free external links
-  in `evaluation.related_model_scores`.
-- EEE is link and index evidence, not authority for checkpoint-specific scores.
-
-Conflicting accepted values do not use last-write-wins. The field remains
-unfilled and the conflict appears in `provenance_and_quality.flagged_fields`.
-The five quality fields are computed directly from the substantive ledger and
-do not receive recursive evidence bindings.
-
-## Source roles
-
-The baseline models these source roles without distributing collected source
-content:
-
-| Role | Intended use |
-| --- | --- |
-| Exact Hugging Face metadata | Model identity and explicit structured facts at a resolved revision |
-| Selected Hugging Face snapshot file | Exact-revision developer text |
-| Developer report | A report explicitly associated with the target |
-| Pinned developer code | Developer-owned documentation with explicit target scope |
-| EEE index | Links and external-record discovery only |
-| Synthetic input | Redistributable tests and examples |
-
-Broad discovery, third-party commentary, mirrors, generic leaderboards, and
-API-only ingestion are outside this baseline.
-
-## Composer dependency decision
-
-The lean core needs exactly two Composer primitives:
-
-- whitespace and typographic-punctuation normalization; and
-- case-sensitive exact substring verification.
-
-The public Auto-BenchmarkCards package does not expose the generic schema
-runtime used by the earlier prototype. Importing that larger runtime would also
-make this offline package unnecessarily heavy. The two required public
-MIT-licensed functions are therefore included as the small local kernel in
-`model_cards/quote.py`; see [NOTICE.md](NOTICE.md). There is no runtime Git or
-adjacent-repository dependency.
-
-## Review semantics
-
-A review command always writes a new artifact. It appends `accept`, `withhold`,
-or `reassign` and leaves the generated bindings and prior events unchanged:
-
-```sh
-python3 -m model_cards review INPUT.json BINDING_ID \
-  --action withhold --reason needs_check --output REVIEWED.json
-```
-
-This baseline records no person, team, or role on an event. A future review
-protocol can define those semantics separately without changing the scientific
-binding core.
+The immediate sequence is to repair and re-audit the OLMo Instruct card, generate the
+next source-ready targets, add named human review, and move a smaller end-to-end
+generator into this repository.
 
 ## License
 

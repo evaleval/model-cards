@@ -273,13 +273,28 @@ def get_field(card: Mapping[str, Mapping[str, Any]], field_path: str) -> Any:
 
 
 def validate_complete_card(card: Mapping[str, Mapping[str, Any]]) -> None:
-    """Raise unless a card contains exactly the v5 sections and fields."""
+    """Raise unless a card contains exactly the 38 schema-v5 fields.
 
+    Schema v5 freezes the section and field vocabulary. Value profiles are checked
+    separately because the full research generator and this lean binding core do not
+    currently emit identical value shapes for every field.
+    """
+
+    if not isinstance(card, Mapping):
+        raise ValueError("card must be a mapping")
     if set(card) != set(SCHEMA_V5_SECTIONS):
         raise ValueError("card sections do not match schema v5")
     for section, fields in SCHEMA_V5_SECTIONS.items():
         actual = card.get(section)
         if not isinstance(actual, Mapping) or set(actual) != set(fields):
             raise ValueError(f"card fields do not match schema v5 section {section}")
+
+
+def validate_core_card(card: Mapping[str, Mapping[str, Any]]) -> None:
+    """Validate the complete card and the lean core's binding value profile."""
+
+    validate_complete_card(card)
+    for section, fields in SCHEMA_V5_SECTIONS.items():
+        actual = card[section]
         for field in fields:
             validate_field_value(f"{section}.{field}", actual[field])

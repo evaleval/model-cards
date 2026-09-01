@@ -1,0 +1,111 @@
+{
+  "identity": {
+    "model_id": "docling-project/docling-layout-heron",
+    "name": "docling-layout-heron",
+    "developed_by": "Not specified",
+    "model_type": "Not specified",
+    "license": {
+      "name": "apache-2.0",
+      "url": "https://huggingface.co/docling-project/docling-layout-heron/blob/54100edecdceb65a9d8204d2478ac4cc8d4ca68b/README.md"
+    },
+    "release_date": "Not specified",
+    "version": "54100edecdceb65a9d8204d2478ac4cc8d4ca68b",
+    "summary": "Not specified"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "model_family": "Not specified",
+    "derivatives": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "encoder-decoder",
+    "num_parameters": "Not specified",
+    "context_length": "Not specified",
+    "precision": "float32",
+    "modalities": {
+      "input": [
+        "image"
+      ],
+      "output": [
+        "bounding boxes",
+        "labels"
+      ]
+    },
+    "model_stage": "Not specified"
+  },
+  "training_context": {
+    "training_data": "Not specified",
+    "training_data_size": "Not specified",
+    "data_cutoff": "Not specified",
+    "adaptations": "Not specified"
+  },
+  "access_and_adoption": {
+    "access_type": "Not specified",
+    "downloads": "Not specified"
+  },
+  "evaluation": {
+    "results_summary": "Not specified",
+    "benchmark_scores": "Not specified",
+    "related_model_scores": "Not specified",
+    "human_evals": "Not specified",
+    "safety_evals": "Not specified",
+    "evaluation_sources": "Not specified"
+  },
+  "links": {
+    "model_card": "https://huggingface.co/docling-project/docling-layout-heron/tree/54100edecdceb65a9d8204d2478ac4cc8d4ca68b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified",
+    "code_repository": "Not specified"
+  },
+  "provenance_and_quality": {
+    "provenance": {
+      "ledger": "artifact.bindings",
+      "policy": "one BindingRecord per filled scalar or list item",
+      "quality_snapshot": "generation-time; later review events remain in the append-only ledger and do not silently rewrite these derived values"
+    },
+    "flagged_fields": [
+      "identity.summary",
+      "links.tech_report"
+    ],
+    "missing_fields": [
+      "identity.developed_by",
+      "identity.model_type",
+      "identity.release_date",
+      "identity.summary",
+      "lineage.base_models",
+      "lineage.model_family",
+      "lineage.derivatives",
+      "specifications.num_parameters",
+      "specifications.context_length",
+      "specifications.model_stage",
+      "training_context.training_data",
+      "training_context.training_data_size",
+      "training_context.data_cutoff",
+      "training_context.adaptations",
+      "access_and_adoption.access_type",
+      "access_and_adoption.downloads",
+      "evaluation.results_summary",
+      "evaluation.benchmark_scores",
+      "evaluation.related_model_scores",
+      "evaluation.human_evals",
+      "evaluation.safety_evals",
+      "evaluation.evaluation_sources",
+      "links.system_card",
+      "links.tech_report",
+      "links.code_repository"
+    ],
+    "coverage_score": 0.242424,
+    "card_info": {
+      "schema_version": "5",
+      "target": "docling-project/docling-layout-heron@54100edecdceb65a9d8204d2478ac4cc8d4ca68b",
+      "condition": "hybrid",
+      "quality_snapshot": "generation_time",
+      "composer_commit": "ba0dbeeae1afe99ccfabbdcb7d5ccaac5de41935",
+      "source_manifest": {
+        "README.md": "1f75a19bd4c4f36345bf9c9ca8484b5bdb24ec7a95f7f51c259ae521b7d2bb14",
+        "config.json": "3528d9cd7f8fdc0989670d770cb995a2f4f678775820b819ea13a63f0ff3c246"
+      },
+      "inapplicable_fields": []
+    }
+  }
+}

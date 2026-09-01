@@ -27,10 +27,36 @@ sources/
 temp/
 tmp/
 
+# Private research inputs and execution material never enter the public tree.
+**/source_bundle/
+**/source-bundle/
+**/source_bundles/
+**/source-bundles/
+**/source-bundle.json
+**/source_bundle.json
+**/source-freeze/
+**/private-candidate-evidence/
+**/provider-traces/
+**/vault/
+**/attachments/
+**/.claude/
+**/.codex/
+**/CLAUDE.md
+**/CODEX.md
+**/AGENTS.md
+**/pasted-text.txt
+
 *.log
 *.jsonl
 *.pdf
+!docs/figures/model-card-pipeline.pdf
 *.zip
 *.tar
 *.tar.gz
 *.tgz
+
+docs/figures/*.aux
+docs/figures/*.fdb_latexmk
+docs/figures/*.fls
+docs/figures/*.out
+docs/figures/*.synctex.gz
