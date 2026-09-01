@@ -131,6 +131,8 @@ def quote_binding(
     claim_entity: str,
     relation: RelationToTarget | str,
     benchmark_scope: dict[str, Any] | None = None,
+    section_path: tuple[str, ...] = (),
+    table_id: str | None = None,
 ) -> Binding:
     """Create a visible accepted, withheld, or rejected quoted binding."""
 
@@ -143,6 +145,7 @@ def quote_binding(
     evidence = Evidence(
         kind=EvidenceKind.QUOTE,
         source_id=source.source_id,
+        source_uri=source.source_uri,
         source_role=source.role,
         source_revision=source.source_revision,
         source_sha256=source.sha256,
@@ -152,6 +155,8 @@ def quote_binding(
         quote=match.quote if match else normalized_quote,
         char_start=match.char_start if match else None,
         char_end=match.char_end if match else None,
+        section_path=section_path,
+        table_id=table_id,
     )
     return _finish_binding(
         target=target,
@@ -174,6 +179,8 @@ def structured_binding(
     claim_entity: str,
     relation: RelationToTarget | str,
     benchmark_scope: dict[str, Any] | None = None,
+    section_path: tuple[str, ...] = (),
+    table_id: str | None = None,
 ) -> Binding:
     """Create a binding whose value is replayed from a structured pointer."""
 
@@ -183,6 +190,7 @@ def structured_binding(
     evidence = Evidence(
         kind=EvidenceKind.STRUCTURED,
         source_id=source.source_id,
+        source_uri=source.source_uri,
         source_role=source.role,
         source_revision=source.source_revision,
         source_sha256=source.sha256,
@@ -191,6 +199,8 @@ def structured_binding(
         verified=True,
         pointer=pointer,
         fragment=fragment,
+        section_path=section_path,
+        table_id=table_id,
     )
     return _finish_binding(
         target=target,
@@ -208,12 +218,14 @@ def source_from_dict(value: dict[str, Any]) -> SourceDocument:
     target = value.get("target")
     return SourceDocument(
         source_id=value["source_id"],
+        source_uri=value["source_uri"],
         role=SourceRole(value["role"]),
         source_revision=value["source_revision"],
         target=TargetIdentity.from_dict(target) if target else None,
         text=value.get("text"),
         data=value.get("data"),
         synthetic=value.get("synthetic", False),
+        content_sha256=value.get("content_sha256"),
     )
 
 
@@ -221,6 +233,7 @@ def build_artifact(specification: dict[str, Any]):
     """Build an artifact from a compact offline JSON-compatible specification."""
 
     from .artifact import CardArtifact
+    from .models import ValidationCheck
 
     target = TargetIdentity.from_dict(specification["target"])
     sources: dict[str, SourceDocument] = {}
@@ -242,6 +255,8 @@ def build_artifact(specification: dict[str, Any]):
             "claim_entity": candidate["claim_entity"],
             "relation": candidate["relation"],
             "benchmark_scope": candidate.get("benchmark_scope"),
+            "section_path": tuple(candidate.get("section_path", ())),
+            "table_id": candidate.get("table_id"),
         }
         kind = candidate["kind"]
         if kind == "quote":
@@ -256,7 +271,20 @@ def build_artifact(specification: dict[str, Any]):
             raise ValueError(f"unknown candidate kind: {kind}")
         bindings.append(binding)
 
-    artifact = CardArtifact(target=target, bindings=tuple(bindings))
+    lifecycle = specification.get("lifecycle", {})
+    if not isinstance(lifecycle, dict):
+        raise ValueError("specification lifecycle must be an object")
+    artifact = CardArtifact(
+        target=target,
+        bindings=tuple(bindings),
+        validation_checks=tuple(
+            ValidationCheck.from_dict(item)
+            for item in specification.get("validation_checks", [])
+        ),
+        lifecycle_status=lifecycle.get("status", "generated_unreviewed"),
+        generated_at=lifecycle.get("generated_at", "Not specified"),
+        validated_at=lifecycle.get("validated_at", "Not specified"),
+    )
     verify_artifact_sources(artifact, sources.values())
     return artifact
 
@@ -287,6 +315,7 @@ def verify_artifact_sources(artifact, sources: Iterable[SourceDocument]) -> None
                 raise ValueError(f"missing replay source: {evidence.source_id}")
             if (
                 source.role is not evidence.source_role
+                or source.source_uri != evidence.source_uri
                 or source.source_revision != evidence.source_revision
                 or source.target != evidence.source_target
                 or source.synthetic != evidence.synthetic

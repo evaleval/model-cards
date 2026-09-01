@@ -37,7 +37,11 @@ def append_review(
         target=artifact.target,
         bindings=artifact.bindings,
         reviews=artifact.reviews + (event,),
-        schema_version=artifact.schema_version,
+        validation_checks=artifact.validation_checks,
+        lifecycle_status=artifact.lifecycle_status,
+        generated_at=artifact.generated_at,
+        validated_at=artifact.validated_at,
+        contract_version=artifact.contract_version,
     )
 
 

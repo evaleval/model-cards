@@ -16,8 +16,7 @@ from .models import (
 from .schema import canonical_field_path
 
 
-_COMPUTED_PREFIX = "provenance_and_quality."
-_STRUCTURED_IDENTITY = frozenset({"identity.model_id", "identity.version"})
+_STRUCTURED_IDENTITY = frozenset({"identity.model_id", "identity.revision"})
 _REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -73,8 +72,6 @@ def decide_binding(
     """Return the binding disposition and stable reason code."""
 
     base = canonical_field_path(field_path)
-    if base.startswith(_COMPUTED_PREFIX):
-        return Disposition.REJECTED, "computed_field_not_bindable"
     if any(not item.verified for item in evidence):
         return Disposition.REJECTED, "quote_not_verified"
     if value in ("Not specified", "Not applicable"):
@@ -83,10 +80,16 @@ def decide_binding(
         return Disposition.REJECTED, "identity_requires_structured_evidence"
     if base == "identity.model_id" and value != target.model_id:
         return Disposition.REJECTED, "target_model_id_mismatch"
-    if base == "identity.version" and value != target.revision:
+    if base == "identity.revision" and value != target.revision:
         return Disposition.REJECTED, "target_revision_mismatch"
     if base == "evaluation.benchmark_scores" and not _valid_score_row(value):
         return Disposition.REJECTED, "invalid_benchmark_row"
+    if (
+        base == "use_and_risk.identified_risks"
+        and isinstance(value, dict)
+        and value.get("identification_origin") == "taxonomy_identified"
+    ):
+        return Disposition.REJECTED, "taxonomy_risk_requires_derivation"
 
     exact_source = all(item.source_target == target for item in evidence)
     source_roles = {item.source_role for item in evidence}

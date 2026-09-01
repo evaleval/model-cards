@@ -9,6 +9,10 @@ class PublicTreeTests(unittest.TestCase):
         ".claude",
         ".codex",
         "attachments",
+        "official-source-bundle",
+        "official-source-bundles",
+        "official_source_bundle",
+        "official_source_bundles",
         "private-candidate-evidence",
         "provider-traces",
         "source-bundle",
@@ -55,6 +59,8 @@ class PublicTreeTests(unittest.TestCase):
         should_ignore = (
             "source_bundle/source-bundle.json",
             "nested/source-bundles/source.json",
+            "nested/official-source-bundle/objects/sha256/ab/source",
+            "nested/official_source_bundles/manifest.json",
             "nested/source-freeze/manifest.json",
             "private-candidate-evidence/audit.json",
             "vault/notes.md",
@@ -83,6 +89,7 @@ class PublicTreeTests(unittest.TestCase):
         self.assertEqual(
             {path.name for path in cards.iterdir()},
             {
+                "mistral-7b-v0.3.json",
                 "olmo-2-1124-7b.json",
                 "olmo-2-1124-7b-instruct.json",
             },

@@ -6,6 +6,7 @@
   "sources": [
     {
       "source_id": "synthetic-hf-metadata",
+      "source_uri": "hf://example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
       "role": "hugging_face_metadata",
       "source_revision": "1111111111111111111111111111111111111111",
       "target": {
@@ -20,7 +21,7 @@
         "license": "MIT",
         "base_model": {
           "model_id": "example-lab/synthetic-base-1b",
-          "relation": "base"
+          "relation": "base_model"
         },
         "config": {
           "architecture_type": "dense decoder-only",
@@ -32,6 +33,7 @@
     },
     {
       "source_id": "synthetic-model-page",
+      "source_uri": "hf://example-lab/synthetic-model-1b@1111111111111111111111111111111111111111/README.md",
       "role": "hugging_face_snapshot",
       "source_revision": "1111111111111111111111111111111111111111",
       "target": {
@@ -43,6 +45,7 @@
     },
     {
       "source_id": "synthetic-report",
+      "source_uri": "https://example.invalid/reports/synthetic-model-1b",
       "role": "developer_report",
       "source_revision": "synthetic-report-v1",
       "target": {
@@ -54,6 +57,7 @@
     },
     {
       "source_id": "synthetic-family-report",
+      "source_uri": "https://example.invalid/reports/synthetic-family",
       "role": "developer_report",
       "source_revision": "synthetic-family-v1",
       "target": {
@@ -65,6 +69,7 @@
     },
     {
       "source_id": "synthetic-eee-record",
+      "source_uri": "https://example.invalid/evaluations/synthetic-model-1b",
       "role": "eee_index",
       "source_revision": "synthetic-index-v1",
       "target": {
@@ -78,6 +83,7 @@
     },
     {
       "source_id": "synthetic-comparison-record",
+      "source_uri": "https://example.invalid/evaluations/synthetic-comparison-2b",
       "role": "eee_index",
       "source_revision": "synthetic-index-v1",
       "target": {
@@ -105,7 +111,7 @@
     {
       "kind": "structured",
       "source_id": "synthetic-hf-metadata",
-      "field_path": "identity.version",
+      "field_path": "identity.revision",
       "pointer": "/revision",
       "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
       "relation": "exact_target"
@@ -146,7 +152,7 @@
     {
       "kind": "structured",
       "source_id": "synthetic-hf-metadata",
-      "field_path": "specifications.architecture_type",
+      "field_path": "model_details.architecture_type",
       "pointer": "/config/architecture_type",
       "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
       "relation": "exact_target"
@@ -154,7 +160,7 @@
     {
       "kind": "structured",
       "source_id": "synthetic-hf-metadata",
-      "field_path": "specifications.context_length",
+      "field_path": "model_details.context_length",
       "pointer": "/config/advertised_context_length",
       "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
       "relation": "exact_target"
@@ -162,7 +168,7 @@
     {
       "kind": "quote",
       "source_id": "synthetic-model-page",
-      "field_path": "training_context.adaptations",
+      "field_path": "training.adaptations",
       "value": "Synthetic preference tuning",
       "quote": "The exact checkpoint uses synthetic preference tuning.",
       "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
@@ -171,7 +177,7 @@
     {
       "kind": "quote",
       "source_id": "synthetic-family-report",
-      "field_path": "training_context.training_data_size",
+      "field_path": "training.training_data_size",
       "value": "99 trillion invented tokens",
       "quote": "The Synthetic Model family was trained on 99 trillion invented tokens.",
       "claim_entity": "Synthetic Model family",
@@ -215,7 +221,7 @@
     {
       "kind": "structured",
       "source_id": "synthetic-hf-metadata",
-      "field_path": "links.model_card",
+      "field_path": "model_details.model_card",
       "pointer": "/model_card",
       "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
       "relation": "exact_target"

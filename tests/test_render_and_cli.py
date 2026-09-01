@@ -16,13 +16,15 @@ class RenderAndCliTests(unittest.TestCase):
     def test_json_and_static_html_render_offline(self) -> None:
         artifact = synthetic_artifact()
         payload = json.loads(render_json(artifact))
-        self.assertEqual(payload["schema_version"], "5")
+        self.assertEqual(payload["contract_version"], "1")
         self.assertEqual(payload["target"]["model_id"], "example-lab/synthetic-model-1b")
 
         html = render_html(artifact)
         self.assertTrue(html.startswith("<!doctype html>"))
         self.assertIn("Evidence bindings", html)
         self.assertIn("family_scope_not_target", html)
+        self.assertIn("generated_unreviewed", html)
+        self.assertNotIn("Schema v", html)
         self.assertNotIn("<script", html.lower())
 
     def test_rendering_is_byte_stable(self) -> None:
@@ -78,8 +80,19 @@ class RenderAndCliTests(unittest.TestCase):
             self.assertEqual(result, 0)
             self.assertTrue(json_path.is_file())
             self.assertTrue(html_path.is_file())
-            self.assertEqual(load_artifact(json_path).schema_version, "5")
+            self.assertEqual(load_artifact(json_path).contract_version, "1")
             self.assertIn("<!doctype html>", html_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(main(["validate", str(json_path)]), 0)
+            public_path = destination / "public.json"
+            self.assertEqual(
+                main(["export", str(json_path), "--output", str(public_path)]),
+                0,
+            )
+            self.assertEqual(main(["validate", str(public_path)]), 0)
+            public = json.loads(public_path.read_text(encoding="utf-8"))
+            self.assertEqual(public["contract_version"], "1")
+            self.assertEqual(public["lifecycle"]["status"], "generated_unreviewed")
 
     def test_loader_rejects_a_tampered_projection(self) -> None:
         payload = synthetic_artifact().to_dict()
@@ -97,12 +110,12 @@ class RenderAndCliTests(unittest.TestCase):
                 binding = next(
                     item
                     for item in payload["bindings"]
-                    if item["field_path"] == "specifications.context_length"
+                    if item["field_path"] == "model_details.context_length"
                 )
                 binding["value"] = "999999 tokens"
                 if change_fragment:
                     binding["evidence"][0]["fragment"] = "999999 tokens"
-                payload["card"]["specifications"]["context_length"] = "999999 tokens"
+                payload["card"]["model_details"]["context_length"] = "999999 tokens"
                 with tempfile.TemporaryDirectory() as directory:
                     path = Path(directory) / "changed.json"
                     path.write_text(json.dumps(payload), encoding="utf-8")

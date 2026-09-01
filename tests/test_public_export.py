@@ -1,281 +1,163 @@
-import hashlib
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+
+from jsonschema import Draft202012Validator, FormatChecker
 
 from model_cards.public_export import (
     PublicExportError,
     assert_public_projection,
     export_public_card,
 )
-from model_cards.schema import blank_card, validate_complete_card
+from model_cards.review import save_artifact
+from model_cards.schema import CONTRACT_SCHEMA, validate_public_card
+from tests.helpers import synthetic_artifact
 
 
 class PublicExportTests(unittest.TestCase):
     ROOT = Path(__file__).resolve().parents[1]
-    EXPECTED_PUBLIC_CARDS = {
-        "olmo-2-1124-7b.json":
-            "3fb467b86abcc1ad81619f0bde3327559d01954c4c92aac004669f663243f92a",
-        "olmo-2-1124-7b-instruct.json":
-            "ee5ab65974dcd826f638179a5617bcd1a962f6134450a7c3f7c9187eadbe3ee2",
-    }
     EXPECTED_CARD_FACTS = {
         "olmo-2-1124-7b.json": {
-            "exact_target": (
-                "allenai/OLMo-2-1124-7B@"
-                "7df9a82518afdecae4e8c026b27adccc8c1f0032"
-            ),
-            "coverage_score": 0.666667,
-            "score_rows": 9,
+            "model_id": "allenai/OLMo-2-1124-7B",
+            "revision": "7df9a82518afdecae4e8c026b27adccc8c1f0032",
+            "coverage_score": 0.113636,
+            "score_rows": 0,
         },
         "olmo-2-1124-7b-instruct.json": {
-            "exact_target": (
-                "allenai/OLMo-2-1124-7B-Instruct@"
-                "470b1fba1ae01581f270116362ee4aa1b97f4c84"
-            ),
-            "coverage_score": 0.636364,
-            "score_rows": 8,
+            "model_id": "allenai/OLMo-2-1124-7B-Instruct",
+            "revision": "470b1fba1ae01581f270116362ee4aa1b97f4c84",
+            "coverage_score": 0.136364,
+            "score_rows": 0,
+        },
+        "mistral-7b-v0.3.json": {
+            "model_id": "mistralai/Mistral-7B-v0.3",
+            "revision": "caa1feb0e54d415e2df31207e5f4e273e33509b1",
+            "coverage_score": 0.113636,
+            "score_rows": 0,
         },
     }
 
-    def _artifact(self):
-        card = blank_card()
-        card["identity"].update(
-            {
-                "model_id": "owner/model",
-                "name": "Example",
-                "version": "a" * 40,
-            }
-        )
-        card["provenance_and_quality"].update(
-            {
-                "coverage_score": 0.5,
-                "missing_fields": ["evaluation.benchmark_scores"],
-                "flagged_fields": [],
-                "card_info": {
-                    "composer_commit": "c" * 40,
-                    "inapplicable_fields": [],
-                    "schema_version": "5",
-                    "target": f"owner/model@{'a' * 40}",
-                    "source_manifest": {"README.md": "b" * 64},
-                },
-            }
-        )
-        return {
-            "artifact_id": "card_" + "e" * 24,
-            "schema_version": "5",
-            "target": {
-                "model_id": "owner/model",
-                "resolved_revision": "a" * 40,
-            },
-            "bindings": [
-                {"verifier_action": "accept"},
-                {"verifier_action": "withhold"},
-            ],
-            "source_bundle": {"content": "must stay local"},
-            "card": card,
-        }
-
     def _write_artifact(self, root: Path, value=None) -> Path:
-        artifact = root / "artifact.json"
-        artifact.write_text(
-            json.dumps(self._artifact() if value is None else value),
-            encoding="utf-8",
-        )
-        return artifact
+        path = root / "artifact.json"
+        if value is None:
+            save_artifact(synthetic_artifact(), path)
+        else:
+            path.write_text(json.dumps(value), encoding="utf-8")
+        return path
 
-    def test_exports_one_json_card_projection(self):
+    def test_exports_the_projection_from_the_actual_card_artifact_dialect(self) -> None:
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            artifact = self._write_artifact(root)
+            artifact = synthetic_artifact()
+            source = root / "artifact.json"
+            save_artifact(artifact, source)
             output = root / "card.json"
 
-            record = export_public_card(artifact, output)
-
+            record = export_public_card(source, output)
             exported = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(exported, self._artifact()["card"])
-            self.assertNotIn("source_bundle", exported)
-            self.assertEqual(record["binding_counts"], {"accept": 1, "withhold": 1})
-            self.assertEqual(record["exact_target"], f"owner/model@{'a' * 40}")
-            self.assertEqual(record["score_rows"], 0)
-            self.assertEqual(
-                {path.name for path in root.iterdir()},
-                {"artifact.json", "card.json"},
-            )
 
-    def test_force_controls_overwrite(self):
+            self.assertEqual(exported, artifact.to_dict()["card"])
+            validate_public_card(exported)
+            self.assertEqual(record["artifact_id"], artifact.artifact_id)
+            self.assertEqual(record["contract_version"], "1")
+            self.assertEqual(record["lifecycle_status"], "generated_unreviewed")
+            self.assertNotIn("bindings", exported)
+            self.assertNotIn("reviews", exported)
+
+    def test_force_controls_overwrite(self) -> None:
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            artifact = self._write_artifact(root)
+            source = self._write_artifact(root)
             output = root / "card.json"
-            export_public_card(artifact, output)
-
+            export_public_card(source, output)
             with self.assertRaises(PublicExportError):
-                export_public_card(artifact, output)
-            export_public_card(artifact, output, force=True)
+                export_public_card(source, output)
+            export_public_card(source, output, force=True)
 
-    def test_rejects_private_structure_in_card(self):
-        card = self._artifact()["card"]
-        card["source_bundle"] = {"content": "private"}
-        with self.assertRaises(PublicExportError):
-            assert_public_projection(card)
+    def test_privacy_boundary_rejects_private_structure_and_paths(self) -> None:
+        unsafe = (
+            {"source_bundle": {"content": "private"}},
+            {"value": "/Users/example/.cache/model"},
+            {"value": "~/private/model"},
+            {"value": "https://user:secret@example.org/model"},
+            {"/Users/example/private": "redacted"},
+        )
+        for value in unsafe:
+            with self.subTest(value=value), self.assertRaises(PublicExportError):
+                assert_public_projection(value)
 
-    def test_rejects_sensitive_dictionary_key(self):
-        with self.assertRaises(PublicExportError):
-            assert_public_projection({"/Users/example/private": "redacted"})
-
-    def test_rejects_unknown_binding_action(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            value = self._artifact()
-            value["bindings"][0]["verifier_action"] = "confidential-source-prose"
-            with self.assertRaises(PublicExportError):
-                export_public_card(self._write_artifact(root, value), root / "card.json")
-
-    def test_rejects_private_run_label_as_artifact_id(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            value = self._artifact()
-            value["artifact_id"] = "private-20260830-06"
-            with self.assertRaises(PublicExportError):
-                export_public_card(self._write_artifact(root, value), root / "card.json")
-
-    def test_rejects_local_paths(self):
-        with self.assertRaises(PublicExportError):
-            assert_public_projection({"value": "/Users/example/.cache/model"})
-
-    def test_rejects_home_relative_paths_and_url_credentials(self):
-        for value in ("~/private/model", "https://user:secret@example.org/model"):
-            with self.subTest(value=value):
+    def test_tampered_projection_artifact_id_and_contract_are_rejected(self) -> None:
+        mutations = (
+            lambda value: value["card"]["identity"].update({"name": "tampered"}),
+            lambda value: value.update({"artifact_id": "card_" + "0" * 24}),
+            lambda value: value.update({"contract_version": "2"}),
+            lambda value: value["bindings"][0].update({"reason": "tampered_reason"}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                value = synthetic_artifact().to_dict()
+                mutate(value)
                 with self.assertRaises(PublicExportError):
-                    assert_public_projection({"value": value})
+                    export_public_card(self._write_artifact(root, value), root / "card.json")
 
-    def test_rejects_target_drift(self):
+    def test_public_source_manifest_cannot_disguise_content(self) -> None:
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            value = self._artifact()
-            value["card"]["identity"]["model_id"] = "owner/other-model"
-            with self.assertRaises(PublicExportError):
-                export_public_card(self._write_artifact(root, value), root / "card.json")
-
-    def test_rejects_schema_metadata_drift(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            value = self._artifact()
-            value["card"]["provenance_and_quality"]["card_info"]["schema_version"] = "4"
-            with self.assertRaises(PublicExportError):
-                export_public_card(self._write_artifact(root, value), root / "card.json")
-
-    def test_rejects_source_content_disguised_as_manifest(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            value = self._artifact()
-            value["card"]["provenance_and_quality"]["card_info"]["source_manifest"] = {
-                "README.md": "private notes that are not a digest"
+            value = synthetic_artifact().to_dict()
+            value["card"]["provenance"]["source_manifest"]["synthetic-hf-metadata"] = {
+                "source_uri": "https://example.invalid/source",
+                "source_role": "hugging_face_metadata",
+                "source_revision": "main",
+                "source_sha256": "private notes rather than a digest",
             }
             with self.assertRaises(PublicExportError):
                 export_public_card(self._write_artifact(root, value), root / "card.json")
 
-    def test_rejects_unknown_card_info_keys(self):
+    def test_output_must_be_a_new_regular_json_path(self) -> None:
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
-            value = self._artifact()
-            value["card"]["provenance_and_quality"]["card_info"]["private_notes"] = "text"
+            source = self._write_artifact(root)
             with self.assertRaises(PublicExportError):
-                export_public_card(self._write_artifact(root, value), root / "card.json")
+                export_public_card(source, root / "card.md")
 
-    def test_rejects_private_content_in_allowlisted_card_info(self):
-        unsafe_values = {
-            "condition": {"private_notes": "confidential source prose"},
-            "quality_snapshot": {"private_notes": "confidential source prose"},
-            "generated_at": {"private_notes": "confidential source prose"},
-            "llm": {"private_notes": "confidential source prose"},
-        }
-        for key, unsafe in unsafe_values.items():
-            with self.subTest(key=key), TemporaryDirectory() as temporary:
-                root = Path(temporary)
-                value = self._artifact()
-                value["card"]["provenance_and_quality"]["card_info"][key] = unsafe
-                with self.assertRaises(PublicExportError):
-                    export_public_card(self._write_artifact(root, value), root / "card.json")
-
-    def test_rejects_unrecognized_card_info_labels(self):
-        unsafe_values = {
-            "inapplicable_fields": ["private_notes.confidential"],
-            "frame": {"private_notes": 1},
-            "source_manifest": {"private_notes.md": "b" * 64},
-            "condition": "confidential_source_prose",
-            "quality_snapshot": "confidential_source_prose",
-            "generated_at": "confidential_source_prose",
-            "llm": "confidential source prose",
-        }
-        for key, unsafe in unsafe_values.items():
-            with self.subTest(key=key), TemporaryDirectory() as temporary:
-                root = Path(temporary)
-                value = self._artifact()
-                value["card"]["provenance_and_quality"]["card_info"][key] = unsafe
-                with self.assertRaises(PublicExportError):
-                    export_public_card(self._write_artifact(root, value), root / "card.json")
-
-    def test_rejects_non_json_and_directory_destinations(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            artifact = self._write_artifact(root)
+            directory = root / "directory.json"
+            directory.mkdir()
             with self.assertRaises(PublicExportError):
-                export_public_card(artifact, root / "card.md")
+                export_public_card(source, directory, force=True)
 
-            output_directory = root / "card.json"
-            output_directory.mkdir()
-            with self.assertRaises(PublicExportError):
-                export_public_card(artifact, output_directory, force=True)
-
-    def test_rejects_symlinked_output(self):
-        with TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            artifact = self._write_artifact(root)
             target = root / "elsewhere.json"
             target.write_text("{}", encoding="utf-8")
-            output = root / "card.json"
-            output.symlink_to(target)
+            symlink = root / "symlink.json"
+            symlink.symlink_to(target)
             with self.assertRaises(PublicExportError):
-                export_public_card(artifact, output, force=True)
+                export_public_card(source, symlink, force=True)
 
-    def test_checked_in_cards_are_canonical_json_projections(self):
-        cards_directory = self.ROOT / "cards"
-        self.assertEqual(
-            {path.name for path in cards_directory.iterdir()},
-            set(self.EXPECTED_PUBLIC_CARDS),
-        )
-
-        for filename, expected_digest in self.EXPECTED_PUBLIC_CARDS.items():
-            with self.subTest(filename=filename):
-                card_path = cards_directory / filename
-                card = json.loads(card_path.read_text(encoding="utf-8"))
-                validate_complete_card(card)
+    def test_every_checked_in_card_passes_the_actual_draft_validator(self) -> None:
+        validator = Draft202012Validator(CONTRACT_SCHEMA, format_checker=FormatChecker())
+        cards = self.ROOT / "cards"
+        self.assertEqual({path.name for path in cards.iterdir()}, set(self.EXPECTED_CARD_FACTS))
+        for path in sorted(cards.glob("*.json")):
+            with self.subTest(path=path):
+                card = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(list(validator.iter_errors(card)), [])
+                validate_public_card(card)
                 assert_public_projection(card)
-                canonical = (
-                    json.dumps(
-                        card,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    )
-                    + "\n"
-                ).encode("utf-8")
-                self.assertEqual(hashlib.sha256(canonical).hexdigest(), expected_digest)
-
-                expected = self.EXPECTED_CARD_FACTS[filename]
-                card_info = card["provenance_and_quality"]["card_info"]
-                self.assertEqual(card_info["target"], expected["exact_target"])
-                self.assertEqual(
-                    card["provenance_and_quality"]["coverage_score"],
-                    expected["coverage_score"],
-                )
-                self.assertEqual(
-                    len(card["evaluation"]["benchmark_scores"]),
-                    expected["score_rows"],
-                )
+                expected = self.EXPECTED_CARD_FACTS[path.name]
+                self.assertEqual(card["contract_version"], "1")
+                self.assertEqual(card["identity"]["model_id"], expected["model_id"])
+                self.assertEqual(card["identity"]["revision"], expected["revision"])
+                self.assertEqual(card["validation"]["coverage_score"], expected["coverage_score"])
+                scores = card["evaluation"]["benchmark_scores"]
+                self.assertEqual(len(scores) if isinstance(scores, list) else 0, expected["score_rows"])
+                self.assertEqual(card["lifecycle"]["status"], "generated_unreviewed")
+                self.assertTrue(card["provenance"]["source_manifest"])
+                for source in card["provenance"]["source_manifest"].values():
+                    self.assertIn("source_uri", source)
+                    self.assertNotIn("/Users/", source["source_uri"])
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ from typing import Any
 
 from .artifact import CardArtifact, project_card
 from .models import EvidenceKind
-from .schema import SCHEMA_V5_SECTIONS
+from .schema import CONTRACT_VERSION, SECTION_FIELDS
 
 
 def render_json(artifact: CardArtifact) -> str:
@@ -59,7 +59,7 @@ def render_html(artifact: CardArtifact) -> str:
 
     card = project_card(artifact)
     section_blocks: list[str] = []
-    for section, fields in SCHEMA_V5_SECTIONS.items():
+    for section, fields in SECTION_FIELDS.items():
         rows = "".join(
             "<tr>"
             f"<th>{escape(field)}</th>"
@@ -155,7 +155,7 @@ def render_html(artifact: CardArtifact) -> str:
 <body>
   <header>
     <h1>{escape(title)}</h1>
-    <div class="target">Exact revision: {escape(artifact.target.revision)} · Schema v{escape(artifact.schema_version)}</div>
+    <div class="target">Exact revision: {escape(artifact.target.revision)} · Contract {escape(CONTRACT_VERSION)} · {escape(artifact.lifecycle_status.value)}</div>
   </header>
   {''.join(section_blocks)}
   <section><h2>Evidence bindings</h2>{''.join(binding_blocks)}</section>

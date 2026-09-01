@@ -75,7 +75,7 @@ class ReviewTests(unittest.TestCase):
         binding = next(
             item
             for item in artifact.bindings
-            if item.field_path == "training_context.training_data_size"
+            if item.field_path == "training.training_data_size"
         )
         with self.assertRaises(ValueError):
             accept_binding(artifact, binding.binding_id, reason="scope_unresolved")

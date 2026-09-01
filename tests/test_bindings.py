@@ -39,7 +39,7 @@ class BindingPolicyTests(unittest.TestCase):
         self.assertTrue(binding.evidence[0].verified)
         card = project_card(self.artifact)
         self.assertEqual(card["evaluation"]["benchmark_scores"][0]["score"], 73.5)
-        self.assertEqual(card["specifications"]["context_length"], "4096 tokens")
+        self.assertEqual(card["model_details"]["context_length"], "4096 tokens")
 
     def test_target_identity_values_must_match_the_artifact_target(self) -> None:
         cases = (
@@ -51,7 +51,7 @@ class BindingPolicyTests(unittest.TestCase):
                 specification = synthetic_specification()
                 specification["sources"][0]["data"][source_key] = wrong_value
                 artifact = build_artifact(specification)
-                field_path = "identity.model_id" if source_key == "model_id" else "identity.version"
+                field_path = "identity.model_id" if source_key == "model_id" else "identity.revision"
                 binding = next(item for item in artifact.bindings if item.field_path == field_path)
                 self.assertEqual(binding.disposition, Disposition.REJECTED)
                 self.assertEqual(binding.reason, reason)
@@ -73,6 +73,7 @@ class BindingPolicyTests(unittest.TestCase):
             with self.subTest(revision=revision):
                 source = SourceDocument(
                     source_id="synthetic-developer-code",
+                    source_uri="https://example.invalid/code",
                     role=SourceRole.DEVELOPER_CODE,
                     source_revision=revision,
                     target=target,
@@ -82,7 +83,7 @@ class BindingPolicyTests(unittest.TestCase):
                 binding = quote_binding(
                     target=target,
                     source=source,
-                    field_path="links.code_repository",
+                    field_path="model_details.code_repository",
                     value="https://example.invalid/code",
                     quote="https://example.invalid/code",
                     claim_entity=f"{target.model_id}@{target.revision}",
@@ -165,31 +166,31 @@ class BindingPolicyTests(unittest.TestCase):
         self.assertEqual(binding.reason, "related_source_target_mismatch")
 
     def test_family_numeric_evidence_remains_visible_but_withheld(self) -> None:
-        binding = self._one("training_context.training_data_size")
+        binding = self._one("training.training_data_size")
         self.assertEqual(binding.relation, RelationToTarget.MODEL_FAMILY)
         self.assertEqual(binding.disposition, Disposition.WITHHELD)
         self.assertEqual(binding.reason, "family_scope_not_target")
         self.assertTrue(binding.evidence[0].verified)
         self.assertEqual(
-            project_card(self.artifact)["training_context"]["training_data_size"],
+            project_card(self.artifact)["training"]["training_data_size"],
             NOT_SPECIFIED,
         )
 
     def test_non_exact_evidence_does_not_close_an_exact_target_gap(self) -> None:
         card = project_card(self.artifact)
         self.assertIn(
-            "training_context.training_data_size",
-            card["provenance_and_quality"]["missing_fields"],
+            "training.training_data_size",
+            card["validation"]["missing_fields"],
         )
-        flags = card["provenance_and_quality"]["flagged_fields"]
-        self.assertIn("training_context.training_data_size", flags)
+        flags = card["validation"]["flagged_fields"]
+        self.assertIn("training.training_data_size", flags)
 
     def test_base_relation_only_populates_explicit_lineage(self) -> None:
         binding = self._one("lineage.base_models[0]")
         self.assertEqual(binding.disposition, Disposition.ACCEPTED)
         self.assertEqual(
             project_card(self.artifact)["lineage"]["base_models"],
-            [{"model_id": "example-lab/synthetic-base-1b", "relation": "base"}],
+            [{"model_id": "example-lab/synthetic-base-1b", "relation": "base_model"}],
         )
 
     def test_comparison_link_is_not_a_target_score(self) -> None:
@@ -220,6 +221,7 @@ class BindingPolicyTests(unittest.TestCase):
             with self.subTest(index=index, relation=relation.value):
                 source = SourceDocument(
                     source_id=f"synthetic-related-{index}",
+                    source_uri=f"https://example.invalid/related/{index}",
                     role=SourceRole.EEE_INDEX,
                     source_revision="synthetic-index-v3",
                     target=target if relation is RelationToTarget.EXACT_TARGET else TargetIdentity(
@@ -228,24 +230,30 @@ class BindingPolicyTests(unittest.TestCase):
                     synthetic=True,
                     data={"row": row},
                 )
-                binding = structured_binding(
-                    target=target,
-                    source=source,
-                    field_path="evaluation.related_model_scores[0]",
-                    pointer="/row",
-                    claim_entity=(
+                arguments = {
+                    "target": target,
+                    "source": source,
+                    "field_path": "evaluation.related_model_scores[0]",
+                    "pointer": "/row",
+                    "claim_entity": (
                         f"{target.model_id}@{target.revision}"
                         if relation is RelationToTarget.EXACT_TARGET
                         else "example-lab/other@" + "4" * 40
                     ),
-                    relation=relation,
-                )
-                self.assertEqual(binding.disposition, Disposition.WITHHELD)
+                    "relation": relation,
+                }
+                if index < 3:
+                    with self.assertRaises(ValueError):
+                        structured_binding(**arguments)
+                else:
+                    binding = structured_binding(**arguments)
+                    self.assertEqual(binding.disposition, Disposition.WITHHELD)
 
     def test_eee_index_is_not_checkpoint_score_authority(self) -> None:
         target = self.artifact.target
         source = SourceDocument(
             source_id="synthetic-index-score",
+            source_uri="https://example.invalid/evaluations/index-score",
             role=SourceRole.EEE_INDEX,
             source_revision="synthetic-index-v2",
             target=target,
@@ -294,7 +302,7 @@ class BindingPolicyTests(unittest.TestCase):
         self.assertEqual(card["identity"]["summary"], NOT_SPECIFIED)
         reasons = {
             item["reason"]
-            for item in card["provenance_and_quality"]["flagged_fields"]["identity.summary"]
+            for item in card["validation"]["flagged_fields"]["identity.summary"]
         }
         self.assertEqual(reasons, {"conflicting_accepted_values"})
 
@@ -326,7 +334,7 @@ class BindingPolicyTests(unittest.TestCase):
             {
                 "kind": "quote",
                 "source_id": "synthetic-model-page",
-                "field_path": "links.system_card",
+                "field_path": "model_details.system_card",
                 "value": "https://example.invalid/system-card",
                 "quote": "This link does not occur in the source.",
                 "claim_entity": (
@@ -387,7 +395,7 @@ class BindingPolicyTests(unittest.TestCase):
         family = next(
             item
             for item in original.bindings
-            if item.field_path == "training_context.training_data_size"
+            if item.field_path == "training.training_data_size"
         )
         malicious = replace(
             family,
@@ -397,7 +405,7 @@ class BindingPolicyTests(unittest.TestCase):
         caller_bindings.append(malicious)
         self.assertEqual(len(artifact.bindings), len(original.bindings))
         self.assertEqual(
-            project_card(artifact)["training_context"]["training_data_size"],
+            project_card(artifact)["training"]["training_data_size"],
             NOT_SPECIFIED,
         )
         with self.assertRaises(ValueError):

@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evaleval.github.io/model-cards/evaluation/annotation.schema.json",
+  "title": "Held-out Model Card annotation record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "packet_version",
+    "study_status",
+    "study_unit_id",
+    "condition",
+    "target_blind_id",
+    "claim_support",
+    "assignment",
+    "omissions",
+    "risk_applicability",
+    "warning_utility",
+    "annotator_confirmation"
+  ],
+  "properties": {
+    "packet_version": {
+      "const": "model-card-heldout-annotation/v1"
+    },
+    "study_status": {
+      "enum": ["design_only_no_human_results", "annotation_in_progress", "annotation_complete"]
+    },
+    "study_unit_id": {
+      "$ref": "#/$defs/opaque_id"
+    },
+    "condition": {
+      "enum": ["A", "B"]
+    },
+    "target_blind_id": {
+      "$ref": "#/$defs/opaque_id"
+    },
+    "claim_support": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "verdict", "source_binding", "evidence_sufficiency"],
+        "properties": {
+          "claim_id": {"$ref": "#/$defs/opaque_id"},
+          "verdict": {
+            "enum": ["fully_supported", "partially_supported", "unsupported", "unavailable"]
+          },
+          "source_binding": {
+            "enum": ["correct", "wrong", "missing", "unclear", "unavailable"]
+          },
+          "evidence_sufficiency": {
+            "enum": ["sufficient", "insufficient", "unclear", "unavailable"]
+          }
+        }
+      }
+    },
+    "assignment": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "entity_checkpoint", "relation", "field_fit"],
+        "properties": {
+          "claim_id": {"$ref": "#/$defs/opaque_id"},
+          "entity_checkpoint": {
+            "enum": ["correct", "wrong_entity", "wrong_checkpoint", "unclear", "unavailable"]
+          },
+          "relation": {
+            "enum": ["correct", "wrong", "unresolved", "unclear", "unavailable"]
+          },
+          "field_fit": {
+            "enum": ["correct", "wrong", "unclear", "unavailable"]
+          }
+        }
+      }
+    },
+    "omissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate_fact_id", "source_present", "applicable", "card_state", "verdict"],
+        "properties": {
+          "candidate_fact_id": {"$ref": "#/$defs/opaque_id"},
+          "source_present": {"enum": ["yes", "no", "unclear", "unavailable"]},
+          "applicable": {"enum": ["yes", "no", "unclear", "unavailable"]},
+          "card_state": {"enum": ["present", "withheld", "conflicting", "absent"]},
+          "verdict": {"enum": ["not_omitted", "justified_abstention", "source_present_omission", "unclear"]}
+        }
+      }
+    },
+    "risk_applicability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["risk_id", "taxonomy_valid", "use_context_grounding", "applicability", "publisher_attribution"],
+        "properties": {
+          "risk_id": {"$ref": "#/$defs/opaque_id"},
+          "taxonomy_valid": {"enum": ["yes", "no", "unclear"]},
+          "use_context_grounding": {"enum": ["adequate", "inadequate", "unclear", "unavailable"]},
+          "applicability": {"enum": ["applies", "does_not_apply", "unclear", "unavailable"]},
+          "publisher_attribution": {"enum": ["correctly_separate", "misattributed", "unclear"]}
+        }
+      }
+    },
+    "warning_utility": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["warning_id", "validity", "utility"],
+        "properties": {
+          "warning_id": {"$ref": "#/$defs/opaque_id"},
+          "validity": {"enum": ["correct", "incorrect", "unclear", "unavailable"]},
+          "utility": {"enum": ["useful", "not_useful", "unclear", "unavailable"]}
+        }
+      }
+    },
+    "annotator_confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completed", "used_only_displayed_evidence", "uncertainty_notes"],
+      "properties": {
+        "completed": {"type": "boolean"},
+        "used_only_displayed_evidence": {"type": "boolean"},
+        "uncertainty_notes": {"type": "string", "maxLength": 2000}
+      }
+    }
+  },
+  "$defs": {
+    "opaque_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{7,127}$"
+    }
+  }
+}

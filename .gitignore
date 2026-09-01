@@ -32,6 +32,10 @@ tmp/
 **/source-bundle/
 **/source_bundles/
 **/source-bundles/
+**/official_source_bundle/
+**/official-source-bundle/
+**/official_source_bundles/
+**/official-source-bundles/
 **/source-bundle.json
 **/source_bundle.json
 **/source-freeze/

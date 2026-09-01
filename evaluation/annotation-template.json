@@ -1,0 +1,17 @@
+{
+  "packet_version": "model-card-heldout-annotation/v1",
+  "study_status": "design_only_no_human_results",
+  "study_unit_id": "study-unit-template",
+  "condition": "A",
+  "target_blind_id": "target-template",
+  "claim_support": [],
+  "assignment": [],
+  "omissions": [],
+  "risk_applicability": [],
+  "warning_utility": [],
+  "annotator_confirmation": {
+    "completed": false,
+    "used_only_displayed_evidence": false,
+    "uncertainty_notes": "Template only; no human annotation has been performed."
+  }
+}
