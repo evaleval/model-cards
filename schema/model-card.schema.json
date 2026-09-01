@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/evaleval/model-cards/main/schema/model-card-v6-draft.schema.json",
-  "title": "Model Card v6 draft",
-  "description": "Additive draft of the evidence-bound Model Card schema with explicit use-context and risk records.",
+  "$id": "https://raw.githubusercontent.com/evaleval/model-cards/main/schema/model-card.schema.json",
+  "title": "Model Card schema",
+  "description": "Schema for evidence-backed Model Cards with explicit use-context and risk records.",
   "$comment": "Cross-reference integrity, selected-key uniqueness, source resolution, taxonomy snapshot replay, and recursive privacy scanning are enforced by application-level release validators. JSON Schema alone does not identify secrets or source text.",
   "type": "object",
   "required": [
@@ -47,8 +47,8 @@
   },
   "additionalProperties": false,
   "$defs": {
-    "v5FieldValue": {
-      "$comment": "The existing v5 generator has field-specific value profiles. Their stricter runtime validators remain authoritative while v6 is a draft.",
+    "cardFieldValue": {
+      "$comment": "Field-specific runtime validators may impose stricter value profiles.",
       "anyOf": [
         {
           "type": "string",
@@ -79,28 +79,28 @@
       ],
       "properties": {
         "model_id": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "name": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "developed_by": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "model_type": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "license": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "release_date": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "version": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "summary": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         }
       },
       "additionalProperties": false
@@ -114,13 +114,13 @@
       ],
       "properties": {
         "base_models": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "model_family": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "derivatives": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         }
       },
       "additionalProperties": false
@@ -137,22 +137,22 @@
       ],
       "properties": {
         "architecture_type": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "num_parameters": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "context_length": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "precision": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "modalities": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "model_stage": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         }
       },
       "additionalProperties": false
@@ -167,16 +167,16 @@
       ],
       "properties": {
         "training_data": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "training_data_size": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "data_cutoff": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "adaptations": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         }
       },
       "additionalProperties": false
@@ -189,10 +189,10 @@
       ],
       "properties": {
         "access_type": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "downloads": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         }
       },
       "additionalProperties": false
@@ -209,22 +209,22 @@
       ],
       "properties": {
         "results_summary": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "benchmark_scores": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "related_model_scores": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "human_evals": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "safety_evals": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "evaluation_sources": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         }
       },
       "additionalProperties": false
@@ -239,16 +239,16 @@
       ],
       "properties": {
         "model_card": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "system_card": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "tech_report": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "code_repository": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         }
       },
       "additionalProperties": false
@@ -267,10 +267,10 @@
           "$ref": "#/$defs/publicProvenance"
         },
         "flagged_fields": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "missing_fields": {
-          "$ref": "#/$defs/v5FieldValue"
+          "$ref": "#/$defs/cardFieldValue"
         },
         "coverage_score": {
           "type": "number",
@@ -862,7 +862,7 @@
       ],
       "properties": {
         "schema_version": {
-          "const": "6"
+          "const": "1"
         },
         "target": {
           "type": "string",

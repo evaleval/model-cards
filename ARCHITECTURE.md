@@ -1,12 +1,12 @@
 # Architecture
 
-The system generates one evidence-bound Model Card for one exact model revision. It
+The system generates one evidence-bound Model Card for one specific model release. It
 freezes the source material first, keeps every proposed value in a binding ledger, and
 projects the public JSON card from accepted bindings. The binding ledger is the primary
 record. The public card is its derived projection.
 
 ```text
-model_id@resolved_revision
+selected model release
         |
         v
 frozen local source bundle --> model and referent frame
@@ -31,7 +31,7 @@ frozen local source bundle --> model and referent frame
 
 ## System invariants
 
-- The target is a repository model ID paired with a resolved 40-character revision.
+- The target is a canonical model ID paired with the release being documented.
 - Each source-derived filled field traces to a verified source span or structured
   pointer.
 - Each binding names the entity described by the evidence and its relation to the
@@ -47,17 +47,17 @@ frozen local source bundle --> model and referent frame
 
 ## Pipeline and data model
 
-### 1. Fix the target and freeze the sources
+### 1. Select the model release and preserve the sources
 
-The run resolves the requested model to `model_id@revision` before extraction. Source
-adapters then collect the admissible publisher and evaluation material for that exact
-target. Each source record stores a logical source ID, authority role, source revision,
-target scope, and SHA-256 digest. The frozen bytes stay local so every later check can
-replay the same input.
+Before extraction, the workflow records the canonical model ID and the release being
+documented. Source adapters then collect the relevant publisher and evaluation
+material for that model. Each source record stores a logical source ID, authority
+role, source version, model scope, and retrieval information. The saved source files
+stay local so later checks can replay the same input.
 
-The source bundle is immutable for a run. A changed README, report, configuration, or
-evaluation record starts a new source revision instead of changing an existing run in
-place.
+The source set does not change during generation. A changed README, report,
+configuration, or evaluation record starts a new collection instead of changing the
+evidence behind an existing card.
 
 ### 2. Build the model and referent frame
 
@@ -92,7 +92,7 @@ enter the card. Withheld and rejected bindings remain in the ledger for inspecti
 
 ### 5. Compose the card
 
-Composition reads accepted bindings only. It fills the versioned JSON schema, retains
+Composition reads accepted bindings only. It fills the JSON schema, retains
 the two absence sentinels, derives provenance and coverage fields, and withholds fields
 with unresolved conflicts. Narrative fields may be composed from accepted evidence.
 Numeric benchmark rows come from deterministic table extraction and reconciliation.
@@ -109,10 +109,10 @@ normal evidence-binding path. They must satisfy the same referent and source che
 other card fields.
 
 The pipeline also runs model-assisted risk identification through AI Atlas Nexus
-against a pinned IBM AI Risk Atlas release. Each internal candidate mapping records
-the taxonomy risk ID, taxonomy name and version, use context, applicability rationale,
-input field references, Nexus version, inference model, configuration digest, and
-review status. The `use_and_risk.identified_risks` entries label their
+against a selected IBM AI Risk Atlas release. Each candidate mapping records the
+taxonomy risk ID and release, use context, applicability rationale, supporting card
+fields, identification method, and review status. The
+`use_and_risk.identified_risks` entries label their
 `identification_origin`, so a taxonomy-identified risk cannot be mistaken for a
 publisher statement. A mapping does not receive a severity or confidence value unless
 a separate assessment supports it.
@@ -125,15 +125,15 @@ the frozen sources contain.
 
 | Layer | Operates on | Question answered | Failure action |
 | --- | --- | --- | --- |
-| Source replay | Source manifest and evidence coordinates | Do the hashes, spans, pointers, and derivations reproduce against the frozen bundle? | Reject the affected binding |
+| Source replay | Source manifest and evidence coordinates | Do the saved sources, spans, pointers, and derivations reproduce? | Reject the affected binding |
 | Schema checks | Public projection | Are sections, field types, enums, absence values, and required metadata valid? | Block release |
 | Entity-Attribution Verification | Candidate bindings | Does this value describe this entity, field, row, and protocol? | Withhold or reassign |
 | Numeric reconciliation | Score rows and quantitative fields | Do value, unit, metric, setting, split, and source row agree? | Withhold the row |
 | Final-claim audit | Composed card claims and their own citations | Does the final wording follow from the evidence attached to that field? | Repair or withhold the field |
 | FactReasoner | Atomic claims and the frozen source bundle | What support or contradiction does retrieval find for each claim? | Flag unsupported claims for repair or review |
 | Conflict checks | Accepted bindings | Do accepted values disagree for the same scoped field? | Leave the field unfilled |
-| Omission audit | Frozen sources and projected card | Which source-present facts were lost during extraction or composition? | Add candidates and rerun the affected gates |
-| Risk-mapping gate | Candidate risk mappings | Does the risk ID exist in the pinned taxonomy, and do the use context, rationale, field references, and review state support the mapping? | Reject or retain as unreviewed |
+| Omission audit | Saved sources and projected card | Which relevant source facts are missing from the card? | Add candidates and rerun the affected gates |
+| Risk-mapping gate | Candidate risk mappings | Does the risk ID exist in the selected taxonomy release, and do the use context, rationale, field references, and review state support the mapping? | Reject or retain as unreviewed |
 
 These layers have separate jobs. Entity-Attribution Verification establishes
 assignment before composition. The final-claim audit checks the wording produced after
@@ -158,20 +158,19 @@ after the release gates pass.
 
 | Artifact | Contents | Location |
 | --- | --- | --- |
-| Frozen source bundle | Exact source bytes, revisions, hashes, and collection metadata | Local only |
+| Frozen source bundle | Saved source files, source versions, and collection metadata | Local only |
 | Full `CardArtifact` | Target, generated card, binding ledger, evidence coordinates, validation findings, and review history | Local only |
 | Public Model Card | Source-clean JSON projection with public provenance metadata | Repository `cards/` directory |
 
 The repository export excludes source bodies, local filesystem paths, credentials,
-working notes, prompts and responses, provider traces, and private audit records. The
-v6 contract adds a field-to-source index with logical source IDs, public source URIs,
-revisions, digests, typed locators, claimed entities, and target relations. It never
-contains the source bundle, evidence text, or full binding ledger.
+working notes, prompts and responses, provider traces, and private audit records. Its
+field-to-source index contains public source references, precise locators, the entity
+described, and its relation to the documented model. It never contains the source
+set, evidence text, or full binding ledger.
 
-`public_export.py` enforces the current v5 boundary and writes one JSON file without
-Markdown or audit sidecars. A v6 release additionally requires validation of its
-fail-closed metadata shape, typed public locators, cross-references, and pinned
-taxonomy records, followed by a recursive privacy scan over the complete projection.
+`public_export.py` writes one JSON file without Markdown or audit sidecars. Release
+validation checks the public metadata, source locators, cross-references, taxonomy
+records, and the complete card for private material.
 
 ## Package modules
 
@@ -186,17 +185,15 @@ orchestration.
 | `bindings.py` | Quote and structured binding construction, stable IDs, JSON Pointer replay, and source verification |
 | `policy.py` | Fail-closed field, source-role, revision, and target-relation rules |
 | `artifact.py` | Immutable artifacts, review folding, conflict handling, and deterministic card projection |
-| `schema.py` | Versioned field vocabulary, value shapes, list indexing, and absence semantics |
+| `schema.py` | Field vocabulary, value shapes, list indexing, and absence semantics |
 | `review.py` | Append-only accept, withhold, and reassign operations |
 | `render.py` | Deterministic internal JSON and static HTML inspection views |
 | `public_export.py` | JSON-only public export plus privacy and integrity checks |
 | `cli.py` | Offline build, inspect, render, and review commands |
 
 The full collector, model-assisted composer, validation orchestration, risk mapping,
-and release workflow integrate through these interfaces. Checked-in cards remain
-unchanged generation outputs until the complete path regenerates them. Schema
-revisions are explicit for the same reason. Existing v5 cards are not edited after the
-fact to imitate fields introduced by a later schema.
+and release workflow integrate through these interfaces. The public exporter
+determines the contents of each generated card.
 
 ## Developer commands
 

@@ -1,116 +1,104 @@
 # Model Cards
 
-Model Cards builds machine-readable documentation for an exact model revision. The
-workflow starts from versioned primary sources, produces a JSON card, and retains a
-separate evidence ledger. The ledger supports claim tracing, correction, and release
-review. Every included fact must be supported by the frozen source bundle and assigned
-to the model, checkpoint, and field it actually describes. Evaluation claims must
-also retain their evaluation setting.
+Model Cards turns primary documentation about an AI model into a structured JSON
+record. Its sources can include official model pages, technical reports, configuration
+files, evaluation results, and safety documentation. Each populated field points to
+evidence about the model it describes. Unsupported fields remain `Not specified`.
 
-The unit of analysis is `model_id@revision`. Evidence about a base model, sibling
-checkpoint, family, or comparison system does not automatically become evidence about
-the target. When the available sources do not support a field, the card says
-`Not specified`.
-
-This README defines the end-to-end pipeline contract. The checked-in cards are v5
-outputs from before the v6 use-and-risk stage.
+Each card describes a specific model release. Information about a base model, related
+checkpoint, model family, or comparison system is kept separate unless a source
+explicitly connects it to the documented model.
 
 ![Model Card generation pipeline](assets/model-card-pipeline.png)
 
-*The central generation path fixes one model revision, freezes its source bundle,
-binds candidate values to scoped evidence, and composes the card from accepted
-bindings. The vector [PDF](assets/model-card-pipeline.pdf) and
+*The pipeline selects a model release, collects its sources, links proposed values to
+supporting evidence, and composes the card from verified claims. The vector
+[PDF](assets/model-card-pipeline.pdf) and
 [LaTeX source](assets/model-card-pipeline.tex) are included.*
 
 ## What the pipeline produces
 
-The public deliverable is one JSON Model Card. The target schema v6 draft organizes
-the record into the following sections.
+The resulting JSON Model Card is organized into the following sections.
 
 | Section | Contents |
 | --- | --- |
-| Identity | Exact model ID and revision, developer, model type, release, license, and summary |
+| Identity | Model ID, developer, model type, release, license, and summary |
 | Lineage | Base models, family membership, and derivatives, with explicit relations |
 | Specifications | Architecture, parameter count, context length, precision, modalities, and model stage |
 | Training context | Training data, scale, cutoff, and adaptations |
 | Access and adoption | Access conditions and available adoption indicators |
-| Evaluation | Target-specific benchmark results, related-model results, human and safety evaluations, and evaluation sources |
+| Evaluation | Results for the documented model, related-model results, human and safety evaluations, and evaluation sources |
 | Links | Model card, system card, technical report, and code repository |
 | Uses and risks | Intended and out-of-scope uses, limitations, known biases, candidate risks, and mitigations |
-| Provenance and quality | Source manifest, flagged and missing fields, coverage, schema version, and generation metadata |
+| Provenance and quality | Source references, flagged and missing fields, coverage, and generation details |
 
-Under the v6 contract, the public card will retain a safe field-to-source index with
-logical source IDs, revisions, digests, and typed locators. The retained research
-artifact contains the full source inventory, evidence text, binding ledger, conflicts,
-withheld candidates, and review history needed to reproduce decisions. Frozen source
-files, prompts, provider traces, audit material, and local execution metadata remain
-private and are never part of the public export.
+Field-to-source references connect each documented claim to a stable public source.
+The local research record keeps the supporting evidence, conflicts, excluded
+candidates, and review history needed to reproduce decisions. Source copies, prompts,
+provider traces, audit material, and local execution records remain private.
 
 ## Pipeline
 
-### 1. Fix the target revision
+### 1. Select the model release
 
-Generation begins with one exact target. For a Hugging Face model, the workflow
-resolves the requested revision to a commit and records the canonical
-`owner/model@commit` identifier before collecting evidence. Later phases reject a
-card, source record, or review action that refers to a different target.
+Generation begins by selecting the model release or checkpoint to document. The
+workflow records its canonical identifier and verifies throughout the pipeline that
+sources, evaluation results, and review decisions refer to that model.
 
-### 2. Freeze the source bundle
+### 2. Collect and preserve the sources
 
-The collector retrieves the available primary sources and stores immutable local
-copies with revision information, retrieval metadata, and SHA-256 digests. A typical
-bundle contains the exact Hugging Face snapshot, README, configuration and weight
-metadata, a verified technical report, pinned developer documentation, and an
-exact-ID EvalEval record. EvalEval contributes identifiers and discovery links. It
-cannot establish checkpoint scores without revision-specific evidence. Collection
-failures and missing source classes remain visible in the run state.
+The collector retrieves the available primary sources and saves a fixed local copy of
+each source with version and retrieval information. A typical source set contains the
+Hugging Face model page, README, configuration and weight metadata, a relevant
+technical report, developer documentation, and the matching EvalEval record. EvalEval
+contributes identifiers and discovery links. It cannot establish model scores without
+evidence for the documented release. Collection failures and unavailable source types
+remain visible during validation and review.
 
-### 3. Build the model and evaluation frame
+### 3. Map model lineage and evaluations
 
-Before extracting values, the workflow identifies the target, base models, family,
-sibling variants, comparison systems, benchmarks, metrics, datasets, and named
-evaluation settings. Relations enter the frame only when supported by source evidence
-or explicit metadata. Similar names alone do not establish a model relation. This
-frame prevents a score for an instruction-tuned variant or a training quantity
-for a model family from being assigned to the target checkpoint without explicit
-support.
+Before extracting values, the workflow identifies the documented model, base models,
+family, sibling variants, comparison systems, benchmarks, metrics, datasets, and named
+evaluation settings. Relations enter the map only when supported by source evidence
+or explicit metadata. Similar names alone do not establish a model relation. This map
+prevents a score for an instruction-tuned variant or a training quantity for a model
+family from being assigned to the documented checkpoint without explicit support.
 
 ### 4. Extract evidence through two channels
 
-Structured extraction reads fields from pinned metadata, configuration files, weight
-metadata, model-index records, and exact-ID evaluation records. Model-assisted
-extraction proposes verbatim passages from prose sources such as model READMEs,
-reports, and developer documentation. Missing core fields can trigger bounded
-retrieval from the already admitted source classes.
+Structured extraction reads fields from version-specific metadata, configuration
+files, weight metadata, model-index records, and matching evaluation records.
+Model-assisted extraction proposes verbatim passages from prose sources such as model
+READMEs, reports, and developer documentation. Missing core fields can trigger further
+retrieval from approved source types.
 
-Each quotation must occur exactly in the frozen source. Each structured claim must
-resolve to a recorded pointer and value. Extraction proposes evidence; it does not
+Each quotation must occur exactly in the saved source. Each structured claim must
+resolve to a recorded pointer and value. Extraction proposes evidence. It does not
 decide that the evidence belongs in the card.
 
-### 5. Bind evidence to fields and referents
+### 5. Verify evidence and assign fields
 
-Every candidate records its destination field, claimed entity, relation to the
-target, source coordinates or structured pointer, and relevant section or table
-anchors. Evaluation candidates also carry benchmark, version, subset, split, metric,
-protocol, and row scope when the source provides them.
+Every candidate records its destination field, the model or entity it describes, its
+relation to the documented model, its source location, and the relevant section or
+table. Evaluation candidates also record the benchmark, subset, split, metric,
+protocol, and table row when the source provides them.
 
 Entity-Attribution Verification checks whether a passage is actually about the
-claimed entity and whether it supports the proposed field. Deterministic policy gates
-then enforce exact-target, lineage, source-role, row-anchor, and evaluation-scope
-rules. A valid referent correction is recorded. Wrong, ambiguous, or unsupported
-assignments are withheld in the ledger.
+named model and whether it supports the proposed field. Deterministic checks then
+verify the model relation, source suitability, table context, and evaluation setting.
+Valid corrections are recorded. Wrong, ambiguous, or unsupported assignments remain
+in the ledger but do not enter the card.
 
 ### 6. Compose the JSON card
 
-The composer receives accepted bindings, including bindings created from deterministic
-structured extraction. It does not receive the unfiltered source bundle. It fills
-schema fields, preserves `Not specified` for unsupported information, and uses
-`Not applicable` only when the field genuinely does not apply. Parsing, type, enum,
-list-shape, citation, and absence-value checks run inside a bounded repair loop.
+The composer receives only evidence that passed the previous checks. It does not
+receive the unfiltered source set. It fills the JSON fields, preserves `Not specified`
+for unsupported information, and uses `Not applicable` only when a field genuinely
+does not apply. A controlled repair loop checks parsing, field types, allowed values,
+list structure, citations, and absence markers.
 
-Benchmark scores follow a stricter route. Rows are extracted and reconciled
-deterministically against their table and protocol scope. Free-form model output does
-not create score rows.
+Benchmark rows are extracted and reconciled against their table and evaluation
+setting. Free-form model output does not create or alter scores.
 
 ### 7. Identify use-context risks
 
@@ -123,36 +111,34 @@ whose taxonomy and tooling are described in the
 [AI Risk Atlas paper](https://arxiv.org/abs/2503.05780).
 
 Taxonomy-identified risks remain distinct from publisher statements. Each mapping
-retains a stable risk ID, pinned taxonomy name and version, taxonomy snapshot digest,
-description, use context, applicability rationale, triggering card fields, Nexus
-version, inference model, configuration digest, review status, and mitigation
-references. The mapping states why a risk may apply; it does not claim that the
-publisher reported it or that harm has occurred.
+records the risk identifier, taxonomy release, use context, rationale, supporting
+evidence, review status, and relevant mitigations. The mapping explains why a risk may
+apply. It does not present the risk as a publisher statement or confirmed harm.
 
-The additive [schema v6 draft](schema/model-card-v6-draft.schema.json) formalizes this
-section while leaving the generated v5 examples unchanged. An empty risk, limitation,
-or bias list means that no entry was recorded; it is not evidence that none exists.
+The [JSON schema](schema/model-card.schema.json) defines this section alongside the
+rest of the card. An empty risk, limitation, or bias list means that no supported entry
+was recorded. It does not establish that none exists.
 
 ### 8. Run layered validation
 
 Validation checks source presence, assignment, wording, completeness, and risk
-applicability separately. Claim failures create field-level findings. Target, schema,
-privacy, and release-control failures block the artifact.
+applicability separately. Claim failures create field-level findings. Model identity,
+schema, privacy, and publication-control failures block the card.
 
 ### 9. Repair and re-audit
 
-Findings enter a targeted repair queue. A repair can add a missing binding, reassign a
-candidate to the correct referent or field, or withhold it. Existing supported fields
-are preserved. Each change is append-only and the affected claims are replayed
-against the same source bundle before the full audit runs again.
+Findings enter a targeted repair queue. A repair can add missing evidence, assign a
+candidate to the correct model or field, or exclude it. Existing supported fields are
+preserved. Each change is recorded in the repair history. The affected claims are
+checked against the same sources before the full audit runs again.
 
 ### 10. Review and release
 
-A named reviewer inspects included values, withheld evidence, conflicts, and
-source-present omissions. High-impact identity, lineage, licensing, training,
+A named reviewer inspects included values, withheld evidence, conflicts, and relevant
+source facts missing from the card. High-impact identity, lineage, licensing, training,
 evaluation, access, and risk decisions can require a second sign-off. Release occurs
 only after the schema, source, review, privacy, licensing, and quotation gates pass.
-The release artifact is JSON; internal bundles and ledgers stay local.
+The release output is JSON. Internal source sets and evidence ledgers stay local.
 
 ## Validation
 
@@ -161,16 +147,16 @@ combines replayable checks with separate model-based assessments.
 
 | Gate | Question answered |
 | --- | --- |
-| Target and source replay | Do the target revision, source hashes, quote spans, structured pointers, and deterministic derivations still match? |
-| Schema and absence checks | Does the projection satisfy the versioned field, type, enum, required-value, and absence rules? |
+| Model and source replay | Do source references, quoted passages, structured values, and derived fields still match the collected sources? |
+| Schema and absence checks | Does the card satisfy the required fields, types, allowed values, and absence rules? |
 | Assignment policy | Is the evidence about the correct model or checkpoint, and may that source-relation pair populate this field? |
 | Evaluation scope | Does each result retain the correct benchmark, row, metric, split, protocol, and comparison scope? |
 | Entity-Attribution Verification | Does the evidence support this field for the entity named by the binding? |
-| Final-claim entailment | Does the card's final wording follow from that claim's own citations? |
-| FactReasoner | When narrative claims are split into atomic claims, what support, contradiction, or neutral evidence is found in the frozen bundle? Low-support claims return to repair or review. |
+| Claim support | Does the card's final wording follow from that claim's own citations? |
+| FactReasoner | When narrative claims are split into atomic claims, what support, contradiction, or neutral evidence is found in the saved sources? Low-support claims return to repair or review. |
 | Conflict and numeric checks | Do accepted values disagree, and do scores and derived quantities reconcile without last-write-wins behavior? |
 | Omission audit | Which relevant facts are present in the sources but absent from the card? |
-| Risk-mapping gate | Does the risk exist in the pinned taxonomy, and is its applicability rationale grounded in the stated use context and card fields? |
+| Risk-mapping gate | Does the risk exist in the selected taxonomy release, and is its rationale grounded in the stated use context and card fields? |
 | Release and privacy checks | Does the JSON contain only approved public fields and no source text, credentials, local paths, prompts, or provider traces? |
 | Review, licensing, and quotation checks | Are required decisions signed off, and may the selected source references and short quotations be released? |
 
@@ -184,56 +170,52 @@ context, not a publisher quotation.
 
 ## Sources
 
-The workflow admits sources according to what they can establish for the exact
-target.
+The workflow admits sources according to what they can establish for the documented
+model release.
 
 | Source | Role | Constraint |
 | --- | --- | --- |
-| Hugging Face metadata, model README, config, and weight metadata | Identity, architecture, parameters, precision, links, and publisher documentation | Pinned to the exact model revision |
-| Developer paper or technical report | Training, methods, limitations, and evaluation details | Verified as relevant to the target or linked with an explicit related-model relation |
-| Developer GitHub documentation | Code, release, and supplementary model documentation | Pinned to a developer-owned commit |
-| Official model, system, and safety cards | Intended use, limitations, safety evaluations, and mitigations | Versioned and tied to the exact target or an explicit model relation |
+| Hugging Face metadata, model README, config, and weight metadata | Identity, architecture, parameters, precision, links, and publisher documentation | Saved from the documented model release |
+| Developer paper or technical report | Training, methods, limitations, and evaluation details | Verified as relevant to the documented model or linked through an explicit model relation |
+| Developer GitHub documentation | Code, release, and supplementary model documentation | Taken from a fixed version of a developer-owned repository |
+| Official model, system, and safety cards | Intended use, limitations, safety evaluations, and mitigations | Tied to the documented model or an explicit model relation |
 | Official provider documentation and changelogs | Capabilities, access, versions, and API behavior | Version and product scope must be recoverable |
 | Original independent evaluation reports | External evaluation claims | Exact model version and protocol must be identified |
-| Evaluation configurations and result artifacts | Benchmark scores and settings | Target, benchmark version, metric, split, and protocol must be recoverable |
+| Evaluation configurations and result artifacts | Benchmark scores and settings | Documented model, benchmark version, metric, split, and protocol must be recoverable |
 | Official dataset cards | Dataset identity, version, composition, and restrictions | Must describe the dataset version actually used |
-| EvalEval evaluation record | Exact-ID links and source discovery | Not authority for checkpoint-specific scores by itself |
+| EvalEval evaluation record | Matching model links and source discovery | Not authority for model scores by itself |
 
-Third-party summaries, mirrors, and unversioned leaderboards may support discovery,
-but they are not target authority. Evidence from a base model or family is retained
-with that relation unless the source explicitly supports inheritance by the target.
+Third-party summaries, mirrors, and leaderboards may support discovery, but they are
+not treated as primary evidence for the documented model. Evidence from a base model
+or family keeps that relation unless the source explicitly states that it also applies
+to the documented model.
 
 ## Example cards
 
-These JSON cards were generated by the research workflow and exported without their
-private source bundles or evidence ledgers. They are examples, not hand-written
-templates.
+These JSON cards are examples produced by the workflow. Their private source bundles
+and evidence ledgers remain local.
 
-| Card | What it illustrates | Field coverage | Status |
-| --- | --- | ---: | --- |
-| [OLMo-2-1124-7B](cards/olmo-2-1124-7b.json) | Exact-revision identity, training context, and nine publisher-reported benchmark rows | 66.7% | Development example |
-| [OLMo-2-1124-7B-Instruct](cards/olmo-2-1124-7b-instruct.json) | A derivative checkpoint with explicit base-model relations and eight benchmark rows | 63.6% | Repair required after omission audit |
+| Card | What it illustrates | Field coverage |
+| --- | --- | ---: |
+| [OLMo-2-1124-7B](cards/olmo-2-1124-7b.json) | Model identity, training context, and nine publisher-reported benchmark rows | 66.7% |
+| [OLMo-2-1124-7B-Instruct](cards/olmo-2-1124-7b-instruct.json) | A derivative checkpoint with explicit base-model relations and eight benchmark rows | 63.6% |
 
-Coverage reports how many documentation fields are populated; it is not a correctness
-score. Both files remain exact schema-v5 projections. Cards generated under v6 will
-also include the use-and-risk section. Neither checked-in card is human-reviewed or
-release-approved. The Instruct file's retained omission audit also found
-source-present information missing from `lineage.model_family` and
-`training_context.training_data_size`.
+Coverage reports how many documentation fields are populated from the available
+evidence. It is not a correctness score. The examples illustrate the JSON format and
+the treatment of model identity, lineage, training information, and evaluation
+results. They have not completed human release review.
 
 ## Repository and code
 
-The repository contains the public, source-free components for schema handling,
-evidence and binding records, exact quote and structured-pointer verification,
-relation and scope policy, deterministic projection and conflict handling,
-append-only review events, rendering, and sanitized JSON export. The collector,
-composer, validation, and release orchestration use these interfaces. The end-to-end
-generator is not yet exposed as one public command.
+The repository contains the public schema, generated JSON examples, pipeline figure,
+Python package, tests, and architecture documentation. The code covers evidence and
+assignment records, source verification, relation and evaluation-scope policy,
+conflict handling, review events, rendering, and sanitized JSON export.
 
 ```text
 assets/             LaTeX pipeline figure and rendered PDF/PNG
 cards/              Generated public JSON cards
-schema/             Versioned JSON Schema drafts
+schema/             JSON Schema
 src/model_cards/    Python package
 tests/              Offline deterministic tests and synthetic fixtures
 ARCHITECTURE.md      Developer architecture and privacy boundary

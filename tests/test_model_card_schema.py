@@ -6,15 +6,15 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_PATH = ROOT / "schema" / "model-card-v6-draft.schema.json"
+SCHEMA_PATH = ROOT / "schema" / "model-card.schema.json"
 
 
-class SchemaV6DraftTests(unittest.TestCase):
+class ModelCardSchemaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
-    def test_adds_use_and_risk_to_the_v5_sections(self) -> None:
+    def test_defines_the_public_sections(self) -> None:
         expected_sections = {
             "identity",
             "lineage",
@@ -33,7 +33,7 @@ class SchemaV6DraftTests(unittest.TestCase):
         )
         card_info = self.schema["$defs"]["cardInfo"]
         self.assertFalse(card_info["additionalProperties"])
-        self.assertEqual(card_info["properties"]["schema_version"]["const"], "6")
+        self.assertEqual(card_info["properties"]["schema_version"]["const"], "1")
         self.assertEqual(
             self.schema["$defs"]["provenanceAndQuality"]["properties"]["provenance"]
             ["$ref"],

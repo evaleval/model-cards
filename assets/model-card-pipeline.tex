@@ -1,7 +1,4 @@
-% Model Cards pipeline figure.
-% Adapted from the shipped Auto-BenchmarkCards Figure 1 visual grammar.
-% The figure ends at a generated candidate. Human release review is not shown
-% because it has not yet been completed for the examples in this repository.
+% Model Card generation pipeline.
 \documentclass[tikz,border=3pt]{standalone}
 
 \usepackage{newtxtext,newtxmath}
@@ -129,9 +126,9 @@
 \barrow{13.012}{-0.80}
 
 % Stage names.
-\node[ttl] (t1) at (1.35,-2.03) {Exact Model};
+\node[ttl] (t1) at (1.35,-2.03) {Selected};
 \node[badge] at ($(t1.west)+(-0.30,0.085)$) {1};
-\node[ttl] at (1.35,-2.40) {Revision};
+\node[ttl] at (1.35,-2.40) {Model Release};
 
 \node[ttl] (t2) at (4.85,-2.03) {Multi-Source};
 \node[badge] at ($(t2.west)+(-0.30,0.085)$) {2};
