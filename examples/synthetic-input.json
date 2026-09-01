@@ -1,0 +1,224 @@
+{
+  "target": {
+    "model_id": "example-lab/synthetic-model-1b",
+    "revision": "1111111111111111111111111111111111111111"
+  },
+  "sources": [
+    {
+      "source_id": "synthetic-hf-metadata",
+      "role": "hugging_face_metadata",
+      "source_revision": "1111111111111111111111111111111111111111",
+      "target": {
+        "model_id": "example-lab/synthetic-model-1b",
+        "revision": "1111111111111111111111111111111111111111"
+      },
+      "synthetic": true,
+      "data": {
+        "model_id": "example-lab/synthetic-model-1b",
+        "revision": "1111111111111111111111111111111111111111",
+        "display_name": "Synthetic Model 1B",
+        "license": "MIT",
+        "base_model": {
+          "model_id": "example-lab/synthetic-base-1b",
+          "relation": "base"
+        },
+        "config": {
+          "architecture_type": "dense decoder-only",
+          "advertised_context_length": "4096 tokens",
+          "torch_dtype": "bfloat16"
+        },
+        "model_card": "https://example.invalid/models/synthetic-model-1b"
+      }
+    },
+    {
+      "source_id": "synthetic-model-page",
+      "role": "hugging_face_snapshot",
+      "source_revision": "1111111111111111111111111111111111111111",
+      "target": {
+        "model_id": "example-lab/synthetic-model-1b",
+        "revision": "1111111111111111111111111111111111111111"
+      },
+      "synthetic": true,
+      "text": "# Synthetic Model 1B\n\nSynthetic Model 1B is an instruction-tuned text model built for fictional offline examples. The exact checkpoint uses synthetic preference tuning."
+    },
+    {
+      "source_id": "synthetic-report",
+      "role": "developer_report",
+      "source_revision": "synthetic-report-v1",
+      "target": {
+        "model_id": "example-lab/synthetic-model-1b",
+        "revision": "1111111111111111111111111111111111111111"
+      },
+      "synthetic": true,
+      "text": "Synthetic Model 1B reports 73.5 accuracy on Toy Reasoning in a zero-shot setting. The report describes only invented measurements."
+    },
+    {
+      "source_id": "synthetic-family-report",
+      "role": "developer_report",
+      "source_revision": "synthetic-family-v1",
+      "target": {
+        "model_id": "example-lab/synthetic-family",
+        "revision": "2222222222222222222222222222222222222222"
+      },
+      "synthetic": true,
+      "text": "The Synthetic Model family was trained on 99 trillion invented tokens."
+    },
+    {
+      "source_id": "synthetic-eee-record",
+      "role": "eee_index",
+      "source_revision": "synthetic-index-v1",
+      "target": {
+        "model_id": "example-lab/synthetic-model-1b",
+        "revision": "1111111111111111111111111111111111111111"
+      },
+      "synthetic": true,
+      "data": {
+        "record": "https://example.invalid/evaluations/synthetic-model-1b"
+      }
+    },
+    {
+      "source_id": "synthetic-comparison-record",
+      "role": "eee_index",
+      "source_revision": "synthetic-index-v1",
+      "target": {
+        "model_id": "example-lab/synthetic-comparison-2b",
+        "revision": "3333333333333333333333333333333333333333"
+      },
+      "synthetic": true,
+      "data": {
+        "record": {
+          "model_id": "example-lab/synthetic-comparison-2b",
+          "link": "https://example.invalid/evaluations/synthetic-comparison-2b"
+        }
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "identity.model_id",
+      "pointer": "/model_id",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "identity.version",
+      "pointer": "/revision",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "identity.name",
+      "pointer": "/display_name",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "identity.license",
+      "pointer": "/license",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "quote",
+      "source_id": "synthetic-model-page",
+      "field_path": "identity.summary",
+      "value": "Synthetic Model 1B is an instruction-tuned text model built for fictional offline examples.",
+      "quote": "Synthetic Model 1B is an instruction-tuned text model built for fictional offline examples.",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "lineage.base_models[0]",
+      "pointer": "/base_model",
+      "claim_entity": "example-lab/synthetic-base-1b",
+      "relation": "base_model"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "specifications.architecture_type",
+      "pointer": "/config/architecture_type",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "specifications.context_length",
+      "pointer": "/config/advertised_context_length",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "quote",
+      "source_id": "synthetic-model-page",
+      "field_path": "training_context.adaptations",
+      "value": "Synthetic preference tuning",
+      "quote": "The exact checkpoint uses synthetic preference tuning.",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "quote",
+      "source_id": "synthetic-family-report",
+      "field_path": "training_context.training_data_size",
+      "value": "99 trillion invented tokens",
+      "quote": "The Synthetic Model family was trained on 99 trillion invented tokens.",
+      "claim_entity": "Synthetic Model family",
+      "relation": "model_family"
+    },
+    {
+      "kind": "quote",
+      "source_id": "synthetic-report",
+      "field_path": "evaluation.benchmark_scores[0]",
+      "value": {
+        "benchmark": "Toy Reasoning",
+        "metric": "accuracy",
+        "score": 73.5,
+        "setting": "zero-shot"
+      },
+      "quote": "Synthetic Model 1B reports 73.5 accuracy on Toy Reasoning in a zero-shot setting.",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target",
+      "benchmark_scope": {
+        "benchmark": "Toy Reasoning",
+        "metric": "accuracy",
+        "setting": "zero-shot"
+      }
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-eee-record",
+      "field_path": "evaluation.evaluation_sources[0]",
+      "pointer": "/record",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-comparison-record",
+      "field_path": "evaluation.related_model_scores[0]",
+      "pointer": "/record",
+      "claim_entity": "example-lab/synthetic-comparison-2b@3333333333333333333333333333333333333333",
+      "relation": "comparison_model"
+    },
+    {
+      "kind": "structured",
+      "source_id": "synthetic-hf-metadata",
+      "field_path": "links.model_card",
+      "pointer": "/model_card",
+      "claim_entity": "example-lab/synthetic-model-1b@1111111111111111111111111111111111111111",
+      "relation": "exact_target"
+    }
+  ]
+}
