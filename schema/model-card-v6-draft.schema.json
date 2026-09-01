@@ -1,0 +1,1145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/evaleval/model-cards/main/schema/model-card-v6-draft.schema.json",
+  "title": "Model Card v6 draft",
+  "description": "Additive draft of the evidence-bound Model Card schema with explicit use-context and risk records.",
+  "$comment": "Cross-reference integrity, selected-key uniqueness, source resolution, taxonomy snapshot replay, and recursive privacy scanning are enforced by application-level release validators. JSON Schema alone does not identify secrets or source text.",
+  "type": "object",
+  "required": [
+    "identity",
+    "lineage",
+    "specifications",
+    "training_context",
+    "access_and_adoption",
+    "evaluation",
+    "links",
+    "use_and_risk",
+    "provenance_and_quality"
+  ],
+  "properties": {
+    "identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "lineage": {
+      "$ref": "#/$defs/lineage"
+    },
+    "specifications": {
+      "$ref": "#/$defs/specifications"
+    },
+    "training_context": {
+      "$ref": "#/$defs/trainingContext"
+    },
+    "access_and_adoption": {
+      "$ref": "#/$defs/accessAndAdoption"
+    },
+    "evaluation": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "links": {
+      "$ref": "#/$defs/links"
+    },
+    "use_and_risk": {
+      "$ref": "#/$defs/useAndRisk"
+    },
+    "provenance_and_quality": {
+      "$ref": "#/$defs/provenanceAndQuality"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "v5FieldValue": {
+      "$comment": "The existing v5 generator has field-specific value profiles. Their stricter runtime validators remain authoritative while v6 is a draft.",
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "array"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "name",
+        "developed_by",
+        "model_type",
+        "license",
+        "release_date",
+        "version",
+        "summary"
+      ],
+      "properties": {
+        "model_id": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "name": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "developed_by": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "model_type": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "license": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "release_date": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "version": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "summary": {
+          "$ref": "#/$defs/v5FieldValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "lineage": {
+      "type": "object",
+      "required": [
+        "base_models",
+        "model_family",
+        "derivatives"
+      ],
+      "properties": {
+        "base_models": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "model_family": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "derivatives": {
+          "$ref": "#/$defs/v5FieldValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "specifications": {
+      "type": "object",
+      "required": [
+        "architecture_type",
+        "num_parameters",
+        "context_length",
+        "precision",
+        "modalities",
+        "model_stage"
+      ],
+      "properties": {
+        "architecture_type": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "num_parameters": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "context_length": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "precision": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "modalities": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "model_stage": {
+          "$ref": "#/$defs/v5FieldValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "trainingContext": {
+      "type": "object",
+      "required": [
+        "training_data",
+        "training_data_size",
+        "data_cutoff",
+        "adaptations"
+      ],
+      "properties": {
+        "training_data": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "training_data_size": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "data_cutoff": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "adaptations": {
+          "$ref": "#/$defs/v5FieldValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "accessAndAdoption": {
+      "type": "object",
+      "required": [
+        "access_type",
+        "downloads"
+      ],
+      "properties": {
+        "access_type": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "downloads": {
+          "$ref": "#/$defs/v5FieldValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluation": {
+      "type": "object",
+      "required": [
+        "results_summary",
+        "benchmark_scores",
+        "related_model_scores",
+        "human_evals",
+        "safety_evals",
+        "evaluation_sources"
+      ],
+      "properties": {
+        "results_summary": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "benchmark_scores": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "related_model_scores": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "human_evals": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "safety_evals": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "evaluation_sources": {
+          "$ref": "#/$defs/v5FieldValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "links": {
+      "type": "object",
+      "required": [
+        "model_card",
+        "system_card",
+        "tech_report",
+        "code_repository"
+      ],
+      "properties": {
+        "model_card": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "system_card": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "tech_report": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "code_repository": {
+          "$ref": "#/$defs/v5FieldValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenanceAndQuality": {
+      "type": "object",
+      "required": [
+        "provenance",
+        "flagged_fields",
+        "missing_fields",
+        "coverage_score",
+        "card_info"
+      ],
+      "properties": {
+        "provenance": {
+          "$ref": "#/$defs/publicProvenance"
+        },
+        "flagged_fields": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "missing_fields": {
+          "$ref": "#/$defs/v5FieldValue"
+        },
+        "coverage_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "card_info": {
+          "$ref": "#/$defs/cardInfo"
+        }
+      },
+      "additionalProperties": false
+    },
+    "useAndRisk": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "intended_uses",
+        "out_of_scope_uses",
+        "limitations",
+        "known_biases",
+        "identified_risks",
+        "mitigations"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1"
+        },
+        "intended_uses": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/contextStatement"
+              },
+              {
+                "properties": {
+                  "context_id": {
+                    "pattern": "^intended-use:[a-z0-9][a-z0-9._-]*$"
+                  }
+                }
+              }
+            ]
+          },
+          "uniqueItems": true
+        },
+        "out_of_scope_uses": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/contextStatement"
+              },
+              {
+                "properties": {
+                  "context_id": {
+                    "pattern": "^out-of-scope-use:[a-z0-9][a-z0-9._-]*$"
+                  }
+                }
+              }
+            ]
+          },
+          "uniqueItems": true
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/contextStatement"
+              },
+              {
+                "properties": {
+                  "context_id": {
+                    "pattern": "^limitation:[a-z0-9][a-z0-9._-]*$"
+                  }
+                }
+              }
+            ]
+          },
+          "uniqueItems": true
+        },
+        "known_biases": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/contextStatement"
+              },
+              {
+                "properties": {
+                  "context_id": {
+                    "pattern": "^known-bias:[a-z0-9][a-z0-9._-]*$"
+                  }
+                }
+              }
+            ]
+          },
+          "uniqueItems": true
+        },
+        "identified_risks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/risk"
+          },
+          "uniqueItems": true
+        },
+        "mitigations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mitigation"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "contextStatement": {
+      "type": "object",
+      "required": [
+        "context_id",
+        "description",
+        "origin",
+        "source_refs"
+      ],
+      "properties": {
+        "context_id": {
+          "type": "string",
+          "pattern": "^(intended-use|out-of-scope-use|limitation|known-bias):[a-z0-9][a-z0-9._-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "enum": [
+            "publisher_reported",
+            "source_derived",
+            "operator_defined"
+          ]
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "origin": {
+                "enum": [
+                  "publisher_reported",
+                  "source_derived"
+                ]
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_refs": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "risk": {
+      "type": "object",
+      "required": [
+        "risk_id",
+        "identification_origin",
+        "taxonomy",
+        "name",
+        "description",
+        "applicability_rationale",
+        "grounds",
+        "source_refs",
+        "mapping_provenance",
+        "review_status",
+        "mitigation_assessment",
+        "mitigation_refs"
+      ],
+      "properties": {
+        "risk_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "identification_origin": {
+          "enum": [
+            "publisher_reported",
+            "taxonomy_identified"
+          ]
+        },
+        "taxonomy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/taxonomyReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "applicability_rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ground"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        },
+        "mapping_provenance": {
+          "$ref": "#/$defs/mappingProvenance"
+        },
+        "review_status": {
+          "enum": [
+            "candidate",
+            "reviewed",
+            "rejected"
+          ]
+        },
+        "mitigation_assessment": {
+          "enum": [
+            "linked",
+            "none_identified",
+            "not_applicable"
+          ]
+        },
+        "mitigation_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mitigationReference"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "identification_origin": {
+                "const": "taxonomy_identified"
+              }
+            },
+            "required": [
+              "identification_origin"
+            ]
+          },
+          "then": {
+            "properties": {
+              "taxonomy": {
+                "$ref": "#/$defs/taxonomyReference"
+              },
+              "mapping_provenance": {
+                "properties": {
+                  "method": {
+                    "const": "ai_atlas_nexus"
+                  },
+                  "tool_version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "inference_model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "inference_config_sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "identification_origin": {
+                "const": "publisher_reported"
+              }
+            },
+            "required": [
+              "identification_origin"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_refs": {
+                "minItems": 1
+              },
+              "mapping_provenance": {
+                "properties": {
+                  "method": {
+                    "const": "source_binding"
+                  },
+                  "inference_model": {
+                    "type": "null"
+                  },
+                  "inference_config_sha256": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mitigation_assessment": {
+                "const": "linked"
+              }
+            },
+            "required": [
+              "mitigation_assessment"
+            ]
+          },
+          "then": {
+            "properties": {
+              "mitigation_refs": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "mitigation_refs": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "taxonomyReference": {
+      "type": "object",
+      "required": [
+        "taxonomy_id",
+        "name",
+        "version",
+        "source_url",
+        "snapshot_sha256"
+      ],
+      "properties": {
+        "taxonomy_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mappingProvenance": {
+      "type": "object",
+      "required": [
+        "method",
+        "tool_version",
+        "inference_model",
+        "inference_config_sha256"
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "source_binding",
+            "ai_atlas_nexus"
+          ]
+        },
+        "tool_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "inference_model": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "inference_config_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ground": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "ref",
+            "relevance"
+          ],
+          "properties": {
+            "kind": {
+              "const": "card_field"
+            },
+            "ref": {
+              "enum": [
+                "identity.model_id",
+                "identity.name",
+                "identity.developed_by",
+                "identity.model_type",
+                "identity.license",
+                "identity.release_date",
+                "identity.version",
+                "identity.summary",
+                "lineage.base_models",
+                "lineage.model_family",
+                "lineage.derivatives",
+                "specifications.architecture_type",
+                "specifications.num_parameters",
+                "specifications.context_length",
+                "specifications.precision",
+                "specifications.modalities",
+                "specifications.model_stage",
+                "training_context.training_data",
+                "training_context.training_data_size",
+                "training_context.data_cutoff",
+                "training_context.adaptations",
+                "access_and_adoption.access_type",
+                "access_and_adoption.downloads",
+                "evaluation.results_summary",
+                "evaluation.benchmark_scores",
+                "evaluation.related_model_scores",
+                "evaluation.human_evals",
+                "evaluation.safety_evals",
+                "evaluation.evaluation_sources",
+                "links.model_card",
+                "links.system_card",
+                "links.tech_report",
+                "links.code_repository"
+              ]
+            },
+            "relevance": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "ref",
+            "relevance"
+          ],
+          "properties": {
+            "kind": {
+              "const": "use_context"
+            },
+            "ref": {
+              "type": "string",
+              "pattern": "^(intended-use|out-of-scope-use|limitation|known-bias):[a-z0-9][a-z0-9._-]*$"
+            },
+            "relevance": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "mitigation": {
+      "type": "object",
+      "required": [
+        "mitigation_id",
+        "description",
+        "origin",
+        "source_refs"
+      ],
+      "properties": {
+        "mitigation_id": {
+          "type": "string",
+          "pattern": "^mitigation:[a-z0-9][a-z0-9._-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "enum": [
+            "publisher_reported",
+            "taxonomy_recommended",
+            "project_recommended",
+            "operator_defined"
+          ]
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mitigationReference": {
+      "type": "object",
+      "required": [
+        "mitigation_id",
+        "status"
+      ],
+      "properties": {
+        "mitigation_id": {
+          "type": "string",
+          "pattern": "^mitigation:[a-z0-9][a-z0-9._-]*$"
+        },
+        "status": {
+          "enum": [
+            "recommended",
+            "planned",
+            "implemented",
+            "verified",
+            "unknown"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "sourceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "fieldPath": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*(?:\\[(?:0|[1-9][0-9]*)\\])?$"
+    },
+    "cardInfo": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "target",
+        "generated_at",
+        "composer_commit",
+        "source_manifest",
+        "inapplicable_fields"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "6"
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^[^@\\s]+/[^@\\s]+@[0-9a-f]{40}$"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "composer_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "llm": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/+-]{0,159}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_manifest": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "inapplicable_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fieldPath"
+          },
+          "uniqueItems": true
+        },
+        "condition": {
+          "enum": [
+            "deterministic",
+            "model_assisted",
+            "hybrid"
+          ]
+        },
+        "quality_snapshot": {
+          "const": "generation_time"
+        },
+        "frame": {
+          "$ref": "#/$defs/publicFrame"
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicFrame": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "family": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "family_target_collision_disambiguated": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "base": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "benchmarks": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "metrics": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "siblings_llm": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "comparisons_llm": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "family_aliases_llm": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "own_name_dropped": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "publicProvenance": {
+      "description": "Source-clean field-to-source references. Source bodies and evidence text remain in the private binding ledger.",
+      "type": "object",
+      "required": [
+        "schema_version",
+        "claim_sources"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1"
+        },
+        "claim_sources": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/fieldPath"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/publicSourceReference"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicSourceReference": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "source_uri",
+        "source_revision",
+        "source_sha256",
+        "locator",
+        "claimed_entity",
+        "relation"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "source_uri": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^(?:https://(?!(?:localhost|127\\.0\\.0\\.1)(?::|/|$))[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/[^\\s]*)?|hf://[A-Za-z0-9._/-]+(?:@[A-Za-z0-9._-]+)?|doi:[^\\s]+|arxiv:[0-9.]+)$"
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "locator": {
+          "$ref": "#/$defs/publicLocator"
+        },
+        "claimed_entity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "relation": {
+          "enum": [
+            "exact_target",
+            "base",
+            "family",
+            "derivative",
+            "sibling_or_comparison"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicLocator": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/exactSpanLocator"
+        },
+        {
+          "$ref": "#/$defs/jsonPointerLocator"
+        },
+        {
+          "$ref": "#/$defs/tableRowLocator"
+        },
+        {
+          "$ref": "#/$defs/sectionLocator"
+        }
+      ]
+    },
+    "exactSpanLocator": {
+      "type": "object",
+      "required": [
+        "kind",
+        "start",
+        "end"
+      ],
+      "properties": {
+        "kind": {
+          "const": "exact_span"
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "jsonPointerLocator": {
+      "type": "object",
+      "required": [
+        "kind",
+        "pointer"
+      ],
+      "properties": {
+        "kind": {
+          "const": "json_pointer"
+        },
+        "pointer": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^/(?:[^~\\r\\n]|~[01])*$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tableRowLocator": {
+      "type": "object",
+      "required": [
+        "kind",
+        "table",
+        "row"
+      ],
+      "properties": {
+        "kind": {
+          "const": "table_row"
+        },
+        "table": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\r\\n]+$"
+        },
+        "row": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\r\\n]+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sectionLocator": {
+      "type": "object",
+      "required": [
+        "kind",
+        "heading"
+      ],
+      "properties": {
+        "kind": {
+          "const": "section"
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[^\\r\\n]+$"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

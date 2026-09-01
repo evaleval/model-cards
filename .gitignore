@@ -49,14 +49,14 @@ tmp/
 *.log
 *.jsonl
 *.pdf
-!docs/figures/model-card-pipeline.pdf
+!assets/model-card-pipeline.pdf
 *.zip
 *.tar
 *.tar.gz
 *.tgz
 
-docs/figures/*.aux
-docs/figures/*.fdb_latexmk
-docs/figures/*.fls
-docs/figures/*.out
-docs/figures/*.synctex.gz
+assets/*.aux
+assets/*.fdb_latexmk
+assets/*.fls
+assets/*.out
+assets/*.synctex.gz

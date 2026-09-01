@@ -47,7 +47,7 @@ class PublicTreeTests(unittest.TestCase):
                 self.assertTrue(self.FORBIDDEN_COMPONENTS.isdisjoint(path.parts))
                 self.assertNotIn(path.name, self.FORBIDDEN_NAMES)
                 if path.suffix.lower() == ".pdf":
-                    self.assertEqual(path.as_posix(), "docs/figures/model-card-pipeline.pdf")
+                    self.assertEqual(path.as_posix(), "assets/model-card-pipeline.pdf")
 
     def test_gitignore_covers_private_boundary(self):
         if not (self.ROOT / ".git").is_dir():
@@ -63,7 +63,7 @@ class PublicTreeTests(unittest.TestCase):
             ".codex/config.json",
             "nested/CLAUDE.md",
             "nested/AGENTS.md",
-            "docs/figures/unreviewed.pdf",
+            "assets/unreviewed.pdf",
         )
         for path in should_ignore:
             with self.subTest(path=path):
@@ -74,9 +74,22 @@ class PublicTreeTests(unittest.TestCase):
             "check-ignore",
             "--no-index",
             "--quiet",
-            "docs/figures/model-card-pipeline.pdf",
+            "assets/model-card-pipeline.pdf",
         )
         self.assertEqual(allowed.returncode, 1)
+
+    def test_cards_directory_contains_only_canonical_json_examples(self):
+        cards = self.ROOT / "cards"
+        self.assertEqual(
+            {path.name for path in cards.iterdir()},
+            {
+                "olmo-2-1124-7b.json",
+                "olmo-2-1124-7b-instruct.json",
+            },
+        )
+        self.assertTrue(
+            all(path.is_file() and path.suffix == ".json" for path in cards.iterdir())
+        )
 
 
 if __name__ == "__main__":
