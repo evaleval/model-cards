@@ -37,7 +37,7 @@ def _binding_evidence(binding) -> str:
         )
         if evidence.kind is EvidenceKind.QUOTE:
             coordinates = (
-                f"normalized characters {evidence.char_start}–{evidence.char_end}"
+                f"characters {evidence.char_start}–{evidence.char_end}"
                 if evidence.verified
                 else "not verified"
             )
@@ -58,18 +58,6 @@ def render_html(artifact: CardArtifact) -> str:
     """Render a standalone inspection page with card, bindings, and reviews."""
 
     card = project_card(artifact)
-    synthetic_only = bool(artifact.bindings) and all(
-        evidence.synthetic
-        for binding in artifact.bindings
-        for evidence in binding.evidence
-    )
-    synthetic_notice = ""
-    if synthetic_only:
-        synthetic_notice = (
-            '<div class="notice"><strong>Synthetic example.</strong> Every evidence item '
-            "in this artifact is marked synthetic. This page tests the mechanism and "
-            "does not document a real model.</div>"
-        )
     section_blocks: list[str] = []
     for section, fields in SCHEMA_V5_SECTIONS.items():
         rows = "".join(
@@ -158,7 +146,6 @@ def render_html(artifact: CardArtifact) -> str:
     .binding.rejected {{ border-left-color: #c0392b; }}
     .binding-head {{ display: flex; justify-content: space-between; gap: 12px; }}
     .pill {{ border: 1px solid #9aa5b1; border-radius: 999px; padding: 2px 8px; font-size: 0.8rem; }}
-    .notice {{ margin: 22px 0; padding: 12px 14px; border-left: 5px solid #b2182b; background: #f9eff1; }}
     pre, blockquote {{ white-space: pre-wrap; overflow-wrap: anywhere; background: #f6f8fa; margin: 8px 0; padding: 9px; }}
     blockquote {{ border-left: 3px solid #9aa5b1; }}
     .source, .reason {{ color: #52606d; font-size: 0.9rem; }}
@@ -170,7 +157,6 @@ def render_html(artifact: CardArtifact) -> str:
     <h1>{escape(title)}</h1>
     <div class="target">Exact revision: {escape(artifact.target.revision)} · Schema v{escape(artifact.schema_version)}</div>
   </header>
-  {synthetic_notice}
   {''.join(section_blocks)}
   <section><h2>Evidence bindings</h2>{''.join(binding_blocks)}</section>
   <section><h2>Review history</h2>
