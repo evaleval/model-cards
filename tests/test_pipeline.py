@@ -19,6 +19,7 @@ from model_cards.artifact import CardArtifact
 from model_cards.composer import CompositionResult
 from model_cards.extraction import (
     ExtractionBatch,
+    ProviderProposalRejection,
     QuoteProposal,
     materialize_quote_batch,
 )
@@ -176,6 +177,18 @@ class SupportingFactChecker:
         )
 
 
+class UnavailableFactChecker:
+    checker_id = "tests/unavailable_fact_checker"
+    checker_revision = "fixture-v1"
+
+    def check(self, request):
+        return CheckerResponse(
+            outcome=CheckOutcome.UNAVAILABLE,
+            reason_code="fixture_unavailable",
+            cited_chunk_ids=(),
+        )
+
+
 class SelectiveFactChecker:
     checker_revision = "fixture-v1"
 
@@ -297,7 +310,7 @@ class PipelineTests(unittest.TestCase):
         batch = ExtractionBatch.build(
             target=catalog.target,
             source_catalog_sha256=catalog.catalog_sha256,
-            provider="Baidu",
+            provider="Together",
             inference_config_sha256="b" * 64,
             proposals=(proposal,),
         )
@@ -356,6 +369,63 @@ class PipelineTests(unittest.TestCase):
             risk_catalog=RISK_CATALOG,
             fact_checker=SupportingFactChecker(),
         )
+
+    def test_extraction_rejections_are_hash_only_and_replay_byte_identically(self) -> None:
+        batch, _, decisions = self.quote_input(
+            field_path="identity.summary",
+            value="First exact summary.",
+            quote="First exact summary.",
+        )
+        rejected_content = b"synthetic rejected provider proposal"
+        rejection = ProviderProposalRejection(
+            proposal_index=1,
+            proposal_sha256=hashlib.sha256(rejected_content).hexdigest(),
+            reason="proposal_contract_invalid",
+        )
+        batch_with_rejection = ExtractionBatch.build(
+            target=batch.target,
+            source_catalog_sha256=batch.source_catalog_sha256,
+            provider=batch.provider,
+            inference_config_sha256=batch.inference_config_sha256,
+            proposals=batch.proposals,
+            rejections=(rejection,),
+        )
+
+        first = self.run_pipeline(
+            quote_batches=(batch_with_rejection,),
+            prose_checker_decisions=decisions,
+            fact_checker=SupportingFactChecker(),
+        )
+        extraction_path = self.run / "extraction.json"
+        first_bytes = extraction_path.read_bytes()
+        extraction = json.loads(first_bytes)
+        self.assertEqual(
+            [
+                {
+                    "proposal_index": 1,
+                    "proposal_sha256": rejection.proposal_sha256,
+                    "reason": "proposal_contract_invalid",
+                }
+            ],
+            extraction["quote_batches"][0]["rejections"],
+        )
+        self.assertNotIn(rejected_content.decode("utf-8"), first_bytes.decode("utf-8"))
+        extraction_event = next(
+            json.loads(line)
+            for line in (self.run / "journal.jsonl").read_text().splitlines()
+            if json.loads(line)["stage"] == "extract"
+        )
+        self.assertEqual(
+            1, extraction_event["metrics"]["provider_proposal_rejection_count"]
+        )
+
+        second = self.run_pipeline(
+            quote_batches=(batch_with_rejection,),
+            prose_checker_decisions=decisions,
+            fact_checker=SupportingFactChecker(),
+        )
+        self.assertEqual(first.to_dict(), second.to_dict())
+        self.assertEqual(first_bytes, extraction_path.read_bytes())
 
     def test_official_bundle_is_ancestry_bound_and_used_by_every_pipeline_stage(self) -> None:
         hf_bundle = self.root / "official-hf-bundle"
@@ -725,6 +795,36 @@ class PipelineTests(unittest.TestCase):
             if item.field_path == "identity.summary"
         )
         self.assertIn(CheckOutcome.UNAVAILABLE, field.outcomes)
+        fact_events = [
+            json.loads(line)
+            for line in (self.run / "journal.jsonl").read_text().splitlines()
+            if json.loads(line)["stage"] == "factreasoner"
+        ]
+        self.assertEqual(2, len(fact_events))
+        self.assertTrue(all(item["status"] == "completed" for item in fact_events))
+
+    def test_all_unavailable_fact_checks_mark_both_stages_unavailable(self) -> None:
+        summary = "The exact target is an instruction-following language model."
+        batch, _, decisions = self.quote_input(
+            field_path="identity.summary", value=summary, quote=summary
+        )
+        result = self.run_pipeline(
+            quote_batches=(batch,),
+            prose_checker_decisions=decisions,
+            fact_checker=UnavailableFactChecker(),
+        )
+        self.assertFalse(result.validation.factreasoner_passed)
+        self.assertEqual(LifecycleStatus.GENERATED_UNREVIEWED, result.lifecycle_status)
+        fact_events = [
+            json.loads(line)
+            for line in (self.run / "journal.jsonl").read_text().splitlines()
+            if json.loads(line)["stage"] == "factreasoner"
+        ]
+        self.assertEqual(2, len(fact_events))
+        self.assertTrue(all(item["status"] == "unavailable" for item in fact_events))
+        self.assertTrue(
+            all(item["reason"] == "fact_checks_unavailable" for item in fact_events)
+        )
 
     def test_repair_record_replays_tamper_fails_and_resume_is_deterministic(self) -> None:
         summary = "The exact target is an instruction-following language model."
@@ -957,7 +1057,7 @@ class PipelineTests(unittest.TestCase):
         other = ExtractionBatch.build(
             target=batch.target,
             source_catalog_sha256="0" * 64,
-            provider="Baidu",
+            provider="Together",
             inference_config_sha256="b" * 64,
             proposals=batch.proposals,
         )

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import unittest
 
+from jsonschema import ValidationError
+
 from model_cards.bindings import quote_binding
 from model_cards.claim_gate import ClaimCandidate, GateName
+from model_cards.extraction import ExtractionBatch
 from model_cards.factreasoner import (
     ATOM_VERSION,
     CheckRequest,
@@ -20,6 +24,9 @@ from model_cards.factreasoner import (
 from model_cards.models import RelationToTarget, SourceDocument, SourceRole, TargetIdentity
 from model_cards.provider import MODEL_ID
 from model_cards.provider_adapters import (
+    MAX_CLAIM_OUTPUT_TOKENS,
+    MAX_EXTRACTION_OUTPUT_TOKENS,
+    MAX_FACT_OUTPUT_TOKENS,
     OpenRouterApplicabilityChecker,
     OpenRouterClaimChecker,
     OpenRouterFactChecker,
@@ -35,6 +42,7 @@ from model_cards.risk_mapping import (
     TaxonomyRisk,
     UseContext,
 )
+from model_cards.schema import CONTRACT_SCHEMA
 
 
 TARGET = TargetIdentity("example-lab/exact-model", "a" * 40)
@@ -55,6 +63,19 @@ class FakeCalls:
         kwargs["validator"](decision)
         return SimpleNamespace(
             decision=decision,
+            receipt=SimpleNamespace(prompt_tokens=10, completion_tokens=3),
+            resumed=False,
+        )
+
+
+class IgnoringValidatorCall(FakeCalls):
+    def __call__(self, spec, **kwargs):
+        self.specs.append(spec)
+        self.kwargs.append(kwargs)
+        if not self.decisions:
+            raise AssertionError("unexpected provider call")
+        return SimpleNamespace(
+            decision=self.decisions.pop(0),
             receipt=SimpleNamespace(prompt_tokens=10, completion_tokens=3),
             resumed=False,
         )
@@ -97,7 +118,7 @@ class ProviderAdapterTests(unittest.TestCase):
 
     def kwargs(self, fake):
         return {
-            "provider": "Baidu",
+            "provider": "Together",
             "ledger_path": self.ledger,
             "decision_dir": self.decisions,
             "environment": {"OPENROUTER_API_KEY": "not-read-by-fixture"},
@@ -126,16 +147,54 @@ class ProviderAdapterTests(unittest.TestCase):
             source(), target=TARGET, source_catalog_sha256="c" * 64
         )
         self.assertEqual(MODEL_ID, batch.inference_model)
-        self.assertEqual("Baidu", batch.provider)
+        self.assertEqual("Together", batch.provider)
         self.assertEqual(1, len(batch.proposals))
         spec = fake.specs[0]
+        payload = json.loads(spec.user_prompt)
         self.assertEqual(MODEL_ID, MODEL_ID)
-        self.assertEqual(0, json.loads(spec.user_prompt)["windows"][0]["normalized_start"])
+        self.assertEqual(0, payload["windows"][0]["normalized_start"])
         self.assertFalse(spec.json_schema["additionalProperties"])
+        self.assertEqual(MAX_EXTRACTION_OUTPUT_TOKENS, spec.max_output_tokens)
+        self.assertIn(
+            "model_details.num_parameters",
+            payload["field_value_contract"]["field_value_schemas"],
+        )
+        self.assertLess(
+            len(payload["field_value_contract"]["$defs"]),
+            len(CONTRACT_SCHEMA["$defs"]),
+        )
+        self.assertEqual(
+            {"type": "string", "minLength": 1},
+            payload["field_value_contract"]["field_value_schemas"][
+                "use_and_risk.limitations"
+            ],
+        )
+        publisher_risk_schema = payload["field_value_contract"][
+            "field_value_schemas"
+        ]["use_and_risk.identified_risks"]
+        self.assertEqual(
+            ["name", "description", "applicability_rationale"],
+            publisher_risk_schema["required"],
+        )
+        self.assertFalse(publisher_risk_schema["additionalProperties"])
+        self.assertNotIn("risk_id", publisher_risk_schema["properties"])
+        self.assertEqual(
+            "use_and_risk.identified_risks",
+            payload["field_value_contract"]["publisher_risk_item_field"],
+        )
+        self.assertEqual(
+            "source_stated",
+            payload["rules"]["publisher_reported_risk"]["origin"],
+        )
+        self.assertIn(
+            "7B",
+            payload["rules"]["text_values_preserve_units_and_qualifiers"],
+        )
+        self.assertIn("highest-value", payload["rules"]["proposal_selection"])
         self.assertEqual("quote_extraction", spec.context_metadata["stage"])
         self.assertNotIn("excerpt", spec.context_metadata)
 
-    def test_quote_extractor_rejects_invented_source_and_wrong_target(self) -> None:
+    def test_quote_extractor_withholds_invented_source_and_rejects_wrong_target(self) -> None:
         fake = FakeCalls(
             {
                 "proposals": [
@@ -152,15 +211,124 @@ class ProviderAdapterTests(unittest.TestCase):
                 ]
             }
         )
-        with self.assertRaises(ProviderAdapterError):
-            OpenRouterQuoteExtractor(**self.kwargs(fake)).extract_source(
-                source(), target=TARGET, source_catalog_sha256="c" * 64
-            )
+        batch = OpenRouterQuoteExtractor(**self.kwargs(fake)).extract_source(
+            source(), target=TARGET, source_catalog_sha256="c" * 64
+        )
+        self.assertEqual((), batch.proposals)
+        self.assertEqual(1, len(batch.rejections))
+        self.assertEqual("source_identifier_mismatch", batch.rejections[0].reason)
         other = TargetIdentity("example-lab/other", "d" * 40)
         with self.assertRaisesRegex(ProviderAdapterError, "exact-target"):
             OpenRouterQuoteExtractor(**self.kwargs(FakeCalls())).extract_source(
                 source(), target=other, source_catalog_sha256="c" * 64
             )
+
+    def test_quote_extractor_revalidates_an_injected_call_result(self) -> None:
+        decision = {
+            "proposals": [
+                {
+                    "source_id": "src_" + "b" * 24,
+                    "field_path": "identity.summary",
+                    "value_json": '"summary"',
+                    "quote": "q" * 801,
+                    "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
+                    "relation": "exact_target",
+                    "benchmark_scope_json": None,
+                    "origin": "source_stated",
+                }
+            ]
+        }
+        with self.assertRaises(ValidationError):
+            OpenRouterQuoteExtractor(
+                **self.kwargs(IgnoringValidatorCall(decision))
+            ).extract_source(
+                source(), target=TARGET, source_catalog_sha256="c" * 64
+            )
+
+    def test_quote_extractor_records_each_invalid_item_without_poisoning_peers(self) -> None:
+        valid = {
+            "source_id": "src_" + "b" * 24,
+            "field_path": "identity.summary",
+            "value_json": json.dumps(
+                "The exact model is intended for research summarization."
+            ),
+            "quote": "The exact model is intended for research summarization.",
+            "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
+            "relation": "exact_target",
+            "benchmark_scope_json": None,
+            "origin": "source_stated",
+        }
+        invalid_value = {
+            **valid,
+            "field_path": "model_details.num_parameters",
+            "value_json": "7",
+            "quote": "PRIVATE INVALID PROPOSAL SENTINEL",
+        }
+        wrong_source = {**valid, "source_id": "src_" + "d" * 24}
+        decision = {
+            "proposals": [valid, invalid_value, wrong_source, dict(valid)]
+        }
+        batch = OpenRouterQuoteExtractor(
+            **self.kwargs(FakeCalls(decision))
+        ).extract_source(
+            source(), target=TARGET, source_catalog_sha256="c" * 64
+        )
+        self.assertEqual(1, len(batch.proposals))
+        self.assertEqual([1, 2, 3], [item.proposal_index for item in batch.rejections])
+        self.assertEqual(
+            [
+                "proposal_contract_invalid",
+                "source_identifier_mismatch",
+                "duplicate_proposal",
+            ],
+            [item.reason for item in batch.rejections],
+        )
+        self.assertEqual(
+            [
+                hashlib.sha256(
+                    json.dumps(
+                        item,
+                        allow_nan=False,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ).encode("utf-8")
+                ).hexdigest()
+                for item in (invalid_value, wrong_source, dict(valid))
+            ],
+            [item.proposal_sha256 for item in batch.rejections],
+        )
+        serialized = json.dumps(batch.to_dict(), sort_keys=True)
+        self.assertNotIn("PRIVATE INVALID PROPOSAL SENTINEL", serialized)
+        self.assertEqual(batch, ExtractionBatch.from_dict(batch.to_dict()))
+
+    def test_quote_extractor_replays_server_string_bounds_locally(self) -> None:
+        base = {
+            "source_id": "src_" + "b" * 24,
+            "field_path": "identity.summary",
+            "value_json": '"summary"',
+            "quote": "summary",
+            "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
+            "relation": "exact_target",
+            "benchmark_scope_json": None,
+            "origin": "source_stated",
+        }
+        for field, value in (
+            ("source_id", "s" * 129),
+            ("field_path", "a." + "b" * 159),
+            ("value_json", '"' + "v" * 1_600 + '"'),
+            ("quote", "q" * 801),
+            ("claim_entity", "e" * 257),
+            ("benchmark_scope_json", '"' + "s" * 1_000 + '"'),
+        ):
+            proposal = dict(base)
+            proposal[field] = value
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                OpenRouterQuoteExtractor(
+                    **self.kwargs(FakeCalls({"proposals": [proposal]}))
+                ).extract_source(
+                    source(), target=TARGET, source_catalog_sha256="c" * 64
+                )
 
     def test_claim_checker_runs_independent_closed_decisions(self) -> None:
         fake = FakeCalls(
@@ -177,6 +345,7 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual(2, len(fake.specs))
         for spec in fake.specs:
             payload = json.loads(spec.user_prompt)
+            self.assertEqual(MAX_CLAIM_OUTPUT_TOKENS, spec.max_output_tokens)
             self.assertEqual(item.candidate_id, payload["candidate_id"])
             self.assertEqual(item.value, payload["value"])
             self.assertNotIn("corrected_value", spec.json_schema["properties"])
@@ -224,6 +393,7 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual("support", response.outcome.value)
         self.assertEqual((chunk_id,), response.cited_chunk_ids)
         payload = json.loads(fake.specs[0].user_prompt)
+        self.assertEqual(MAX_FACT_OUTPUT_TOKENS, fake.specs[0].max_output_tokens)
         self.assertEqual(request.hypothesis, payload["hypothesis"])
         self.assertEqual({chunk_id}, {item["chunk_id"] for item in payload["contexts"]})
 
@@ -310,13 +480,19 @@ class ProviderAdapterTests(unittest.TestCase):
                 ledger_path=self.ledger,
                 decision_dir=self.decisions,
             )
+        with self.assertRaisesRegex(ProviderAdapterError, "pinned"):
+            OpenRouterClaimChecker(
+                provider="Baidu",
+                ledger_path=self.ledger,
+                decision_dir=self.decisions,
+            )
         symlink = self.root / "linked"
         real = self.root / "real"
         real.mkdir()
         symlink.symlink_to(real, target_is_directory=True)
         with self.assertRaisesRegex(ProviderAdapterError, "symlink"):
             OpenRouterClaimChecker(
-                provider="Baidu",
+                provider="Together",
                 ledger_path=self.ledger,
                 decision_dir=symlink,
             )

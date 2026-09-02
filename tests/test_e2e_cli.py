@@ -20,6 +20,7 @@ from model_cards.field_repair import (
 from model_cards.models import TargetIdentity
 from model_cards.official_sources import OfficialFetchStatus, OfficialRemoteObject
 from model_cards.pipeline import PipelineResult
+from model_cards.provider import ProviderTerminalAttemptError, RetryExhaustedError
 from model_cards.quality_report import load_quality_report
 from model_cards.schema import validate_public_card
 from model_cards.source_bundle import (
@@ -229,6 +230,19 @@ class E2ECommandLineTests(unittest.TestCase):
         self.assertEqual(validated, 0, validate_stderr)
         self.assertEqual(json.loads(validate_stdout)["kind"], "pipeline_result")
 
+    def test_generate_cli_rejects_every_unpinned_provider(self) -> None:
+        with self.assertRaises(SystemExit):
+            build_parser().parse_args(
+                [
+                    "generate",
+                    "acme/Instruct",
+                    "--output",
+                    "run",
+                    "--provider",
+                    "Baidu",
+                ]
+            )
+
     def test_normal_generate_automatically_freezes_and_replays_official_sources(self) -> None:
         output = self.root / "online-run"
         arguments = [
@@ -309,7 +323,7 @@ class E2ECommandLineTests(unittest.TestCase):
             "--offline-bundle",
             str(frozen),
             "--provider",
-            "Baidu",
+            "Together",
         ]
         with mock.patch(
             "model_cards.cli.run_provider_assisted_pipeline",
@@ -322,7 +336,7 @@ class E2ECommandLineTests(unittest.TestCase):
         self.assertIn("provider-result.json", summary["artifacts"])
         self.assertIn("usage-summary.json", summary["artifacts"])
         admission = json.loads((output / "provider-orchestration.json").read_text())
-        self.assertEqual("Baidu", admission["provider"])
+        self.assertEqual("Together", admission["provider"])
         self.assertEqual(
             "deepseek/deepseek-v4-flash-0731", admission["model"]
         )
@@ -356,7 +370,7 @@ class E2ECommandLineTests(unittest.TestCase):
             "--offline-bundle",
             str(frozen),
             "--provider",
-            "Baidu",
+            "Together",
         ]
         with mock.patch(
             "model_cards.orchestration._build_risk_interfaces",
@@ -383,13 +397,49 @@ class E2ECommandLineTests(unittest.TestCase):
         self.assertEqual(locked_stdout, "")
         self.assertIn("provider_mode_conflict", locked_stderr)
 
+    def test_retry_exhaustion_and_its_terminal_replay_have_one_cli_code(self) -> None:
+        frozen = self.bundle()
+        output = self.root / "retry-exhausted-run"
+        arguments = [
+            "generate",
+            "acme/Instruct",
+            "--revision",
+            COMMIT,
+            "--output",
+            str(output),
+            "--offline-bundle",
+            str(frozen),
+            "--provider",
+            "Together",
+        ]
+        failures = (
+            RetryExhaustedError(),
+            ProviderTerminalAttemptError(
+                "recorded terminal retry exhaustion",
+                reason_code="retry_exhausted",
+            ),
+        )
+        rendered: list[str] = []
+        for failure in failures:
+            with mock.patch(
+                "model_cards.cli.run_provider_assisted_pipeline",
+                side_effect=failure,
+            ):
+                result, stdout, stderr = self.invoke(arguments)
+            self.assertEqual(2, result)
+            self.assertEqual("", stdout)
+            self.assertIn("provider_retries_exhausted", stderr)
+            self.assert_private_text_absent(stderr)
+            rendered.append(stderr)
+        self.assertEqual(rendered[0], rendered[1])
+
     def test_invalid_provider_and_cross_mode_reuse_fail_before_network_or_calls(self) -> None:
         output = self.root / "invalid-provider"
         with mock.patch(
             "model_cards.cli.HuggingFaceHubAdapter",
             side_effect=AssertionError("invalid provider reached source collection"),
-        ):
-            invalid, invalid_stdout, invalid_stderr = self.invoke(
+        ), self.assertRaises(SystemExit):
+            self.invoke(
                 [
                     "generate",
                     "acme/Instruct",
@@ -399,9 +449,6 @@ class E2ECommandLineTests(unittest.TestCase):
                     "bad\nprovider",
                 ]
             )
-        self.assertEqual(invalid, 2)
-        self.assertEqual(invalid_stdout, "")
-        self.assertIn("invalid_provider", invalid_stderr)
         self.assertFalse(output.exists())
 
         frozen = self.bundle()
@@ -423,7 +470,7 @@ class E2ECommandLineTests(unittest.TestCase):
             side_effect=AssertionError("cross-mode run reached provider orchestration"),
         ):
             conflict, conflict_stdout, conflict_stderr = self.invoke(
-                offline_args + ["--provider", "Baidu"]
+                offline_args + ["--provider", "Together"]
             )
         self.assertEqual(conflict, 2)
         self.assertEqual(conflict_stdout, "")

@@ -83,21 +83,27 @@ Provider-assisted extraction and semantic checking are opt-in:
 
 ```sh
 OPENROUTER_API_KEY=... modelcards generate MODEL[@REVISION] \
-  --provider Baidu \
+  --provider Together \
   --output RUN_DIR
 ```
 
-This mode uses OpenRouter with exactly
-`deepseek/deepseek-v4-flash-0731` and the explicitly requested `Baidu` route. The
-runtime has a global run cap of 300 paid calls and USD 25, permits at most two
+This mode pins OpenRouter to exactly `deepseek/deepseek-v4-flash-0731` on
+`Together`. The CLI rejects every other provider, the runtime verifies the live
+endpoint identity and structured-output capabilities before each send, and automatic
+fallback is disabled. The runtime has a global run cap of 300 paid calls and USD 25,
+permits at most two
 retries after an explicit HTTP 429 or 5xx response, and stops on an uncertain send
-instead of risking a duplicate. It has no automatic provider or model fallback.
-The API key, prompts, source text, and raw responses are not written to public
-cards or audit summaries.
+instead of risking a duplicate. The API key, prompts, source text, and raw response
+envelopes are not written to public cards or audit summaries. Private normalized
+decision sidecars can contain evidence quotes and proposed values and must stay in the
+run directory.
 
-A missing key, invalid route, exhausted retry budget, spend cap, uncertain send,
-or stale resume fails closed. Provider mode is not exposed by `modelcards batch`;
-run provider-assisted targets individually so one run owns one global ledger.
+A missing key, invalid route, spend cap, uncertain send, ledger conflict, extraction
+failure, or stale resume aborts the run. A safely recorded malformed, truncated, or
+retry-exhausted response during an individual claim or FactReasoner check becomes an
+explicit `unavailable` decision instead; it cannot count as validation and the card
+remains unreviewed. Provider mode is not exposed by `modelcards batch`; run
+provider-assisted targets individually so one run owns one global ledger.
 
 ## Run artifacts
 

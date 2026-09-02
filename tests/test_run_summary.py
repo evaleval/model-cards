@@ -48,6 +48,7 @@ SOURCE_BODY_MARKER = "private source body marker that summaries must never copy"
 PROVIDER = "Synthetic Provider"
 PARAMETERS = (
     "max_tokens",
+    "reasoning",
     "response_format",
     "structured_outputs",
     "temperature",
@@ -169,7 +170,7 @@ class RunSummaryTests(unittest.TestCase):
         batch = ExtractionBatch.build(
             target=catalog.target,
             source_catalog_sha256=catalog.catalog_sha256,
-            provider="Baidu",
+            provider="Together",
             inference_config_sha256="b" * 64,
             proposals=(
                 QuoteProposal(
@@ -262,7 +263,7 @@ class RunSummaryTests(unittest.TestCase):
                 returned_model=None,
                 returned_provider=None,
             ),
-            reason_code="http_429",
+            reason_code="http_retryable",
         )
         second = ledger.reserve(
             binding,

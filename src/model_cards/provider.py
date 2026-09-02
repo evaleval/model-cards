@@ -44,13 +44,15 @@ from .run_ledger import (
 
 
 MODEL_ID = EXACT_MODEL
+PINNED_PROVIDER = "Together"
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_ROUTE_URL = (
     "https://openrouter.ai/api/v1/models/"
     "deepseek/deepseek-v4-flash-0731/endpoints"
 )
 OPENROUTER_KEY_ENV = "OPENROUTER_API_KEY"
-PROVIDER_RUNTIME_VERSION = "openrouter-structured-provider/v1"
+PROVIDER_RUNTIME_VERSION = "openrouter-structured-provider/v6"
+REASONING_CONFIG = {"effort": "minimal", "exclude": True}
 DETERMINISTIC_USER_AGENT = "evaleval-model-cards/0.1 structured-provider/v1"
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
@@ -64,6 +66,87 @@ ROUTE_TIMEOUT_SECONDS = 15.0
 
 _SCHEMA_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{2,63}$")
 _RETRYABLE_STATUSES = frozenset({429, *range(500, 600)})
+PROVIDER_RESPONSE_REASON_CODES = frozenset(
+    {
+        "completion_tokens_invalid",
+        "cost_invalid",
+        "cost_over_reservation",
+        "finish_reason_length",
+        "finish_reason_nonstop",
+        "http_authentication_failed",
+        "http_bad_request",
+        "http_endpoint_not_found",
+        "http_nonretryable",
+        "http_payment_required",
+        "http_unprocessable_request",
+        "prompt_tokens_invalid",
+        "response_choices_invalid",
+        "response_json_duplicate_keys",
+        "response_json_invalid",
+        "response_json_not_object",
+        "retry_exhausted",
+        "returned_model_mismatch",
+        "returned_provider_mismatch",
+        "structured_content_missing",
+        "structured_content_too_large",
+        "structured_decision_invalid",
+        "structured_json_duplicate_keys",
+        "structured_json_invalid",
+        "structured_json_not_object",
+        "total_tokens_invalid",
+        "usage_missing",
+        "usage_total_mismatch",
+    }
+)
+FATAL_PROVIDER_RESPONSE_REASON_CODES = frozenset(
+    {
+        "cost_over_reservation",
+        "http_authentication_failed",
+        "http_endpoint_not_found",
+        "http_nonretryable",
+        "http_payment_required",
+        "returned_model_mismatch",
+        "returned_provider_mismatch",
+    }
+)
+RECOVERABLE_PROVIDER_RESPONSE_REASON_CODES = frozenset(
+    {
+        "completion_tokens_invalid",
+        "cost_invalid",
+        "finish_reason_length",
+        "finish_reason_nonstop",
+        "http_bad_request",
+        "http_unprocessable_request",
+        "prompt_tokens_invalid",
+        "response_choices_invalid",
+        "response_json_duplicate_keys",
+        "response_json_invalid",
+        "response_json_not_object",
+        "retry_exhausted",
+        "structured_content_missing",
+        "structured_content_too_large",
+        "structured_decision_invalid",
+        "structured_json_duplicate_keys",
+        "structured_json_invalid",
+        "structured_json_not_object",
+        "total_tokens_invalid",
+        "usage_missing",
+        "usage_total_mismatch",
+    }
+)
+if (
+    FATAL_PROVIDER_RESPONSE_REASON_CODES & RECOVERABLE_PROVIDER_RESPONSE_REASON_CODES
+    or FATAL_PROVIDER_RESPONSE_REASON_CODES
+    | RECOVERABLE_PROVIDER_RESPONSE_REASON_CODES
+    != PROVIDER_RESPONSE_REASON_CODES
+):
+    raise RuntimeError("provider response reason classification is incomplete")
+RECOVERABLE_PROVIDER_FAILURE_REASON_CODES = frozenset(
+    {*RECOVERABLE_PROVIDER_RESPONSE_REASON_CODES, "http_retryable"}
+)
+TERMINAL_PROVIDER_FAILURE_REASON_CODES = frozenset(
+    {*PROVIDER_RESPONSE_REASON_CODES, "http_retryable"}
+)
 
 
 class ProviderError(RuntimeError):
@@ -75,15 +158,46 @@ class ProviderRouteError(ProviderError):
 
 
 class ProviderResponseError(ProviderError):
-    pass
+    """Terminal provider response failure with a privacy-safe static code."""
+
+    def __init__(self, message: str, *, reason_code: str) -> None:
+        if reason_code not in PROVIDER_RESPONSE_REASON_CODES:
+            raise ValueError("provider response reason code is not registered")
+        super().__init__(message)
+        self.reason_code = reason_code
 
 
 class ProviderUncertainError(ProviderError):
     pass
 
 
+class ProviderTerminalAttemptError(ProviderError):
+    """An identical attempt already has a safely recorded terminal failure."""
+
+    def __init__(self, message: str, *, reason_code: str) -> None:
+        if reason_code not in TERMINAL_PROVIDER_FAILURE_REASON_CODES:
+            raise ValueError("terminal attempt reason code is not registered")
+        super().__init__(message)
+        self.reason_code = reason_code
+
+
 class RetryExhaustedError(ProviderResponseError):
-    pass
+    def __init__(self, message: str = "provider exhausted two explicit retries") -> None:
+        super().__init__(message, reason_code="retry_exhausted")
+
+
+def _nonretryable_http_reason(status_code: int) -> str:
+    if status_code == 400:
+        return "http_bad_request"
+    if status_code in {401, 403}:
+        return "http_authentication_failed"
+    if status_code == 402:
+        return "http_payment_required"
+    if status_code == 404:
+        return "http_endpoint_not_found"
+    if status_code == 422:
+        return "http_unprocessable_request"
+    return "http_nonretryable"
 
 
 class MissingCredentialError(ProviderError):
@@ -190,12 +304,16 @@ class UrllibProviderTransport:
         for name, value in request.headers:
             urllib_request.add_unredirected_header(name, value)
         opener = build_opener(ProxyHandler({}), _RejectRedirects(), HTTPSHandler())
+        open_failed = False
         try:
             response = opener.open(urllib_request, timeout=request.timeout_seconds)
         except HTTPError as exc:
             response = exc
         except (URLError, TimeoutError, OSError):
-            raise TransportUncertainError("provider transport outcome is uncertain") from None
+            open_failed = True
+        if open_failed:
+            raise TransportUncertainError("provider transport outcome is uncertain")
+        read_failed = False
         try:
             body = response.read(request.max_response_bytes + 1)
             if len(body) > request.max_response_bytes:
@@ -215,9 +333,11 @@ class UrllibProviderTransport:
         except TransportUncertainError:
             raise
         except (URLError, TimeoutError, OSError):
-            raise TransportUncertainError("provider transport outcome is uncertain") from None
+            read_failed = True
         finally:
             response.close()
+        if read_failed:
+            raise TransportUncertainError("provider transport outcome is uncertain")
 
 
 @dataclass(frozen=True)
@@ -295,8 +415,12 @@ def structured_json_call(
     request_fingerprint_bytes = _canonical_bytes(request_payload)
     if len(request_fingerprint_bytes) > MAX_REQUEST_BYTES:
         raise ProviderError("provider request exceeds its byte bound")
-    semantic_request = dict(request_payload)
-    semantic_request.pop("provider")
+    semantic_payload = dict(request_payload)
+    semantic_payload.pop("provider")
+    semantic_request = {
+        "provider_runtime_version": PROVIDER_RUNTIME_VERSION,
+        "payload": semantic_payload,
+    }
     request_sha = json_sha256(semantic_request)
     schema_sha = json_sha256(spec.json_schema)
     binding = AttemptBinding(
@@ -330,8 +454,16 @@ def structured_json_call(
                 request_sha256=request_sha,
             )
         if snapshot.status == "failed":
-            raise LedgerConflictError(
-                "attempt is terminal; an explicit new attempt_id is required"
+            if Path(decision_path).exists() or Path(decision_path).is_symlink():
+                raise LedgerConflictError(
+                    "failed attempt has an unexpected decision sidecar"
+                )
+            terminal = snapshot.latest_terminal
+            if terminal is None:
+                raise LedgerConflictError("failed attempt lacks a terminal event")
+            raise ProviderTerminalAttemptError(
+                "attempt already has a safely recorded terminal failure",
+                reason_code=terminal["payload"]["reason_code"],
             )
     elif Path(decision_path).exists() or Path(decision_path).is_symlink():
         raise LedgerConflictError("fresh attempt has a pre-existing decision sidecar")
@@ -374,6 +506,7 @@ def structured_json_call(
             timeout_seconds=PAID_TIMEOUT_SECONDS,
             max_response_bytes=MAX_RESPONSE_BYTES,
         )
+        transport_failed = False
         try:
             response = active_transport.open(paid_request)
         except BaseException as exc:
@@ -399,9 +532,11 @@ def structured_json_call(
                 pass
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
+            transport_failed = True
+        if transport_failed:
             raise ProviderUncertainError(
                 "provider transport outcome is uncertain; duplicate send is forbidden"
-            ) from None
+            )
         latency = _latency_ms(started, monotonic)
         try:
             _validate_paid_http_response(response)
@@ -434,23 +569,31 @@ def structured_json_call(
                 returned_provider=None,
             )
             retryable = response.status_code in _RETRYABLE_STATUSES
+            retry_exhausted = retryable and next_retry >= MAX_RETRIES
+            reason_code = (
+                "retry_exhausted"
+                if retry_exhausted
+                else "http_retryable"
+                if retryable
+                else _nonretryable_http_reason(response.status_code)
+            )
             ledger.record_terminal(
                 token,
                 outcome="retryable_http_error" if retryable else "terminal_http_error",
                 receipt=conservative,
-                reason_code=(
-                    "http_retryable" if retryable else "http_nonretryable"
-                ),
+                reason_code=reason_code,
             )
             if not retryable:
                 raise ProviderResponseError(
-                    f"provider returned non-retryable HTTP {response.status_code}"
+                    f"provider returned non-retryable HTTP {response.status_code}",
+                    reason_code=reason_code,
                 )
-            if next_retry >= MAX_RETRIES:
+            if retry_exhausted:
                 raise RetryExhaustedError("provider exhausted two explicit retries")
             sleeper(float(2**next_retry))
             next_retry += 1
             continue
+        invalid_cost_over = False
         try:
             decision, receipt = _extract_structured_response(
                 response,
@@ -459,7 +602,7 @@ def structured_json_call(
                 latency_ms=latency,
                 validator=validator,
             )
-        except ProviderResponseError:
+        except ProviderResponseError as exc:
             invalid = _best_effort_receipt(response, token, latency)
             invalid_outcome = (
                 "cost_over_reservation"
@@ -473,10 +616,18 @@ def structured_json_call(
                 reason_code=(
                     "cost_over_reservation"
                     if invalid_outcome == "cost_over_reservation"
-                    else "invalid_provider_response"
+                    else exc.reason_code
                 ),
             )
-            raise
+            if invalid_outcome == "cost_over_reservation":
+                invalid_cost_over = True
+            else:
+                raise
+        if invalid_cost_over:
+            raise ProviderResponseError(
+                "provider charge exceeded its route-bounded reservation; global halt is active",
+                reason_code="cost_over_reservation",
+            )
         if Decimal(receipt.charged_usd) > Decimal(token.reserved_usd):
             ledger.record_terminal(
                 token,
@@ -485,7 +636,8 @@ def structured_json_call(
                 reason_code="cost_over_reservation",
             )
             raise ProviderResponseError(
-                "provider charge exceeded its route-bounded reservation; global halt is active"
+                "provider charge exceeded its route-bounded reservation; global halt is active",
+                reason_code="cost_over_reservation",
             )
         decision_sha, sidecar_sha = write_decision_sidecar(
             decision_path,
@@ -584,6 +736,7 @@ def _request_payload(spec: StructuredCallSpec) -> dict[str, Any]:
         "model": MODEL_ID,
         "temperature": 0,
         "max_tokens": spec.max_output_tokens,
+        "reasoning": dict(REASONING_CONFIG),
         "usage": {"include": True},
         "messages": [
             {"role": "system", "content": spec.system_prompt},
@@ -637,10 +790,13 @@ def _fetch_route(
         timeout_seconds=ROUTE_TIMEOUT_SECONDS,
         max_response_bytes=MAX_ROUTE_BYTES,
     )
+    route_failed = False
     try:
         response = transport.open(request)
     except Exception:
-        raise ProviderRouteError("fresh provider route check failed") from None
+        route_failed = True
+    if route_failed:
+        raise ProviderRouteError("fresh provider route check failed")
     if (
         not isinstance(response, ProviderHttpResponse)
         or response.status_code != 200
@@ -671,13 +827,26 @@ def _fetch_route(
         raise ProviderRouteError("provider route lacks structured capabilities")
     if not isinstance(pricing, dict):
         raise ProviderRouteError("provider route lacks bounded pricing")
-    prompt_price = _decimal(pricing.get("prompt"), "route prompt price")
-    completion_price = _decimal(pricing.get("completion"), "route completion price")
+    pricing_invalid = False
+    try:
+        prompt_price = _decimal(
+            pricing.get("prompt"), "route prompt price", reason_code="cost_invalid"
+        )
+        completion_price = _decimal(
+            pricing.get("completion"),
+            "route completion price",
+            reason_code="cost_invalid",
+        )
+    except ProviderResponseError:
+        pricing_invalid = True
+    if pricing_invalid:
+        raise ProviderRouteError("provider route pricing is invalid")
     context_length = endpoint.get("context_length")
     max_completion = endpoint.get("max_completion_tokens")
     checked_at = _clock_timestamp(clock)
+    capabilities_invalid = False
     try:
-        return RouteSnapshot(
+        result = RouteSnapshot(
             model=MODEL_ID,
             provider=provider,
             checked_at=checked_at,
@@ -687,8 +856,11 @@ def _fetch_route(
             max_completion_tokens=max_completion,
             supported_parameters=tuple(sorted(set(parameters))),
         )
-    except Exception as exc:
-        raise ProviderRouteError("provider route capabilities are invalid") from exc
+    except Exception:
+        capabilities_invalid = True
+    if capabilities_invalid:
+        raise ProviderRouteError("provider route capabilities are invalid")
+    return result
 
 
 def _extract_structured_response(
@@ -701,34 +873,83 @@ def _extract_structured_response(
 ) -> tuple[dict[str, Any], UsageReceipt]:
     envelope = _strict_json_object(response.body, "provider response", decimal_numbers=True)
     if envelope.get("model") != MODEL_ID:
-        raise ProviderResponseError("returned model differs from the exact pinned model")
+        raise ProviderResponseError(
+            "returned model differs from the exact pinned model",
+            reason_code="returned_model_mismatch",
+        )
     if envelope.get("provider") != provider:
-        raise ProviderResponseError("returned provider differs from the pinned provider")
+        raise ProviderResponseError(
+            "returned provider differs from the pinned provider",
+            reason_code="returned_provider_mismatch",
+        )
     choices = envelope.get("choices")
     if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
-        raise ProviderResponseError("provider response choices are invalid")
+        raise ProviderResponseError(
+            "provider response choices are invalid",
+            reason_code="response_choices_invalid",
+        )
+    finish_reason = choices[0].get("finish_reason")
+    if finish_reason == "length":
+        raise ProviderResponseError(
+            "provider response reached its output-token limit",
+            reason_code="finish_reason_length",
+        )
+    if finish_reason != "stop":
+        raise ProviderResponseError(
+            "provider response did not finish normally",
+            reason_code="finish_reason_nonstop",
+        )
     message = choices[0].get("message")
     if not isinstance(message, dict) or not isinstance(message.get("content"), str):
-        raise ProviderResponseError("provider response lacks structured content")
+        raise ProviderResponseError(
+            "provider response lacks structured content",
+            reason_code="structured_content_missing",
+        )
     content = message["content"]
     if len(content.encode("utf-8")) > MAX_RESPONSE_BYTES:
-        raise ProviderResponseError("structured decision exceeds its bound")
+        raise ProviderResponseError(
+            "structured decision exceeds its bound",
+            reason_code="structured_content_too_large",
+        )
     decision = _strict_json_object(content.encode("utf-8"), "structured decision")
+    validation_failed = False
     try:
         validator(decision)
-    except Exception as exc:
-        raise ProviderResponseError("structured decision failed local validation") from exc
+    except Exception:
+        validation_failed = True
+    if validation_failed:
+        raise ProviderResponseError(
+            "structured decision failed local validation",
+            reason_code="structured_decision_invalid",
+        )
     usage = envelope.get("usage")
     if not isinstance(usage, dict):
-        raise ProviderResponseError("provider response lacks usage receipt")
-    prompt_tokens = _nonnegative_int(usage.get("prompt_tokens"), "prompt_tokens")
-    completion_tokens = _nonnegative_int(
-        usage.get("completion_tokens"), "completion_tokens"
+        raise ProviderResponseError(
+            "provider response lacks usage receipt", reason_code="usage_missing"
+        )
+    prompt_tokens = _nonnegative_int(
+        usage.get("prompt_tokens"),
+        "prompt_tokens",
+        reason_code="prompt_tokens_invalid",
     )
-    total_tokens = _nonnegative_int(usage.get("total_tokens"), "total_tokens")
+    completion_tokens = _nonnegative_int(
+        usage.get("completion_tokens"),
+        "completion_tokens",
+        reason_code="completion_tokens_invalid",
+    )
+    total_tokens = _nonnegative_int(
+        usage.get("total_tokens"),
+        "total_tokens",
+        reason_code="total_tokens_invalid",
+    )
     if prompt_tokens + completion_tokens != total_tokens:
-        raise ProviderResponseError("provider usage token counts do not add up")
-    charged = _decimal(usage.get("cost"), "provider cost")
+        raise ProviderResponseError(
+            "provider usage token counts do not add up",
+            reason_code="usage_total_mismatch",
+        )
+    charged = _decimal(
+        usage.get("cost"), "provider cost", reason_code="cost_invalid"
+    )
     receipt = UsageReceipt(
         http_status=200,
         prompt_tokens=prompt_tokens,
@@ -748,25 +969,48 @@ def _best_effort_receipt(
     response: ProviderHttpResponse, token: ReservationToken, latency_ms: int
 ) -> UsageReceipt:
     charged = token.reserved_usd
+    prompt_tokens = completion_tokens = total_tokens = None
+    returned_model = returned_provider = None
     try:
         envelope = _strict_json_object(
             response.body, "provider response", decimal_numbers=True
         )
-        usage = envelope.get("usage")
-        if isinstance(usage, dict):
-            candidate = _decimal(usage.get("cost"), "provider cost")
-            charged = _decimal_text(candidate)
     except Exception:
-        pass
+        envelope = {}
+    if envelope.get("model") == MODEL_ID:
+        returned_model = MODEL_ID
+    if envelope.get("provider") == token.binding.provider:
+        returned_provider = token.binding.provider
+    usage = envelope.get("usage")
+    if isinstance(usage, dict):
+        try:
+            candidate = _decimal(
+                usage.get("cost"), "provider cost", reason_code="cost_invalid"
+            )
+            charged = _decimal_text(candidate)
+        except ProviderResponseError:
+            pass
+        candidate_prompt = usage.get("prompt_tokens")
+        candidate_completion = usage.get("completion_tokens")
+        candidate_total = usage.get("total_tokens")
+        if (
+            _is_nonnegative_int(candidate_prompt)
+            and _is_nonnegative_int(candidate_completion)
+            and _is_nonnegative_int(candidate_total)
+            and candidate_prompt + candidate_completion == candidate_total
+        ):
+            prompt_tokens = candidate_prompt
+            completion_tokens = candidate_completion
+            total_tokens = candidate_total
     return UsageReceipt(
         http_status=200,
-        prompt_tokens=None,
-        completion_tokens=None,
-        total_tokens=None,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
         charged_usd=charged,
         latency_ms=latency_ms,
-        returned_model=None,
-        returned_provider=None,
+        returned_model=returned_model,
+        returned_provider=returned_provider,
     )
 
 
@@ -828,14 +1072,25 @@ def _latency_ms(started: float, clock: Monotonic) -> int:
 def _strict_json_object(
     raw: bytes, label: str, *, decimal_numbers: bool = False
 ) -> dict[str, Any]:
+    reason_prefix = {
+        "provider response": "response_json",
+        "structured decision": "structured_json",
+    }.get(label)
+
     def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         value: dict[str, Any] = {}
         for key, item in pairs:
             if key in value:
-                raise ProviderResponseError(f"{label} contains duplicate keys")
+                if reason_prefix is None:
+                    raise ProviderRouteError(f"{label} contains duplicate keys")
+                raise ProviderResponseError(
+                    f"{label} contains duplicate keys",
+                    reason_code=f"{reason_prefix}_duplicate_keys",
+                )
             value[key] = item
         return value
 
+    parse_failed = False
     try:
         value = json.loads(
             raw.decode("utf-8"),
@@ -844,30 +1099,44 @@ def _strict_json_object(
             parse_constant=lambda _value: (_ for _ in ()).throw(ValueError()),
         )
     except (UnicodeDecodeError, ValueError, json.JSONDecodeError):
-        error = ProviderRouteError if label == "route response" else ProviderResponseError
-        raise error(f"{label} is not finite JSON") from None
+        parse_failed = True
+    if parse_failed:
+        if reason_prefix is None:
+            raise ProviderRouteError(f"{label} is not finite JSON")
+        raise ProviderResponseError(
+            f"{label} is not finite JSON",
+            reason_code=f"{reason_prefix}_invalid",
+        )
     if not isinstance(value, dict):
-        error = ProviderRouteError if label == "route response" else ProviderResponseError
-        raise error(f"{label} must be a JSON object")
+        if reason_prefix is None:
+            raise ProviderRouteError(f"{label} must be a JSON object")
+        raise ProviderResponseError(
+            f"{label} must be a JSON object",
+            reason_code=f"{reason_prefix}_not_object",
+        )
     return value
 
 
 def _json_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ProviderError(f"{label} must be a JSON object")
+    json_failed = False
     try:
         encoded = _canonical_bytes(dict(value))
         decoded = json.loads(encoded)
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise ProviderError(f"{label} must be finite JSON") from exc
+    except (TypeError, ValueError, json.JSONDecodeError):
+        json_failed = True
+    if json_failed:
+        raise ProviderError(f"{label} must be finite JSON")
     if not isinstance(decoded, dict):
         raise ProviderError(f"{label} must be a JSON object")
     return decoded
 
 
 def _canonical_bytes(value: Any) -> bytes:
+    encoding_failed = False
     try:
-        return (
+        encoded = (
             json.dumps(
                 value,
                 allow_nan=False,
@@ -877,19 +1146,27 @@ def _canonical_bytes(value: Any) -> bytes:
             ).encode("utf-8")
             + b"\n"
         )
-    except (TypeError, ValueError) as exc:
-        raise ProviderError("provider value is not finite JSON") from exc
+    except (TypeError, ValueError):
+        encoding_failed = True
+    if encoding_failed:
+        raise ProviderError("provider value is not finite JSON")
+    return encoded
 
 
-def _decimal(value: Any, label: str) -> Decimal:
+def _decimal(value: Any, label: str, *, reason_code: str) -> Decimal:
     if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
-        raise ProviderResponseError(f"{label} is invalid")
+        raise ProviderResponseError(f"{label} is invalid", reason_code=reason_code)
+    decimal_failed = False
     try:
         parsed = Decimal(str(value))
-    except (InvalidOperation, ValueError) as exc:
-        raise ProviderResponseError(f"{label} is invalid") from exc
+    except (InvalidOperation, ValueError):
+        decimal_failed = True
+    if decimal_failed:
+        raise ProviderResponseError(
+            f"{label} is invalid", reason_code=reason_code
+        )
     if not parsed.is_finite() or parsed < 0:
-        raise ProviderResponseError(f"{label} is invalid")
+        raise ProviderResponseError(f"{label} is invalid", reason_code=reason_code)
     return parsed
 
 
@@ -897,30 +1174,42 @@ def _decimal_text(value: Decimal) -> str:
     return format(value, "f")
 
 
-def _nonnegative_int(value: Any, label: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ProviderResponseError(f"{label} is invalid")
+def _is_nonnegative_int(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and value >= 0
+
+
+def _nonnegative_int(value: Any, label: str, *, reason_code: str) -> int:
+    if not _is_nonnegative_int(value):
+        raise ProviderResponseError(f"{label} is invalid", reason_code=reason_code)
     return value
 
 
 __all__ = [
     "DETERMINISTIC_USER_AGENT",
+    "FATAL_PROVIDER_RESPONSE_REASON_CODES",
     "MODEL_ID",
     "MissingCredentialError",
     "OPENROUTER_API_URL",
     "OPENROUTER_KEY_ENV",
     "OPENROUTER_ROUTE_URL",
+    "PINNED_PROVIDER",
+    "PROVIDER_RESPONSE_REASON_CODES",
     "PROVIDER_RUNTIME_VERSION",
+    "RECOVERABLE_PROVIDER_FAILURE_REASON_CODES",
+    "RECOVERABLE_PROVIDER_RESPONSE_REASON_CODES",
+    "REASONING_CONFIG",
     "ProviderError",
     "ProviderHttpRequest",
     "ProviderHttpResponse",
     "ProviderResponseError",
     "ProviderRouteError",
+    "ProviderTerminalAttemptError",
     "ProviderTransport",
     "ProviderUncertainError",
     "RetryExhaustedError",
     "StructuredCallResult",
     "StructuredCallSpec",
+    "TERMINAL_PROVIDER_FAILURE_REASON_CODES",
     "TransportUncertainError",
     "UrllibProviderTransport",
     "structured_json_call",

@@ -52,7 +52,13 @@ _BANNED_METADATA_KEYS = (
     "evidence_text",
 )
 _REQUIRED_ROUTE_PARAMETERS = frozenset(
-    {"max_tokens", "response_format", "structured_outputs", "temperature"}
+    {
+        "max_tokens",
+        "reasoning",
+        "response_format",
+        "structured_outputs",
+        "temperature",
+    }
 )
 _TERMINAL_OUTCOMES = frozenset(
     {
@@ -716,10 +722,15 @@ def read_decision_sidecar(
     decision_sha = hashlib.sha256(_canonical_bytes(decision)).hexdigest()
     if item["decision_sha256"] != decision_sha:
         raise LedgerConflictError("normalized decision sidecar was tampered")
+    validation_failed = False
     try:
         validator(decision)
-    except Exception as exc:
-        raise LedgerConflictError("normalized decision no longer passes validation") from exc
+    except Exception:
+        validation_failed = True
+    if validation_failed:
+        raise LedgerConflictError(
+            "normalized decision no longer passes validation"
+        )
     receipt = UsageReceipt.from_dict(item["receipt"])
     return (
         decision,
@@ -751,7 +762,11 @@ def _snapshot(attempt: Mapping[str, Any]) -> AttemptSnapshot:
             outcome = latest["payload"]["outcome"]
             if outcome == "completed":
                 status = "completed"
-            elif outcome == "retryable_http_error" and len(reservations) <= MAX_RETRIES:
+            elif (
+                outcome == "retryable_http_error"
+                and latest["payload"]["reason_code"] == "http_retryable"
+                and len(reservations) <= MAX_RETRIES
+            ):
                 status = "ready_to_retry"
             elif outcome == "uncertain_send":
                 status = "uncertain"
@@ -1032,6 +1047,7 @@ def _read_events(handle: Any) -> list[dict[str, Any]]:
         raise LedgerIntegrityError("usage ledger is truncated")
     events: list[dict[str, Any]] = []
     for line_number, line in enumerate(raw.splitlines(), 1):
+        parse_failed = False
         try:
             event = json.loads(
                 line.decode("utf-8"),
@@ -1039,9 +1055,11 @@ def _read_events(handle: Any) -> list[dict[str, Any]]:
                 parse_constant=_reject_nonfinite,
             )
         except (UnicodeDecodeError, json.JSONDecodeError, LedgerIntegrityError):
+            parse_failed = True
+        if parse_failed:
             raise LedgerIntegrityError(
                 f"usage ledger line {line_number} is not strict JSON"
-            ) from None
+            )
         if line + b"\n" != _canonical_bytes(event):
             raise LedgerIntegrityError(f"usage ledger line {line_number} is non-canonical")
         events.append(event)
@@ -1183,17 +1201,21 @@ def _parse_timestamp(value: Any) -> datetime:
 def _json_object(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise LedgerIntegrityError(f"{label} must be a JSON object")
+    json_failed = False
     try:
         encoded = _canonical_bytes(dict(value))
         decoded = json.loads(encoded)
-    except (TypeError, ValueError, json.JSONDecodeError) as exc:
-        raise LedgerIntegrityError(f"{label} must be finite JSON") from exc
+    except (TypeError, ValueError, json.JSONDecodeError):
+        json_failed = True
+    if json_failed:
+        raise LedgerIntegrityError(f"{label} must be finite JSON")
     if not isinstance(decoded, dict):
         raise LedgerIntegrityError(f"{label} must be a JSON object")
     return decoded
 
 
 def _load_canonical_json(encoded: bytes, label: str) -> Any:
+    parse_failed = False
     try:
         value = json.loads(
             encoded.decode("utf-8"),
@@ -1201,15 +1223,18 @@ def _load_canonical_json(encoded: bytes, label: str) -> Any:
             parse_constant=_reject_nonfinite,
         )
     except (UnicodeDecodeError, json.JSONDecodeError, LedgerIntegrityError):
-        raise LedgerIntegrityError(f"{label} is not strict JSON") from None
+        parse_failed = True
+    if parse_failed:
+        raise LedgerIntegrityError(f"{label} is not strict JSON")
     if encoded != _canonical_bytes(value):
         raise LedgerIntegrityError(f"{label} is non-canonical")
     return value
 
 
 def _canonical_bytes(value: Any) -> bytes:
+    encoding_failed = False
     try:
-        return (
+        encoded = (
             json.dumps(
                 value,
                 allow_nan=False,
@@ -1219,8 +1244,11 @@ def _canonical_bytes(value: Any) -> bytes:
             ).encode("utf-8")
             + b"\n"
         )
-    except (TypeError, ValueError) as exc:
-        raise LedgerIntegrityError("value is not finite JSON") from exc
+    except (TypeError, ValueError):
+        encoding_failed = True
+    if encoding_failed:
+        raise LedgerIntegrityError("value is not finite JSON")
+    return encoded
 
 
 def _strict_object(value: Any, keys: set[str], label: str) -> dict[str, Any]:

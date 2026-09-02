@@ -5,7 +5,9 @@ from decimal import Decimal
 import json
 from pathlib import Path
 import tempfile
+import traceback
 import unittest
+from unittest.mock import patch
 
 from model_cards.provider import (
     MODEL_ID,
@@ -16,6 +18,7 @@ from model_cards.provider import (
     ProviderHttpResponse,
     ProviderResponseError,
     ProviderRouteError,
+    ProviderTerminalAttemptError,
     ProviderUncertainError,
     RetryExhaustedError,
     StructuredCallSpec,
@@ -60,6 +63,7 @@ def route_payload(
     parameters=None,
 ) -> bytes:
     parameters = parameters or [
+        "reasoning",
         "response_format",
         "structured_outputs",
         "temperature",
@@ -96,14 +100,17 @@ def success_payload(
     provider: str = PROVIDER,
     model: str = MODEL_ID,
     cost: str = "0.001",
+    finish_reason: str = "stop",
 ) -> bytes:
-    decision = decision or {"value": "normalized"}
+    if decision is None:
+        decision = {"value": "normalized"}
     return json.dumps(
         {
             "model": model,
             "provider": provider,
             "choices": [
                 {
+                    "finish_reason": finish_reason,
                     "message": {
                         "role": "assistant",
                         "content": json.dumps(decision, sort_keys=True),
@@ -135,6 +142,8 @@ class FixtureTransport:
         if request.method == "GET":
             self.route_count += 1
             body = self.routes.pop(0) if self.routes else route_payload()
+            if isinstance(body, BaseException):
+                raise body
             return ProviderHttpResponse(200, OPENROUTER_ROUTE_URL, body=body)
         self.paid_count += 1
         if not self.paid_outcomes:
@@ -202,6 +211,17 @@ class ProviderRuntimeTests(unittest.TestCase):
             sleeper=sleeper or (lambda _seconds: None),
         )
 
+    def terminal_payload(self, ledger_path=None):
+        events = [
+            json.loads(line)
+            for line in (ledger_path or self.ledger_path).read_text().splitlines()
+        ]
+        return next(
+            event["payload"]
+            for event in reversed(events)
+            if event["event"] == "reservation_terminal"
+        )
+
     def test_success_uses_exact_model_strict_schema_zero_temperature_and_one_provider(self) -> None:
         transport = FixtureTransport([(200, success_payload())])
         result = self.call(transport)
@@ -215,6 +235,9 @@ class ProviderRuntimeTests(unittest.TestCase):
         payload = json.loads(paid.body)
         self.assertEqual(MODEL_ID, payload["model"])
         self.assertEqual(0, payload["temperature"])
+        self.assertEqual(
+            {"effort": "minimal", "exclude": True}, payload["reasoning"]
+        )
         self.assertTrue(payload["response_format"]["json_schema"]["strict"])
         self.assertEqual([PROVIDER], payload["provider"]["order"])
         self.assertIs(payload["provider"]["allow_fallbacks"], False)
@@ -272,17 +295,28 @@ class ProviderRuntimeTests(unittest.TestCase):
                 self.assertEqual(0, UsageLedger(ledger).audit_state()["paid_calls"])
                 self.assertEqual(0, transport.paid_count)
 
+        marker = "PRIVATE ROUTE TRANSPORT SENTINEL"
+        failed_route = FixtureTransport([], routes=[RuntimeError(marker)])
+        with self.assertRaises(ProviderRouteError) as caught:
+            self.call(failed_route)
+        self.assertIsNone(caught.exception.__context__)
+        self.assertNotIn(marker, str(caught.exception))
+        self.assertNotIn(marker, "".join(traceback.format_exception(caught.exception)))
+
     def test_returned_model_or_provider_drift_is_terminal_without_fallback(self) -> None:
         cases = [
-            success_payload(model="fallback/model"),
-            success_payload(provider="Fallback Provider"),
+            (success_payload(model="fallback/model"), "returned_model_mismatch"),
+            (
+                success_payload(provider="Fallback Provider"),
+                "returned_provider_mismatch",
+            ),
         ]
-        for index, body in enumerate(cases):
+        for index, (body, expected_reason) in enumerate(cases):
             with self.subTest(index=index):
                 ledger = self.root / f"drift-{index}.jsonl"
                 decision = self.root / f"drift-{index}.json"
                 transport = FixtureTransport([(200, body)])
-                with self.assertRaises(ProviderResponseError):
+                with self.assertRaises(ProviderResponseError) as caught:
                     structured_json_call(
                         self.spec(
                             logical_call_id=f"drift.call.{index}",
@@ -296,8 +330,171 @@ class ProviderRuntimeTests(unittest.TestCase):
                         clock=lambda: NOW,
                         monotonic=Monotonic(),
                     )
+                self.assertEqual(expected_reason, caught.exception.reason_code)
+                self.assertEqual(
+                    expected_reason, self.terminal_payload(ledger)["reason_code"]
+                )
                 self.assertEqual(1, transport.paid_count)
+                replay = FixtureTransport([])
+                with self.assertRaises(ProviderTerminalAttemptError) as terminal:
+                    structured_json_call(
+                        self.spec(
+                            logical_call_id=f"drift.call.{index}",
+                            attempt_id=f"drift-attempt-{index}",
+                        ),
+                        ledger_path=ledger,
+                        decision_path=decision,
+                        validator=validator,
+                        environment={},
+                        transport=replay,
+                        clock=lambda: NOW,
+                    )
+                self.assertEqual(expected_reason, terminal.exception.reason_code)
+                self.assertEqual([], replay.requests)
                 self.assertFalse(decision.exists())
+
+    def test_finish_reason_rejects_truncation_before_parsing_or_persisting_content(self) -> None:
+        marker = "PRIVATE PROVIDER RESPONSE SENTINEL"
+        transport = FixtureTransport(
+            [
+                (
+                    200,
+                    success_payload(
+                        decision={"value": marker}, finish_reason="length"
+                    ),
+                )
+            ]
+        )
+        with self.assertRaises(ProviderResponseError) as caught:
+            self.call(transport)
+        self.assertEqual("finish_reason_length", caught.exception.reason_code)
+        terminal = self.terminal_payload()
+        self.assertEqual("finish_reason_length", terminal["reason_code"])
+        self.assertEqual("invalid_response", terminal["outcome"])
+        self.assertEqual(
+            {
+                "prompt_tokens": 100,
+                "completion_tokens": 20,
+                "total_tokens": 120,
+                "returned_model": MODEL_ID,
+                "returned_provider": PROVIDER,
+            },
+            {
+                name: terminal["receipt"][name]
+                for name in (
+                    "prompt_tokens",
+                    "completion_tokens",
+                    "total_tokens",
+                    "returned_model",
+                    "returned_provider",
+                )
+            },
+        )
+        persisted = self.ledger_path.read_text()
+        self.assertNotIn(marker, persisted)
+        self.assertFalse(self.decision_path.exists())
+
+    def test_nonstop_finish_reasons_have_one_static_privacy_safe_code(self) -> None:
+        for index, finish_reason in enumerate(("content_filter", "error", None)):
+            with self.subTest(finish_reason=finish_reason):
+                ledger = self.root / f"finish-{index}.jsonl"
+                decision = self.root / f"finish-{index}.json"
+                body = json.loads(success_payload())
+                body["choices"][0]["finish_reason"] = finish_reason
+                transport = FixtureTransport(
+                    [
+                        (
+                            200,
+                            json.dumps(
+                                body, sort_keys=True, separators=(",", ":")
+                            ).encode(),
+                        )
+                    ]
+                )
+                with self.assertRaises(ProviderResponseError) as caught:
+                    self.call(
+                        transport,
+                        spec=self.spec(
+                            logical_call_id=f"finish.call.{index}",
+                            attempt_id=f"finish-attempt-{index}",
+                        ),
+                        ledger_path=ledger,
+                        decision_path=decision,
+                    )
+                self.assertEqual("finish_reason_nonstop", caught.exception.reason_code)
+                self.assertEqual(
+                    "finish_reason_nonstop",
+                    self.terminal_payload(ledger)["reason_code"],
+                )
+
+    def test_response_validation_failures_have_static_ledger_codes(self) -> None:
+        raw_marker = "PRIVATE RAW BODY SENTINEL"
+        validator_marker = "PRIVATE VALIDATOR SENTINEL"
+        invalid_json = ('{"private_raw_body":"' + raw_marker + '"').encode()
+        invalid_choices = json.loads(success_payload())
+        invalid_choices["choices"] = []
+        invalid_decision_json = json.loads(success_payload())
+        invalid_decision_json["choices"][0]["message"]["content"] = "["
+        invalid_decision_shape = json.loads(
+            success_payload(decision={"wrong": validator_marker})
+        )
+        missing_usage = json.loads(success_payload())
+        missing_usage.pop("usage")
+        invalid_prompt_tokens = json.loads(success_payload())
+        invalid_prompt_tokens["usage"]["prompt_tokens"] = -1
+        mismatched_tokens = json.loads(success_payload())
+        mismatched_tokens["usage"]["total_tokens"] = 999
+        invalid_cost = json.loads(success_payload())
+        invalid_cost["usage"]["cost"] = "not-a-number"
+        cases = [
+            (invalid_json, "response_json_invalid"),
+            (invalid_choices, "response_choices_invalid"),
+            (invalid_decision_json, "structured_json_invalid"),
+            (invalid_decision_shape, "structured_decision_invalid"),
+            (missing_usage, "usage_missing"),
+            (invalid_prompt_tokens, "prompt_tokens_invalid"),
+            (mismatched_tokens, "usage_total_mismatch"),
+            (invalid_cost, "cost_invalid"),
+        ]
+        for index, (value, expected_reason) in enumerate(cases):
+            with self.subTest(reason=expected_reason):
+                ledger = self.root / f"invalid-{index}.jsonl"
+                decision = self.root / f"invalid-{index}.json"
+                body = (
+                    value
+                    if isinstance(value, bytes)
+                    else json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+                )
+                transport = FixtureTransport([(200, body)])
+                with self.assertRaises(ProviderResponseError) as caught:
+                    self.call(
+                        transport,
+                        spec=self.spec(
+                            logical_call_id=f"invalid.call.{index}",
+                            attempt_id=f"invalid-attempt-{index}",
+                        ),
+                        ledger_path=ledger,
+                        decision_path=decision,
+                    )
+                self.assertEqual(expected_reason, caught.exception.reason_code)
+                self.assertEqual(
+                    expected_reason, self.terminal_payload(ledger)["reason_code"]
+                )
+                self.assertIsNone(caught.exception.__context__)
+                rendered = "".join(traceback.format_exception(caught.exception))
+                for marker in (raw_marker, validator_marker):
+                    self.assertNotIn(marker, str(caught.exception))
+                    self.assertNotIn(marker, rendered)
+                    self.assertNotIn(marker, ledger.read_text())
+                self.assertFalse(decision.exists())
+
+    def test_response_reason_code_vocabulary_is_closed(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not registered"):
+            ProviderResponseError("static message", reason_code="runtime_supplied_detail")
+        with self.assertRaisesRegex(ValueError, "not registered"):
+            ProviderTerminalAttemptError(
+                "static message", reason_code="future_unclassified_failure"
+            )
 
     def test_only_429_and_5xx_get_two_logged_retries_with_fresh_routes(self) -> None:
         sleeps: list[float] = []
@@ -329,21 +526,80 @@ class ProviderRuntimeTests(unittest.TestCase):
             )
         self.assertEqual(3, exhausted.paid_count)
         self.assertEqual(3, exhausted.route_count)
+        replay = FixtureTransport([])
+        with self.assertRaises(ProviderTerminalAttemptError) as caught:
+            structured_json_call(
+                self.spec(
+                    logical_call_id="retry.exhausted",
+                    attempt_id="attempt.exhausted",
+                ),
+                ledger_path=exhausted_ledger,
+                decision_path=exhausted_decision,
+                validator=validator,
+                environment={},
+                transport=replay,
+                clock=lambda: NOW,
+            )
+        self.assertEqual("retry_exhausted", caught.exception.reason_code)
+        self.assertEqual([], replay.requests)
 
     def test_nonretryable_4xx_is_one_terminal_send(self) -> None:
         sleeps: list[float] = []
         transport = FixtureTransport([(400, b"{}")])
-        with self.assertRaises(ProviderResponseError):
+        with self.assertRaises(ProviderResponseError) as caught:
             self.call(transport, sleeper=sleeps.append)
+        self.assertEqual("http_bad_request", caught.exception.reason_code)
         self.assertEqual(1, transport.route_count)
         self.assertEqual(1, transport.paid_count)
         self.assertEqual([], sleeps)
+
+        replay = FixtureTransport([])
+        with self.assertRaises(ProviderTerminalAttemptError):
+            self.call(replay)
+        self.assertEqual([], replay.requests)
+
+        self.decision_path.write_text("{}")
+        with self.assertRaises(LedgerConflictError):
+            self.call(FixtureTransport([]))
+
+    def test_auth_payment_and_endpoint_http_failures_have_fatal_codes(self) -> None:
+        cases = {
+            401: "http_authentication_failed",
+            402: "http_payment_required",
+            403: "http_authentication_failed",
+            404: "http_endpoint_not_found",
+            409: "http_nonretryable",
+            422: "http_unprocessable_request",
+        }
+        for status, reason_code in cases.items():
+            with self.subTest(status=status):
+                ledger = self.root / f"http-{status}.jsonl"
+                decision = self.root / f"http-{status}.json"
+                transport = FixtureTransport([(status, b"{}")])
+                with self.assertRaises(ProviderResponseError) as caught:
+                    structured_json_call(
+                        self.spec(
+                            logical_call_id=f"http.status.{status}",
+                            attempt_id=f"http-attempt-{status}",
+                        ),
+                        ledger_path=ledger,
+                        decision_path=decision,
+                        validator=validator,
+                        environment={"OPENROUTER_API_KEY": KEY},
+                        transport=transport,
+                        clock=lambda: NOW,
+                        monotonic=Monotonic(),
+                    )
+                self.assertEqual(reason_code, caught.exception.reason_code)
+                self.assertEqual(reason_code, self.terminal_payload(ledger)["reason_code"])
 
     def test_timeout_is_uncertain_and_never_sent_again(self) -> None:
         transport = FixtureTransport([TimeoutError(f"timeout {KEY}")])
         with self.assertRaises(ProviderUncertainError) as caught:
             self.call(transport)
         self.assertNotIn(KEY, str(caught.exception))
+        self.assertIsNone(caught.exception.__context__)
+        self.assertNotIn(KEY, "".join(traceback.format_exception(caught.exception)))
         self.assertEqual(1, transport.paid_count)
         state = UsageLedger(self.ledger_path).audit_state()
         self.assertGreater(Decimal(state["committed_usd"]), Decimal("0"))
@@ -398,6 +654,18 @@ class ProviderRuntimeTests(unittest.TestCase):
         self.assertEqual("Other Provider", result.provider)
         self.assertEqual(1, second.paid_count)
 
+    def test_runtime_version_is_bound_into_semantic_request_replay(self) -> None:
+        first = FixtureTransport([(200, success_payload())])
+        completed = self.call(first)
+        self.assertFalse(completed.resumed)
+        forbidden = FixtureTransport([])
+        with patch(
+            "model_cards.provider.PROVIDER_RUNTIME_VERSION",
+            "openrouter-structured-provider/future-test",
+        ), self.assertRaises(LedgerConflictError):
+            self.call(forbidden)
+        self.assertEqual([], forbidden.requests)
+
     def test_cost_over_reservation_activates_global_halt(self) -> None:
         transport = FixtureTransport([(200, success_payload(cost="10"))])
         with self.assertRaisesRegex(ProviderResponseError, "global halt"):
@@ -415,6 +683,16 @@ class ProviderRuntimeTests(unittest.TestCase):
                 decision_path=self.root / "next.json",
             )
         self.assertEqual(0, next_transport.paid_count)
+
+    def test_invalid_decision_cannot_hide_cost_over_reservation(self) -> None:
+        transport = FixtureTransport(
+            [(200, success_payload(decision={"wrong": "shape"}, cost="10"))]
+        )
+        with self.assertRaises(ProviderResponseError) as caught:
+            self.call(transport)
+        self.assertEqual("cost_over_reservation", caught.exception.reason_code)
+        self.assertIsNone(caught.exception.__context__)
+        self.assertTrue(UsageLedger(self.ledger_path).audit_state()["global_halt"])
 
     def test_sidecar_tamper_fails_without_key_or_send(self) -> None:
         self.call(FixtureTransport([(200, success_payload())]))

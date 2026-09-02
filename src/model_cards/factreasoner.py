@@ -30,9 +30,17 @@ from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import SchemaError
 
 from .models import RelationToTarget, SourceDocument, TargetIdentity
+from .provider import (
+    ProviderError,
+    ProviderResponseError,
+    ProviderTerminalAttemptError,
+    RECOVERABLE_PROVIDER_FAILURE_REASON_CODES,
+    TransportUncertainError,
+)
+from .run_ledger import LedgerError
 
 
-FACTREASONER_KERNEL_VERSION = "model-card-factreasoner/v1"
+FACTREASONER_KERNEL_VERSION = "model-card-factreasoner/v2"
 ATOM_VERSION = "model-card-fact-atom/v1"
 CHUNK_VERSION = "model-card-source-chunk/v1"
 DECISION_VERSION = "model-card-fact-decision/v1"
@@ -2255,7 +2263,16 @@ def _invoke_checker(
 ) -> CheckerAttempt:
     try:
         response = checker.check(request)
-    except Exception:  # Checker availability is data; the record remains complete.
+    except (ProviderResponseError, ProviderTerminalAttemptError) as exc:
+        if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
+            raise
+        response = CheckerResponse(
+            outcome=CheckOutcome.UNAVAILABLE,
+            reason_code="checker_unavailable",
+        )
+    except (ProviderError, LedgerError, TransportUncertainError):
+        raise
+    except Exception:  # Non-provider checker availability remains typed data.
         response = CheckerResponse(
             outcome=CheckOutcome.UNAVAILABLE,
             reason_code="checker_unavailable",

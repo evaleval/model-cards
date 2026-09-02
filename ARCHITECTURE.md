@@ -92,8 +92,13 @@ decisions and before pipeline composition.
 ## 3. Extraction and claim support
 
 `extraction.py` creates structured candidates from exact metadata pointers and
-materializes optional quoted candidates against saved source coordinates. It records
-unavailable source windows and rejected proposals instead of silently dropping them.
+materializes optional quoted candidates against saved source coordinates. A
+schema-shaped provider response is normalized item by item: valid peers continue,
+while semantic-invalid, wrong-source, and duplicate items become index-and-digest-only
+rejection records in `extraction.json`; raw rejected content cannot enter pipeline or
+public artifacts. The private normalized decision sidecar still contains the
+schema-shaped response and is never exported. Wire-schema failures abort the
+extraction stage.
 
 `claim_gate.py` applies the same ordered interface to every candidate:
 
@@ -164,8 +169,8 @@ file types, and unsafe symlinks.
 
 ## 7. Provider-assisted orchestration
 
-`orchestration.py` is invoked only by `generate --provider PROVIDER`. The documented
-route is `--provider Baidu`; every assisted call uses exactly
+`orchestration.py` is invoked only by `generate --provider Together`. The CLI,
+adapters, and orchestration admission reject every other provider; every assisted call uses exactly
 `deepseek/deepseek-v4-flash-0731` through OpenRouter. It extracts bounded quote
 candidates from each eligible text document once, obtains normalized field-fit and
 value-support decisions, supplies a FactReasoner checker, and, when the pinned risk
@@ -176,7 +181,15 @@ the USD 25 and 300-call run caps, route freshness, structured JSON output, and a
 two retries after explicit 429/5xx responses. A transport outcome that may have sent a
 paid request becomes `uncertain` and cannot be sent again. There is no model or route
 fallback. Prompts and raw responses are not ledger fields; normalized decisions are
-stored separately and addressed by digest.
+stored separately in the private run directory and addressed by digest. The provider
+runtime version is part of each semantic request fingerprint and orchestration
+admission, so retry-policy or parsing changes cannot silently reuse an older attempt.
+
+Route, identity, authorization, budget, ledger, and uncertain-send failures remain
+fatal. Safely recorded response failures during an individual claim or FactReasoner
+check become explicit unavailable outcomes, so the run can retain its audit trail but
+cannot claim full validation. Extraction and risk-interface response failures remain
+fatal because there is no safe local decision to substitute.
 
 Provider mode is intentionally absent from the batch command. This prevents separate
 targets from fragmenting the one-run global accounting boundary.

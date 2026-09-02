@@ -33,8 +33,10 @@ from .orchestration import (
 from .pipeline import PipelineResult, run_offline_pipeline, verify_pipeline_result
 from .provider import (
     MissingCredentialError,
+    PINNED_PROVIDER,
     ProviderError,
     ProviderRouteError,
+    ProviderTerminalAttemptError,
     ProviderUncertainError,
     RetryExhaustedError,
     TransportUncertainError,
@@ -542,6 +544,10 @@ def _generate_target(
         raise CliCommandError("provider_route_unavailable") from exc
     except RetryExhaustedError as exc:
         raise CliCommandError("provider_retries_exhausted") from exc
+    except ProviderTerminalAttemptError as exc:
+        if exc.reason_code == "retry_exhausted":
+            raise CliCommandError("provider_retries_exhausted") from exc
+        raise CliCommandError("provider_pipeline_failed_or_stale") from exc
     except (OrchestrationError, ProviderError, LedgerError) as exc:
         raise CliCommandError("provider_pipeline_failed_or_stale") from exc
     except RunSummaryError as exc:
@@ -985,9 +991,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     generate.add_argument(
         "--provider",
+        choices=(PINNED_PROVIDER,),
+        metavar=PINNED_PROVIDER,
         help=(
-            "exact OpenRouter provider for assisted extraction and validation; "
-            "uses OPENROUTER_API_KEY and the pinned model"
+            "enable assisted extraction and validation on the pinned OpenRouter "
+            "provider and model; uses OPENROUTER_API_KEY"
         ),
     )
     generate.set_defaults(handler=_cmd_generate)

@@ -1,5 +1,6 @@
 # Keep the public repository limited to source, tests, and documentation.
 .*
+.firecrawl/
 !.gitignore
 !.github/
 !.github/**

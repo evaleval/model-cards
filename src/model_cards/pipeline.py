@@ -112,7 +112,7 @@ from .schema import (
 from .source_state import SourceStateMode, load_source_state
 
 
-PIPELINE_VERSION = "offline-model-card-pipeline/v3"
+PIPELINE_VERSION = "offline-model-card-pipeline/v5"
 PRIVACY_SCAN_VERSION = "public-card-privacy-scan/v1"
 RISK_STAGE_VERSION = "pipeline-risk-stage/v1"
 REPAIR_STAGE_VERSION = "pipeline-fact-withholding/v1"
@@ -1811,6 +1811,7 @@ def run_offline_pipeline(
         source_manifest_sha256=source_manifest_sha256,
         configuration={
             "pipeline_version": PIPELINE_VERSION,
+            "extraction_version": EXTRACTION_VERSION,
             "source_state_mode": source_state.mode.value,
             "hf_bundle_id": source_state.hf_bundle_id,
             "hf_manifest_sha256": source_state.hf_manifest_sha256,
@@ -1911,6 +1912,9 @@ def run_offline_pipeline(
             metrics={
                 "candidate_count": len(candidates),
                 "quote_batch_count": len(quote_batch_values),
+                "provider_proposal_rejection_count": sum(
+                    len(item.rejections) for item in quote_batch_values
+                ),
             },
         )
     )
@@ -2018,7 +2022,10 @@ def run_offline_pipeline(
     original_fact_counts = _factreasoner_claim_counts(
         original_fact_record, candidates, original_included_ids
     )
-    original_fact_unavailable = fact_checker is None and bool(original_fact_record.atoms)
+    original_fact_unavailable = bool(original_fact_record.decisions) and all(
+        item.outcome is CheckOutcome.UNAVAILABLE
+        for item in original_fact_record.decisions
+    )
     artifact_refs.append(
         _record_artifact(
             store,
@@ -2026,7 +2033,11 @@ def run_offline_pipeline(
             logical_id="original_claims",
             status="unavailable" if original_fact_unavailable else "completed",
             reason=(
-                "fact_checker_unavailable"
+                (
+                    "fact_checker_unavailable"
+                    if fact_checker is None
+                    else "fact_checks_unavailable"
+                )
                 if original_fact_unavailable
                 else "original_factreasoner_completed"
             ),
@@ -2342,7 +2353,9 @@ def run_offline_pipeline(
     )
 
     fact_counts = _factreasoner_claim_counts(fact_record, candidates, included_ids)
-    fact_stage_unavailable = fact_checker is None and bool(fact_record.atoms)
+    fact_stage_unavailable = bool(fact_record.decisions) and all(
+        item.outcome is CheckOutcome.UNAVAILABLE for item in fact_record.decisions
+    )
     artifact_refs.append(
         _record_artifact(
             store,
@@ -2350,7 +2363,11 @@ def run_offline_pipeline(
             logical_id="post_repair_claims",
             status="unavailable" if fact_stage_unavailable else "completed",
             reason=(
-                "fact_checker_unavailable"
+                (
+                    "fact_checker_unavailable"
+                    if fact_checker is None
+                    else "fact_checks_unavailable"
+                )
                 if fact_stage_unavailable
                 else "post_repair_factreasoner_completed"
             ),

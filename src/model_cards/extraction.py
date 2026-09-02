@@ -22,6 +22,7 @@ from .claim_gate import (
     ClaimCandidate,
     make_context_statement_value,
     make_mitigation_value,
+    make_publisher_risk_value,
 )
 from .document_structure import build_document_index
 from .models import (
@@ -40,6 +41,7 @@ from .policy import decide_binding
 from .quote import match_quote, normalize_ws
 from .schema import (
     CONTENT_FIELD_PATHS,
+    LIST_FIELDS,
     canonical_field_path,
     validate_field_path,
     validate_field_value,
@@ -47,12 +49,41 @@ from .schema import (
 from .source_documents import SourceDocumentCatalog
 
 
-EXTRACTION_VERSION = "model-card-evidence-extraction/v1"
+EXTRACTION_VERSION = "model-card-evidence-extraction/v3"
 EXTRACTION_SCHEMA_NAME = "model_card_quote_evidence_extraction_v1"
 INFERENCE_MODEL = "deepseek/deepseek-v4-flash-0731"
 DEFAULT_WINDOW_CHARS = 12_000
 DEFAULT_WINDOW_OVERLAP = 500
 DEFAULT_MAX_WINDOWS = 16
+# Keep one strict-schema response empirically below the provider's 8,192-token
+# completion ceiling. Extraction is deliberately selective, and downstream
+# field-level omission records keep absent coverage explicit.
+MAX_PROVIDER_PROPOSALS = 8
+MAX_PROVIDER_FIELD_PATH_CHARS = 160
+MAX_PROVIDER_VALUE_JSON_CHARS = 1_600
+MAX_PROVIDER_QUOTE_CHARS = 800
+MAX_PROVIDER_ENTITY_CHARS = 256
+MAX_PROVIDER_SCOPE_JSON_CHARS = 1_000
+MAX_PROVIDER_RISK_NAME_CHARS = 256
+MAX_PROVIDER_RISK_DESCRIPTION_CHARS = 640
+MAX_PROVIDER_RISK_RATIONALE_CHARS = 512
+
+PUBLISHER_RISK_FIELD = "use_and_risk.identified_risks"
+PUBLISHER_RISK_PROPOSAL_FIELDS = (
+    "name",
+    "description",
+    "applicability_rationale",
+)
+
+_SCALAR_PROVIDER_FIELDS = tuple(sorted(set(CONTENT_FIELD_PATHS) - set(LIST_FIELDS)))
+_LIST_PROVIDER_FIELDS = tuple(sorted(LIST_FIELDS))
+_PROVIDER_FIELD_PATH_PATTERN = (
+    "^(?:"
+    + "|".join(re.escape(item) for item in _SCALAR_PROVIDER_FIELDS)
+    + "|(?:"
+    + "|".join(re.escape(item) for item in _LIST_PROVIDER_FIELDS)
+    + ")\\[(?:0|[1-9][0-9]*)\\])$"
+)
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 _PROPOSAL_ID_RE = re.compile(r"^proposal-[0-9a-f]{24}$")
@@ -79,6 +110,47 @@ class ProposalStatus(str, Enum):
     SOURCE_KIND_MISMATCH = "source_kind_mismatch"
 
 
+@dataclass(frozen=True)
+class ProviderProposalRejection:
+    """Hash-only record for one provider item rejected before materialization."""
+
+    proposal_index: int
+    proposal_sha256: str
+    reason: str
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.proposal_index, int)
+            or isinstance(self.proposal_index, bool)
+            or not 0 <= self.proposal_index < MAX_PROVIDER_PROPOSALS
+        ):
+            raise ExtractionError("provider rejection index is invalid")
+        if not _DIGEST_RE.fullmatch(self.proposal_sha256):
+            raise ExtractionError("provider rejection digest is invalid")
+        if self.reason not in {
+            "duplicate_proposal",
+            "proposal_contract_invalid",
+            "source_identifier_mismatch",
+        }:
+            raise ExtractionError("provider rejection reason is invalid")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "proposal_index": self.proposal_index,
+            "proposal_sha256": self.proposal_sha256,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "ProviderProposalRejection":
+        item = _strict(
+            value,
+            {"proposal_index", "proposal_sha256", "reason"},
+            "provider proposal rejection",
+        )
+        return cls(**item)
+
+
 def _canonical(value: Any) -> str:
     try:
         return json.dumps(
@@ -100,6 +172,65 @@ def _strict(value: Any, keys: set[str], label: str) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != keys:
         raise ExtractionError(f"{label} has an invalid closed shape")
     return value
+
+
+def publisher_risk_proposal_schema() -> dict[str, Any]:
+    """Return the bounded provider shape for one publisher-reported risk.
+
+    Provider output contains only substantive, source-stated text.  Stable IDs,
+    source references, grounds, provenance, review state, and mitigation-link
+    state are computed locally after quote coordinates have been replayed.
+    """
+
+    return {
+        "type": "object",
+        "required": list(PUBLISHER_RISK_PROPOSAL_FIELDS),
+        "properties": {
+            "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_PROVIDER_RISK_NAME_CHARS,
+            },
+            "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_PROVIDER_RISK_DESCRIPTION_CHARS,
+            },
+            "applicability_rationale": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_PROVIDER_RISK_RATIONALE_CHARS,
+            },
+        },
+        "additionalProperties": False,
+        "description": (
+            "Publisher-stated risk text only; deterministic wrapper metadata is "
+            "constructed locally and must not be proposed"
+        ),
+    }
+
+
+def _publisher_risk_proposal_value(value: Any) -> dict[str, JsonValue]:
+    item = _strict(
+        value,
+        set(PUBLISHER_RISK_PROPOSAL_FIELDS),
+        "publisher risk proposal",
+    )
+    bounds = {
+        "name": MAX_PROVIDER_RISK_NAME_CHARS,
+        "description": MAX_PROVIDER_RISK_DESCRIPTION_CHARS,
+        "applicability_rationale": MAX_PROVIDER_RISK_RATIONALE_CHARS,
+    }
+    for key in PUBLISHER_RISK_PROPOSAL_FIELDS:
+        text = item[key]
+        if (
+            not isinstance(text, str)
+            or not normalize_ws(text)
+            or len(text) > bounds[key]
+            or normalize_ws(text).casefold() in {"not specified", "not applicable"}
+        ):
+            raise ExtractionError(f"publisher risk proposal {key} is invalid")
+    return {key: deepcopy(item[key]) for key in PUBLISHER_RISK_PROPOSAL_FIELDS}
 
 
 @dataclass(frozen=True)
@@ -145,7 +276,7 @@ def build_source_windows(
         raise ExtractionError("max_windows is outside the bounded range")
     text = normalize_ws(source.text)
     if not text:
-        return ()
+        raise ExtractionError("quote extraction source has no normalized text")
     windows: list[SourceWindow] = []
     start = 0
     step = window_chars - overlap
@@ -194,30 +325,68 @@ class QuoteProposal:
 
     def __post_init__(self) -> None:
         validate_field_path(self.field_path)
+        if len(self.field_path) > MAX_PROVIDER_FIELD_PATH_CHARS:
+            raise ExtractionError("quote proposal field_path exceeds its bound")
         base = canonical_field_path(self.field_path)
-        if base in _CONTEXT_FIELDS or base == "use_and_risk.mitigations":
-            if self.field_path == base:
-                raise ExtractionError("publisher context and mitigation proposals require an item index")
+        if base in LIST_FIELDS and self.field_path == base:
+            raise ExtractionError("list field proposals require one item index")
+        proposal_value: JsonValue = self.value
+        if base == PUBLISHER_RISK_FIELD:
+            proposal_value = _publisher_risk_proposal_value(self.value)
+        elif base in _CONTEXT_FIELDS or base == "use_and_risk.mitigations":
             if not isinstance(self.value, str) or not self.value.strip():
                 raise ExtractionError("publisher context and mitigation proposals use descriptions")
         else:
             validate_field_value(self.field_path, self.value)
-        object.__setattr__(self, "value", deepcopy(self.value))
-        if not isinstance(self.source_id, str) or not self.source_id:
+        object.__setattr__(self, "value", deepcopy(proposal_value))
+        if (
+            not isinstance(self.source_id, str)
+            or not self.source_id
+            or len(self.source_id) > 128
+        ):
             raise ExtractionError("quote proposal source_id is invalid")
-        if not isinstance(self.quote, str) or not normalize_ws(self.quote):
+        normalized_quote = normalize_ws(self.quote) if isinstance(self.quote, str) else ""
+        if (
+            not normalized_quote
+            or len(self.quote) > MAX_PROVIDER_QUOTE_CHARS
+            or len(normalized_quote) > MAX_PROVIDER_QUOTE_CHARS
+        ):
             raise ExtractionError("quote proposal quote is empty")
-        if not isinstance(self.claim_entity, str) or not self.claim_entity.strip():
+        object.__setattr__(self, "quote", normalized_quote)
+        if (
+            not isinstance(self.claim_entity, str)
+            or not self.claim_entity.strip()
+            or len(self.claim_entity) > MAX_PROVIDER_ENTITY_CHARS
+        ):
             raise ExtractionError("quote proposal claim_entity is empty")
+        if len(_canonical(self.value)) > MAX_PROVIDER_VALUE_JSON_CHARS:
+            raise ExtractionError("quote proposal value exceeds its bound")
+        if isinstance(self.value, str) and normalize_ws(self.value).casefold() in {
+            "not specified",
+            "not applicable",
+        }:
+            raise ExtractionError("quote proposal cannot assert an absence marker")
         try:
             object.__setattr__(self, "relation", RelationToTarget(self.relation))
         except (TypeError, ValueError) as exc:
             raise ExtractionError("quote proposal relation is invalid") from exc
         if self.benchmark_scope is not None:
-            _canonical(self.benchmark_scope)
+            if not isinstance(self.benchmark_scope, dict):
+                raise ExtractionError("quote proposal benchmark scope must be an object")
+            if len(_canonical(self.benchmark_scope)) > MAX_PROVIDER_SCOPE_JSON_CHARS:
+                raise ExtractionError("quote proposal benchmark scope exceeds its bound")
             object.__setattr__(self, "benchmark_scope", deepcopy(self.benchmark_scope))
         if not isinstance(self.origin, str) or not _CODE_RE.fullmatch(self.origin):
             raise ExtractionError("quote proposal origin is invalid")
+        if self.origin not in {"source_stated", "source_derived"}:
+            raise ExtractionError("quote proposal origin is unsupported")
+        if (
+            base in {"use_and_risk.mitigations", PUBLISHER_RISK_FIELD}
+            and self.origin != "source_stated"
+        ):
+            raise ExtractionError(
+                "mitigation and publisher-risk proposals require publisher-stated evidence"
+            )
         object.__setattr__(self, "proposal_id", "proposal-" + _digest(self._payload())[:24])
 
     def _payload(self) -> dict[str, Any]:
@@ -266,6 +435,8 @@ class QuoteProposal:
             benchmark_scope=item["benchmark_scope"],
             origin=item["origin"],
         )
+        if item["quote"] != result.quote:
+            raise ExtractionError("quote proposal quote is not canonical")
         if result.proposal_id != item["proposal_id"]:
             raise ExtractionError("quote proposal_id does not match content")
         return result
@@ -280,10 +451,14 @@ class ExtractionBatch:
     provider: str
     inference_config_sha256: str
     proposals: tuple[QuoteProposal, ...]
+    rejections: tuple[ProviderProposalRejection, ...]
     batch_sha256: str
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "proposals", tuple(self.proposals))
+        object.__setattr__(self, "rejections", tuple(self.rejections))
+        if len(self.proposals) + len(self.rejections) > MAX_PROVIDER_PROPOSALS:
+            raise ExtractionError("extraction batch exceeds its proposal bound")
         if self.extraction_version != EXTRACTION_VERSION:
             raise ExtractionError("extraction batch version is unsupported")
         if not isinstance(self.target, TargetIdentity):
@@ -299,6 +474,18 @@ class ExtractionBatch:
         identifiers = [item.proposal_id for item in self.proposals]
         if identifiers != sorted(identifiers) or len(identifiers) != len(set(identifiers)):
             raise ExtractionError("extraction proposals must be sorted and unique")
+        if not all(
+            isinstance(item, ProviderProposalRejection) for item in self.rejections
+        ):
+            raise ExtractionError("provider proposal rejections are not canonical")
+        rejection_indexes = [item.proposal_index for item in self.rejections]
+        item_count = len(self.proposals) + len(self.rejections)
+        if (
+            rejection_indexes != sorted(rejection_indexes)
+            or len(rejection_indexes) != len(set(rejection_indexes))
+            or any(index >= item_count for index in rejection_indexes)
+        ):
+            raise ExtractionError("provider proposal rejections are not canonical")
         if self.batch_sha256 != _digest(self._payload()):
             raise ExtractionError("extraction batch digest is inconsistent")
 
@@ -311,6 +498,7 @@ class ExtractionBatch:
             "provider": self.provider,
             "inference_config_sha256": self.inference_config_sha256,
             "proposals": [item.to_dict() for item in self.proposals],
+            "rejections": [item.to_dict() for item in self.rejections],
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -325,8 +513,12 @@ class ExtractionBatch:
         provider: str,
         inference_config_sha256: str,
         proposals: Iterable[QuoteProposal],
+        rejections: Iterable[ProviderProposalRejection] = (),
     ) -> "ExtractionBatch":
         values = tuple(sorted(tuple(proposals), key=lambda item: item.proposal_id))
+        rejected = tuple(
+            sorted(tuple(rejections), key=lambda item: item.proposal_index)
+        )
         payload = {
             "extraction_version": EXTRACTION_VERSION,
             "target": target.to_dict(),
@@ -335,6 +527,7 @@ class ExtractionBatch:
             "provider": provider,
             "inference_config_sha256": inference_config_sha256,
             "proposals": [item.to_dict() for item in values],
+            "rejections": [item.to_dict() for item in rejected],
         }
         return cls(
             extraction_version=EXTRACTION_VERSION,
@@ -344,6 +537,7 @@ class ExtractionBatch:
             provider=provider,
             inference_config_sha256=inference_config_sha256,
             proposals=values,
+            rejections=rejected,
             batch_sha256=_digest(payload),
         )
 
@@ -359,12 +553,15 @@ class ExtractionBatch:
                 "provider",
                 "inference_config_sha256",
                 "proposals",
+                "rejections",
                 "batch_sha256",
             },
             "extraction batch",
         )
         if not isinstance(item["proposals"], list):
             raise ExtractionError("extraction proposals must be an array")
+        if not isinstance(item["rejections"], list):
+            raise ExtractionError("extraction rejections must be an array")
         return cls(
             extraction_version=item["extraction_version"],
             target=TargetIdentity.from_dict(item["target"]),
@@ -373,6 +570,10 @@ class ExtractionBatch:
             provider=item["provider"],
             inference_config_sha256=item["inference_config_sha256"],
             proposals=tuple(QuoteProposal.from_dict(entry) for entry in item["proposals"]),
+            rejections=tuple(
+                ProviderProposalRejection.from_dict(entry)
+                for entry in item["rejections"]
+            ),
             batch_sha256=item["batch_sha256"],
         )
 
@@ -501,6 +702,21 @@ def materialize_quote_batch(
             value = make_mitigation_value(
                 description=str(proposal.value), evidence=(evidence,)
             )
+        elif base == PUBLISHER_RISK_FIELD:
+            if (
+                not isinstance(proposal.value, dict)
+                or any(
+                    not isinstance(proposal.value.get(key), str)
+                    for key in PUBLISHER_RISK_PROPOSAL_FIELDS
+                )
+            ):  # guarded by QuoteProposal; keep materialization fail-closed
+                raise ExtractionError("publisher risk proposal is invalid")
+            value = make_publisher_risk_value(
+                name=proposal.value["name"],
+                description=proposal.value["description"],
+                applicability_rationale=proposal.value["applicability_rationale"],
+                evidence=(evidence,),
+            )
         binding = _binding_from_quote_evidence(batch.target, proposal, value, evidence)
         candidate = ClaimCandidate.from_binding(batch.target, binding)
         candidates.append(candidate)
@@ -607,7 +823,7 @@ def extraction_response_schema() -> dict[str, Any]:
             "properties": {
                 "proposals": {
                     "type": "array",
-                    "maxItems": 128,
+                    "maxItems": MAX_PROVIDER_PROPOSALS,
                     "items": {
                         "type": "object",
                         "required": [
@@ -621,25 +837,42 @@ def extraction_response_schema() -> dict[str, Any]:
                             "origin",
                         ],
                         "properties": {
-                            "source_id": {"type": "string", "minLength": 1},
+                            "source_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 128,
+                            },
                             "field_path": {
                                 "type": "string",
-                                "pattern": (
-                                    "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*"
-                                    "(?:\\[(?:0|[1-9][0-9]*)\\])?$"
-                                ),
+                                "pattern": _PROVIDER_FIELD_PATH_PATTERN,
+                                "maxLength": MAX_PROVIDER_FIELD_PATH_CHARS,
                             },
                             "value_json": {
                                 "type": "string",
                                 "minLength": 1,
-                                "maxLength": 20000,
+                                "maxLength": MAX_PROVIDER_VALUE_JSON_CHARS,
+                                "description": (
+                                    "JSON text encoding the exact field value; preserve "
+                                    "stated units and satisfy the supplied field contract"
+                                ),
                             },
-                            "quote": {"type": "string", "minLength": 1, "maxLength": 1200},
-                            "claim_entity": {"type": "string", "minLength": 1},
+                            "quote": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": MAX_PROVIDER_QUOTE_CHARS,
+                            },
+                            "claim_entity": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": MAX_PROVIDER_ENTITY_CHARS,
+                            },
                             "relation": {"enum": [item.value for item in RelationToTarget]},
                             "benchmark_scope_json": {
                                 "type": ["string", "null"],
-                                "maxLength": 5000,
+                                "maxLength": MAX_PROVIDER_SCOPE_JSON_CHARS,
+                                "description": (
+                                    "null, or JSON text encoding a benchmark-scope object"
+                                ),
                             },
                             "origin": {"enum": ["source_stated", "source_derived"]},
                         },
@@ -656,7 +889,10 @@ def proposals_from_provider_value(value: Any) -> tuple[QuoteProposal, ...]:
     """Normalize one already-schema-validated response without retaining its envelope."""
 
     item = _strict(value, {"proposals"}, "extraction response")
-    if not isinstance(item["proposals"], list) or len(item["proposals"]) > 128:
+    if (
+        not isinstance(item["proposals"], list)
+        or len(item["proposals"]) > MAX_PROVIDER_PROPOSALS
+    ):
         raise ExtractionError("extraction response proposal count is invalid")
     proposals: list[QuoteProposal] = []
     for raw in item["proposals"]:
@@ -709,6 +945,62 @@ def proposals_from_provider_value(value: Any) -> tuple[QuoteProposal, ...]:
     if len({item.proposal_id for item in values}) != len(values):
         raise ExtractionError("provider returned duplicate quote proposals")
     return values
+
+
+def normalize_provider_proposals(
+    value: Any,
+    *,
+    expected_source_id: str,
+) -> tuple[tuple[QuoteProposal, ...], tuple[ProviderProposalRejection, ...]]:
+    """Fail closed per schema-shaped provider item without discarding its peers."""
+
+    if not isinstance(expected_source_id, str) or not expected_source_id:
+        raise ExtractionError("expected provider source identifier is invalid")
+    item = _strict(value, {"proposals"}, "extraction response")
+    raw_values = item["proposals"]
+    if (
+        not isinstance(raw_values, list)
+        or len(raw_values) > MAX_PROVIDER_PROPOSALS
+    ):
+        raise ExtractionError("extraction response proposal count is invalid")
+    accepted: dict[str, QuoteProposal] = {}
+    rejections: list[ProviderProposalRejection] = []
+    for index, raw in enumerate(raw_values):
+        raw_sha256 = _digest(raw)
+        try:
+            proposal = proposals_from_provider_value({"proposals": [raw]})[0]
+        except (ExtractionError, TypeError, ValueError):
+            rejections.append(
+                ProviderProposalRejection(
+                    proposal_index=index,
+                    proposal_sha256=raw_sha256,
+                    reason="proposal_contract_invalid",
+                )
+            )
+            continue
+        if proposal.source_id != expected_source_id:
+            rejections.append(
+                ProviderProposalRejection(
+                    proposal_index=index,
+                    proposal_sha256=raw_sha256,
+                    reason="source_identifier_mismatch",
+                )
+            )
+            continue
+        if proposal.proposal_id in accepted:
+            rejections.append(
+                ProviderProposalRejection(
+                    proposal_index=index,
+                    proposal_sha256=raw_sha256,
+                    reason="duplicate_proposal",
+                )
+            )
+            continue
+        accepted[proposal.proposal_id] = proposal
+    return (
+        tuple(sorted(accepted.values(), key=lambda proposal: proposal.proposal_id)),
+        tuple(rejections),
+    )
 
 
 def _quote_evidence(source: SourceDocument, quote: str) -> Evidence:
@@ -825,13 +1117,27 @@ __all__ = [
     "ExtractionBatch",
     "ExtractionError",
     "ExtractionResult",
+    "MAX_PROVIDER_ENTITY_CHARS",
+    "MAX_PROVIDER_FIELD_PATH_CHARS",
+    "MAX_PROVIDER_PROPOSALS",
+    "MAX_PROVIDER_QUOTE_CHARS",
+    "MAX_PROVIDER_RISK_DESCRIPTION_CHARS",
+    "MAX_PROVIDER_RISK_NAME_CHARS",
+    "MAX_PROVIDER_RISK_RATIONALE_CHARS",
+    "MAX_PROVIDER_SCOPE_JSON_CHARS",
+    "MAX_PROVIDER_VALUE_JSON_CHARS",
+    "PUBLISHER_RISK_FIELD",
+    "PUBLISHER_RISK_PROPOSAL_FIELDS",
     "ProposalOutcome",
     "ProposalStatus",
+    "ProviderProposalRejection",
     "QuoteProposal",
     "SourceWindow",
     "build_source_windows",
     "deterministic_structured_candidates",
     "extraction_response_schema",
     "materialize_quote_batch",
+    "normalize_provider_proposals",
+    "publisher_risk_proposal_schema",
     "proposals_from_provider_value",
 ]

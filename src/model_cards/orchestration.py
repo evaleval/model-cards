@@ -19,12 +19,23 @@ import re
 import tempfile
 from typing import Any, Callable, Mapping
 
-from .claim_gate import GateName, ProseCheckerDecision
-from .extraction import ExtractionBatch, materialize_quote_batch
+from .claim_gate import ClaimCandidate, GateName, ProseCheckerDecision
+from .extraction import EXTRACTION_VERSION, ExtractionBatch, materialize_quote_batch
+from .factreasoner import FACTREASONER_KERNEL_VERSION
 from .models import TargetIdentity
-from .pipeline import PipelineResult, run_offline_pipeline
-from .provider import MODEL_ID, ProviderTransport, structured_json_call
+from .pipeline import PIPELINE_VERSION, PipelineResult, run_offline_pipeline
+from .provider import (
+    MODEL_ID,
+    PINNED_PROVIDER,
+    PROVIDER_RUNTIME_VERSION,
+    ProviderResponseError,
+    ProviderTerminalAttemptError,
+    ProviderTransport,
+    RECOVERABLE_PROVIDER_FAILURE_REASON_CODES,
+    structured_json_call,
+)
 from .provider_adapters import (
+    ADAPTER_VERSION,
     OpenRouterApplicabilityChecker,
     OpenRouterClaimChecker,
     OpenRouterFactChecker,
@@ -43,15 +54,15 @@ from .run_state import MANIFEST_FILENAME, RunStore, USAGE_LEDGER_FILENAME
 from .source_state import ImmutableSourceState, load_source_state
 
 
-ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v2"
+ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v7"
 ORCHESTRATION_SCOPE = "immutable_source_state_catalog"
 ORCHESTRATION_MANIFEST_FILENAME = "provider-orchestration.json"
 DEFAULT_MAX_RISKS = 5
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
-_PROVIDER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._:/+()-]{0,127}$")
 _SOURCE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{1,127}$")
 _CLAIM_ID_RE = re.compile(r"^claim-[0-9a-f]{24}$")
+_CLAIM_AVAILABILITY_CHECKER = "model-cards/provider-availability-v1"
 
 
 class OrchestrationError(RuntimeError):
@@ -59,6 +70,46 @@ class OrchestrationError(RuntimeError):
 
 
 CallFunction = Callable[..., Any]
+
+
+def _unavailable_claim_decision(
+    candidate: ClaimCandidate,
+    gate: GateName,
+) -> ProseCheckerDecision:
+    return ProseCheckerDecision.for_candidate(
+        candidate,
+        gate=gate,
+        checker=_CLAIM_AVAILABILITY_CHECKER,
+        method="recorded_provider_response_availability",
+        status="withheld",
+        reason="provider_response_unavailable",
+    )
+
+
+def _claim_decision(
+    checker: OpenRouterClaimChecker,
+    candidate: ClaimCandidate,
+    gate: GateName,
+) -> ProseCheckerDecision:
+    """Return a semantic decision or leave the local gate to withhold safely.
+
+    A recorded provider response failure is local to this one semantic check.
+    Route identity and budget-integrity failures remain fatal, as do uncertain
+    sends, route failures, credential failures, and ledger conflicts.
+    """
+
+    try:
+        return checker.decide(candidate, gate)
+    except ProviderTerminalAttemptError as exc:
+        # Deterministic replay of an already-recorded failed response. The
+        # local availability decision remains byte-identical without a send.
+        if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
+            raise
+        return _unavailable_claim_decision(candidate, gate)
+    except ProviderResponseError as exc:
+        if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
+            raise
+        return _unavailable_claim_decision(candidate, gate)
 
 
 def _canonical(value: Any) -> bytes:
@@ -327,8 +378,8 @@ class ProviderOrchestrationResult:
             raise OrchestrationError("orchestration summary version is unsupported")
         if not isinstance(self.target, TargetIdentity):
             raise OrchestrationError("orchestration target is invalid")
-        if not isinstance(self.provider, str) or not _PROVIDER_RE.fullmatch(self.provider):
-            raise OrchestrationError("orchestration provider is invalid")
+        if self.provider != PINNED_PROVIDER:
+            raise OrchestrationError("orchestration provider is not pinned")
         for name in (
             "source_manifest_sha256",
             "source_catalog_sha256",
@@ -427,8 +478,8 @@ def run_provider_assisted_pipeline(
     receives exactly one quote-extraction call.
     """
 
-    if not isinstance(provider, str) or not _PROVIDER_RE.fullmatch(provider):
-        raise OrchestrationError("an explicit OpenRouter provider is required")
+    if provider != PINNED_PROVIDER:
+        raise OrchestrationError("the pinned OpenRouter provider is required")
     if not callable(call):
         raise OrchestrationError("provider call must be callable")
     if (
@@ -474,6 +525,11 @@ def run_provider_assisted_pipeline(
     )
     admission = {
         "orchestration_version": ORCHESTRATION_VERSION,
+        "adapter_version": ADAPTER_VERSION,
+        "extraction_version": EXTRACTION_VERSION,
+        "factreasoner_kernel_version": FACTREASONER_KERNEL_VERSION,
+        "pipeline_version": PIPELINE_VERSION,
+        "provider_runtime_version": PROVIDER_RUNTIME_VERSION,
         "scope": ORCHESTRATION_SCOPE,
         "model": MODEL_ID,
         "target": catalog.target.to_dict(),
@@ -552,12 +608,9 @@ def run_provider_assisted_pipeline(
     quote_candidates = tuple(sorted(by_candidate.values(), key=lambda item: item.candidate_id))
 
     prose_decisions: list[ProseCheckerDecision] = []
-    try:
-        for candidate in quote_candidates:
-            prose_decisions.append(claim_checker.decide(candidate, GateName.FIELD_FIT))
-            prose_decisions.append(claim_checker.decide(candidate, GateName.VALUE_SUPPORT))
-    except ProviderAdapterError as exc:
-        raise OrchestrationError("provider claim checking failed closed") from exc
+    for candidate in quote_candidates:
+        for gate in (GateName.FIELD_FIT, GateName.VALUE_SUPPORT):
+            prose_decisions.append(_claim_decision(claim_checker, candidate, gate))
     prose_values = tuple(prose_decisions)
     if len(prose_values) != 2 * len(quote_candidates):
         raise OrchestrationError("provider claim-check coverage is incomplete")

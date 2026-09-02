@@ -6,6 +6,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from jsonschema import Draft202012Validator
+
 from model_cards.claim_gate import (
     DecisionStatus,
     GateName,
@@ -15,7 +17,14 @@ from model_cards.claim_gate import (
 from model_cards.extraction import (
     ExtractionBatch,
     ExtractionError,
+    MAX_PROVIDER_ENTITY_CHARS,
+    MAX_PROVIDER_FIELD_PATH_CHARS,
+    MAX_PROVIDER_PROPOSALS,
+    MAX_PROVIDER_QUOTE_CHARS,
+    MAX_PROVIDER_SCOPE_JSON_CHARS,
+    MAX_PROVIDER_VALUE_JSON_CHARS,
     ProposalStatus,
+    ProviderProposalRejection,
     QuoteProposal,
     build_source_windows,
     deterministic_structured_candidates,
@@ -45,7 +54,19 @@ The reported exact-target score is 73.5 on ExampleBench.
 ## Limitations
 
 The model may produce incorrect answers in personalized assistant responses.
+
+## Risks
+
+Misinformation risk. The model may produce incorrect factual statements. This risk applies to the exact checkpoint.
 """
+
+PUBLISHER_RISK_NAME = "Misinformation risk"
+PUBLISHER_RISK_DESCRIPTION = "The model may produce incorrect factual statements."
+PUBLISHER_RISK_RATIONALE = "This risk applies to the exact checkpoint."
+PUBLISHER_RISK_QUOTE = (
+    f"{PUBLISHER_RISK_NAME}. {PUBLISHER_RISK_DESCRIPTION} "
+    f"{PUBLISHER_RISK_RATIONALE}"
+)
 
 
 class Adapter:
@@ -111,7 +132,7 @@ class ExtractionTests(unittest.TestCase):
         return ExtractionBatch.build(
             target=self.catalog.target,
             source_catalog_sha256=self.catalog.catalog_sha256,
-            provider="Baidu",
+            provider="Together",
             inference_config_sha256="b" * 64,
             proposals=proposals,
         )
@@ -136,6 +157,27 @@ class ExtractionTests(unittest.TestCase):
         self.assertNotIn("/Users/", repr(windows[0]))
         with self.assertRaises(ExtractionError):
             build_source_windows(self.readme, window_chars=100, overlap=0)
+
+        blank_sources = (
+            replace(
+                self.readme,
+                source_id="blank_source_a",
+                text=" ",
+                content_sha256=None,
+            ),
+            replace(
+                self.readme,
+                source_id="blank_source_b",
+                text="\n",
+                content_sha256=None,
+            ),
+        )
+        self.assertNotEqual(blank_sources[0].sha256, blank_sources[1].sha256)
+        for source in blank_sources:
+            with self.subTest(source_id=source.source_id), self.assertRaisesRegex(
+                ExtractionError, "no normalized text"
+            ):
+                build_source_windows(source)
 
     def test_quote_materialization_recomputes_coordinates_and_section_context(self) -> None:
         proposal = self.proposal()
@@ -182,6 +224,60 @@ class ExtractionTests(unittest.TestCase):
         self.assertTrue(gate.projection_eligible)
         with self.assertRaisesRegex(ExtractionError, "item index"):
             self.proposal(field_path="use_and_risk.limitations", value=description)
+
+        with self.assertRaisesRegex(ExtractionError, "publisher-stated"):
+            self.proposal(
+                field_path="use_and_risk.mitigations[0]",
+                value="The publisher recommends human review.",
+                quote="The publisher recommends human review.",
+                origin="source_derived",
+            )
+
+    def test_publisher_risk_wrapper_is_constructed_locally_and_gate_accepts(self) -> None:
+        proposal_value = {
+            "name": PUBLISHER_RISK_NAME,
+            "description": PUBLISHER_RISK_DESCRIPTION,
+            "applicability_rationale": PUBLISHER_RISK_RATIONALE,
+        }
+        proposal = self.proposal(
+            field_path="use_and_risk.identified_risks[0]",
+            value=proposal_value,
+            quote=PUBLISHER_RISK_QUOTE,
+        )
+        candidate = materialize_quote_batch(
+            self.batch(proposal), self.catalog
+        ).candidates[0]
+        self.assertEqual("publisher_reported", candidate.value["identification_origin"])
+        self.assertIsNone(candidate.value["taxonomy"])
+        self.assertTrue(candidate.value["risk_id"].startswith("publisher-risk:"))
+        self.assertEqual([self.readme.source_id], candidate.value["source_refs"])
+        self.assertEqual("source_binding", candidate.value["mapping_provenance"]["method"])
+        self.assertEqual("generated_unreviewed", candidate.value["review_status"])
+        self.assertNotIn("risk_id", proposal.value)
+        self.assertNotIn(candidate.value["risk_id"], README)
+        gate = evaluate_claim_gate(
+            candidate,
+            self.catalog.documents,
+            (
+                self.checker(candidate, GateName.FIELD_FIT),
+                self.checker(candidate, GateName.VALUE_SUPPORT),
+            ),
+        )
+        self.assertTrue(gate.projection_eligible)
+
+        with self.assertRaisesRegex(ExtractionError, "closed shape"):
+            self.proposal(
+                field_path="use_and_risk.identified_risks[0]",
+                value={**proposal_value, "risk_id": "provider-invented"},
+                quote=PUBLISHER_RISK_QUOTE,
+            )
+        with self.assertRaisesRegex(ExtractionError, "publisher-stated"):
+            self.proposal(
+                field_path="use_and_risk.identified_risks[0]",
+                value=proposal_value,
+                quote=PUBLISHER_RISK_QUOTE,
+                origin="source_derived",
+            )
 
     def test_supported_quote_cannot_cover_a_different_numeric_value(self) -> None:
         proposal = self.proposal(
@@ -287,8 +383,106 @@ class ExtractionTests(unittest.TestCase):
         schema = extraction_response_schema()
         self.assertTrue(schema["strict"])
         self.assertFalse(schema["schema"]["additionalProperties"])
+        self.assertEqual(
+            MAX_PROVIDER_PROPOSALS,
+            schema["schema"]["properties"]["proposals"]["maxItems"],
+        )
+        self.assertEqual(8, MAX_PROVIDER_PROPOSALS)
         item_schema = schema["schema"]["properties"]["proposals"]["items"]
         self.assertFalse(item_schema["additionalProperties"])
+        properties = item_schema["properties"]
+        self.assertEqual(128, properties["source_id"]["maxLength"])
+        self.assertEqual(
+            MAX_PROVIDER_FIELD_PATH_CHARS,
+            properties["field_path"]["maxLength"],
+        )
+        self.assertEqual(
+            MAX_PROVIDER_VALUE_JSON_CHARS,
+            properties["value_json"]["maxLength"],
+        )
+        self.assertEqual(MAX_PROVIDER_QUOTE_CHARS, properties["quote"]["maxLength"])
+        self.assertEqual(
+            MAX_PROVIDER_ENTITY_CHARS,
+            properties["claim_entity"]["maxLength"],
+        )
+        self.assertEqual(
+            MAX_PROVIDER_SCOPE_JSON_CHARS,
+            properties["benchmark_scope_json"]["maxLength"],
+        )
+
+        wrong_parameter_type = json.loads(json.dumps(raw))
+        wrong_parameter_type["proposals"][0].update(
+            {
+                "field_path": "model_details.num_parameters",
+                "value_json": "7",
+                "quote": "The model has 7B parameters.",
+                "benchmark_scope_json": None,
+            }
+        )
+        with self.assertRaisesRegex(
+            ValueError, "model_details.num_parameters violates"
+        ):
+            proposals_from_provider_value(wrong_parameter_type)
+
+        unindexed_list = json.loads(json.dumps(raw))
+        unindexed_list["proposals"][0].update(
+            {
+                "field_path": "model_details.modalities",
+                "value_json": '["text"]',
+                "quote": "Modalities: text.",
+                "benchmark_scope_json": None,
+            }
+        )
+        with self.assertRaisesRegex(ExtractionError, "item index"):
+            proposals_from_provider_value(unindexed_list)
+        self.assertTrue(
+            list(
+                Draft202012Validator(schema["schema"]).iter_errors(unindexed_list)
+            )
+        )
+
+        too_many = {"proposals": raw["proposals"] * (MAX_PROVIDER_PROPOSALS + 1)}
+        with self.assertRaisesRegex(ExtractionError, "proposal count"):
+            proposals_from_provider_value(too_many)
+
+    def test_persisted_quote_batches_enforce_provider_bounds_and_absence_rules(self) -> None:
+        cases = (
+            {"source_id": "s" * 129},
+            {"quote": "q" * (MAX_PROVIDER_QUOTE_CHARS + 1)},
+            {"claim_entity": "e" * (MAX_PROVIDER_ENTITY_CHARS + 1)},
+            {"value": "v" * MAX_PROVIDER_VALUE_JSON_CHARS},
+            {"benchmark_scope": {"detail": "s" * MAX_PROVIDER_SCOPE_JSON_CHARS}},
+            {"value": "Not specified"},
+            {"value": "Not applicable"},
+        )
+        for changes in cases:
+            with self.subTest(changes=tuple(changes)), self.assertRaises(ExtractionError):
+                self.proposal(**changes)
+
+        prefix = "model_details.modalities["
+        exact_path = (
+            prefix
+            + "1" * (MAX_PROVIDER_FIELD_PATH_CHARS - len(prefix) - 1)
+            + "]"
+        )
+        self.assertEqual(MAX_PROVIDER_FIELD_PATH_CHARS, len(exact_path))
+        self.proposal(field_path=exact_path, value="text", quote="text")
+        with self.assertRaisesRegex(ExtractionError, "field_path exceeds"):
+            self.proposal(
+                field_path=exact_path[:-1] + "1]",
+                value="text",
+                quote="text",
+            )
+
+        with self.assertRaisesRegex(ExtractionError, "scope must be an object"):
+            self.proposal(benchmark_scope=[])
+
+        proposals = tuple(
+            self.proposal(value=f"value-{index}", quote=f"quote-{index}")
+            for index in range(MAX_PROVIDER_PROPOSALS + 1)
+        )
+        with self.assertRaisesRegex(ExtractionError, "proposal bound"):
+            self.batch(*proposals)
 
     def test_batch_round_trip_is_content_addressed_and_contains_no_source_body(self) -> None:
         batch = self.batch(self.proposal())
@@ -297,8 +491,48 @@ class ExtractionTests(unittest.TestCase):
         serialized = json.dumps(batch.to_dict())
         self.assertNotIn("The reported exact-target score", serialized)
         self.assertNotIn("provider response", serialized.casefold())
+        padded = batch.to_dict()
+        padded["proposals"][0]["quote"] = " " * MAX_PROVIDER_QUOTE_CHARS + "x"
+        with self.assertRaisesRegex(ExtractionError, "quote"):
+            ExtractionBatch.from_dict(padded)
+        invalid_scope = batch.to_dict()
+        invalid_scope["proposals"][0]["benchmark_scope"] = []
+        with self.assertRaisesRegex(ExtractionError, "scope must be an object"):
+            ExtractionBatch.from_dict(invalid_scope)
         with self.assertRaises(ExtractionError):
             replace(batch, source_catalog_sha256="0" * 64)
+
+    def test_rejection_indexes_are_bounded_by_the_original_item_count(self) -> None:
+        proposal = self.proposal()
+        rejection = ProviderProposalRejection(
+            proposal_index=1,
+            proposal_sha256="c" * 64,
+            reason="proposal_contract_invalid",
+        )
+        batch = ExtractionBatch.build(
+            target=self.catalog.target,
+            source_catalog_sha256=self.catalog.catalog_sha256,
+            provider="Together",
+            inference_config_sha256="b" * 64,
+            proposals=(proposal,),
+            rejections=(rejection,),
+        )
+        self.assertEqual(batch, ExtractionBatch.from_dict(batch.to_dict()))
+
+        invalid = batch.to_dict()
+        invalid["rejections"][0]["proposal_index"] = 2
+        with self.assertRaisesRegex(ExtractionError, "rejections are not canonical"):
+            ExtractionBatch.from_dict(invalid)
+
+        with self.assertRaisesRegex(ExtractionError, "rejections are not canonical"):
+            ExtractionBatch.build(
+                target=self.catalog.target,
+                source_catalog_sha256=self.catalog.catalog_sha256,
+                provider="Together",
+                inference_config_sha256="b" * 64,
+                proposals=(),
+                rejections=(rejection,),
+            )
 
     def test_stale_catalog_or_wrong_model_fails_before_materialization(self) -> None:
         batch = self.batch(self.proposal())

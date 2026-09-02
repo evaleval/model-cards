@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+import traceback
 import unittest
 from unittest.mock import patch
 
@@ -32,6 +33,7 @@ NOW = datetime(2026, 9, 1, 12, 0, 0, tzinfo=timezone.utc)
 PROVIDER = "Synthetic Provider"
 PARAMETERS = (
     "max_tokens",
+    "reasoning",
     "response_format",
     "structured_outputs",
     "temperature",
@@ -284,7 +286,7 @@ class UsageLedgerTests(unittest.TestCase):
                 first,
                 outcome="retryable_http_error",
                 receipt=receipt(status=429, charge="0"),
-                reason_code="http_429",
+                reason_code="http_retryable",
             )
             second = self.ledger.reserve(
                 item,
@@ -297,7 +299,7 @@ class UsageLedgerTests(unittest.TestCase):
                 second,
                 outcome="retryable_http_error",
                 receipt=receipt(status=503, charge="0"),
-                reason_code="http_503",
+                reason_code="http_retryable",
             )
             with self.assertRaisesRegex(BudgetCapError, "paid-call cap"):
                 self.ledger.reserve(
@@ -312,6 +314,34 @@ class UsageLedgerTests(unittest.TestCase):
         self.assertEqual(1, metrics["retry_count"])
         self.assertEqual(2, metrics["receipt_count"])
         self.assertEqual({"retryable_http_error": 2}, metrics["terminal_outcomes"])
+
+    def test_retry_exhaustion_reason_is_terminal_even_below_current_retry_cap(self) -> None:
+        item = binding(self.root)
+        self.ledger.begin_attempt(item)
+        token = self.ledger.reserve(
+            item,
+            retry_index=0,
+            route=route(prompt_price="0", completion_price="0"),
+            input_token_ceiling=1,
+            output_token_ceiling=1,
+        )
+        self.ledger.record_terminal(
+            token,
+            outcome="retryable_http_error",
+            receipt=receipt(status=429, charge="0"),
+            reason_code="retry_exhausted",
+        )
+        snapshot = self.ledger.inspect(item)
+        self.assertIsNotNone(snapshot)
+        self.assertEqual("failed", snapshot.status)
+        with self.assertRaisesRegex(LedgerConflictError, "terminal"):
+            self.ledger.reserve(
+                item,
+                retry_index=1,
+                route=route(prompt_price="0", completion_price="0"),
+                input_token_ceiling=1,
+                output_token_ceiling=1,
+            )
 
     def test_truncation_duplicate_event_identity_and_unknown_fields_fail_replay(self) -> None:
         truncated_path = self.root / "truncated.jsonl"
@@ -405,6 +435,20 @@ class UsageLedgerTests(unittest.TestCase):
         self.assertEqual(sidecar_sha, restored[4])
         self.assertNotIn(str(self.root), decision_path.read_text())
 
+        sentinel = "PRIVATE NORMALIZED DECISION SENTINEL"
+        with self.assertRaises(LedgerConflictError) as caught:
+            read_decision_sidecar(
+                decision_path,
+                binding=item,
+                validator=lambda _value: (_ for _ in ()).throw(ValueError(sentinel)),
+            )
+        self.assertIsNone(caught.exception.__cause__)
+        self.assertIsNone(caught.exception.__context__)
+        self.assertNotIn(
+            sentinel,
+            "".join(traceback.format_exception(caught.exception)),
+        )
+
         raw = json.loads(decision_path.read_text())
         raw["decision"]["value"] = "tampered"
         decision_path.write_text(
@@ -416,6 +460,23 @@ class UsageLedgerTests(unittest.TestCase):
                 binding=item,
                 validator=lambda _value: None,
             )
+
+        malformed_sentinel = "PRIVATE MALFORMED SIDECAR SENTINEL"
+        decision_path.write_text(
+            '{"private":"' + malformed_sentinel + '"', encoding="utf-8"
+        )
+        with self.assertRaises(LedgerIntegrityError) as malformed:
+            read_decision_sidecar(
+                decision_path,
+                binding=item,
+                validator=lambda _value: None,
+            )
+        self.assertIsNone(malformed.exception.__context__)
+        self.assertNotIn(malformed_sentinel, str(malformed.exception))
+        self.assertNotIn(
+            malformed_sentinel,
+            "".join(traceback.format_exception(malformed.exception)),
+        )
 
     def test_concurrent_writers_share_one_locked_canonical_journal(self) -> None:
         def write(index: int) -> str:

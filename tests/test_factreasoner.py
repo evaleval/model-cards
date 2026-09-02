@@ -27,6 +27,8 @@ from model_cards.factreasoner import (
     run_factreasoner,
 )
 from model_cards.models import RelationToTarget, SourceDocument, SourceRole, TargetIdentity
+from model_cards.provider import ProviderResponseError, ProviderTerminalAttemptError
+from model_cards.run_ledger import LedgerConflictError
 from model_cards.artifact import project_card
 from model_cards.schema import CONTRACT_SCHEMA
 from tests.helpers import synthetic_artifact
@@ -523,6 +525,61 @@ class FactReasonerKernelTests(unittest.TestCase):
             self.assertEqual(decision.reason_code, "checker_unavailable")
             self.assertEqual(len(decision.attempts), 1)
             self.assertTrue(decision.attempts[0].evidence)
+
+    def test_provider_checker_failures_preserve_fatal_boundaries(self) -> None:
+        schema = contract({"claim": {"type": "string"}})
+        args = (
+            card(claim="The model accepts text."),
+            schema,
+            TARGET,
+            (identity_source("The model accepts text."),),
+        )
+
+        def response_error(reason_code):
+            def fail(_request):
+                raise ProviderResponseError("synthetic", reason_code=reason_code)
+
+            return fail
+
+        unavailable = run_factreasoner(
+            *args, FixtureChecker(response_error("http_bad_request"))
+        )
+        self.assertTrue(
+            all(item.outcome is CheckOutcome.UNAVAILABLE for item in unavailable.decisions)
+        )
+        terminal_unavailable = run_factreasoner(
+            *args,
+            FixtureChecker(
+                lambda _request: (_ for _ in ()).throw(
+                    ProviderTerminalAttemptError(
+                        "synthetic", reason_code="http_bad_request"
+                    )
+                )
+            ),
+        )
+        self.assertTrue(
+            all(
+                item.outcome is CheckOutcome.UNAVAILABLE
+                for item in terminal_unavailable.decisions
+            )
+        )
+
+        for error in (
+            ProviderResponseError(
+                "synthetic", reason_code="returned_provider_mismatch"
+            ),
+            ProviderTerminalAttemptError(
+                "synthetic", reason_code="cost_over_reservation"
+            ),
+            LedgerConflictError("synthetic"),
+        ):
+            with self.subTest(error=type(error).__name__), self.assertRaises(
+                type(error)
+            ):
+                run_factreasoner(
+                    *args,
+                    FixtureChecker(lambda _request, error=error: (_ for _ in ()).throw(error)),
+                )
 
     def test_truncated_fallback_is_marked_source_limited(self) -> None:
         schema = contract({"claim": {"type": "string"}})

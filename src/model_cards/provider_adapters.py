@@ -27,10 +27,14 @@ from .claim_gate import (
 )
 from .extraction import (
     ExtractionBatch,
+    MAX_PROVIDER_PROPOSALS,
+    PUBLISHER_RISK_FIELD,
+    PUBLISHER_RISK_PROPOSAL_FIELDS,
     SourceWindow,
     build_source_windows,
     extraction_response_schema,
-    proposals_from_provider_value,
+    normalize_provider_proposals,
+    publisher_risk_proposal_schema,
 )
 from .factreasoner import (
     CheckOutcome,
@@ -40,6 +44,8 @@ from .factreasoner import (
 from .models import SourceDocument, TargetIdentity
 from .provider import (
     MODEL_ID,
+    PINNED_PROVIDER,
+    REASONING_CONFIG,
     ProviderTransport,
     StructuredCallSpec,
     structured_json_call,
@@ -51,15 +57,28 @@ from .risk_mapping import (
     UseContext,
 )
 from .run_ledger import json_sha256
-from .schema import CONTENT_FIELD_PATHS
+from .schema import CONTENT_FIELD_PATHS, CONTRACT_SCHEMA, LIST_FIELDS
 
 
-ADAPTER_VERSION = "model-card-openrouter-adapters/v1"
+ADAPTER_VERSION = "model-card-openrouter-adapters/v13"
 CLAIM_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 FACT_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
+MAX_EXTRACTION_OUTPUT_TOKENS = 8192
+MAX_CLAIM_OUTPUT_TOKENS = 1024
+MAX_FACT_OUTPUT_TOKENS = 8192
+MAX_RISK_OUTPUT_TOKENS = 1536
+
+_DESCRIPTION_ITEM_FIELDS = frozenset(
+    {
+        "use_and_risk.intended_uses",
+        "use_and_risk.out_of_scope_uses",
+        "use_and_risk.limitations",
+        "use_and_risk.known_biases",
+        "use_and_risk.mitigations",
+    }
+)
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
-_PROVIDER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._:/+()-]{0,127}$")
 
 
 class ProviderAdapterError(ValueError):
@@ -92,6 +111,63 @@ def _closed(value: Any, keys: set[str], label: str) -> Mapping[str, Any]:
     return value
 
 
+def _extraction_value_contract() -> dict[str, Any]:
+    """Build the decoded-value contract shown to the quote extractor."""
+
+    fields: dict[str, Any] = {}
+    for field_path in CONTENT_FIELD_PATHS:
+        section, field = field_path.split(".", 1)
+        section_ref = CONTRACT_SCHEMA["properties"][section]["$ref"]
+        section_schema = CONTRACT_SCHEMA["$defs"][section_ref.rsplit("/", 1)[-1]]
+        property_schema = section_schema["properties"][field]
+        if field_path in LIST_FIELDS:
+            array_schema = next(
+                option
+                for option in property_schema.get("anyOf", ())
+                if option.get("type") == "array"
+            )
+            value_schema = array_schema["items"]
+        else:
+            value_schema = property_schema
+        if field_path in _DESCRIPTION_ITEM_FIELDS:
+            # The local materializer adds identifiers and evidence references;
+            # the provider proposes only the quoted description.
+            value_schema = {"type": "string", "minLength": 1}
+        elif field_path == PUBLISHER_RISK_FIELD:
+            value_schema = publisher_risk_proposal_schema()
+        fields[field_path] = value_schema
+    referenced: set[str] = set()
+    pending = list(fields.values())
+    while pending:
+        current = pending.pop()
+        if isinstance(current, Mapping):
+            reference = current.get("$ref")
+            if isinstance(reference, str) and reference.startswith("#/$defs/"):
+                name = reference.rsplit("/", 1)[-1]
+                if name not in referenced:
+                    if name not in CONTRACT_SCHEMA["$defs"]:
+                        raise ProviderAdapterError(
+                            "field contract references an unknown definition"
+                        )
+                    referenced.add(name)
+                    pending.append(CONTRACT_SCHEMA["$defs"][name])
+            pending.extend(current.values())
+        elif isinstance(current, Sequence) and not isinstance(
+            current, (str, bytes, bytearray)
+        ):
+            pending.extend(current)
+    return {
+        "$schema": CONTRACT_SCHEMA["$schema"],
+        "$defs": {
+            name: CONTRACT_SCHEMA["$defs"][name] for name in sorted(referenced)
+        },
+        "field_value_schemas": fields,
+        "indexed_fields": sorted(LIST_FIELDS),
+        "description_item_fields": sorted(_DESCRIPTION_ITEM_FIELDS),
+        "publisher_risk_item_field": PUBLISHER_RISK_FIELD,
+    }
+
+
 def _private_directory(path: str | os.PathLike[str]) -> Path:
     root = Path(path)
     if root.is_symlink():
@@ -122,8 +198,8 @@ class _Runtime:
         transport: ProviderTransport | None,
         call: CallFunction,
     ) -> "_Runtime":
-        if not isinstance(provider, str) or not _PROVIDER_RE.fullmatch(provider):
-            raise ProviderAdapterError("an explicit OpenRouter provider is required")
+        if provider != PINNED_PROVIDER:
+            raise ProviderAdapterError("the pinned OpenRouter provider is required")
         ledger = Path(ledger_path)
         if ledger.is_symlink() or ledger.parent.is_symlink():
             raise ProviderAdapterError("usage ledger path is unsafe")
@@ -191,14 +267,20 @@ class OpenRouterQuoteExtractor:
             raise ProviderAdapterError("source catalog digest is invalid")
         windows = build_source_windows(source)
         response = extraction_response_schema()
+        value_contract = _extraction_value_contract()
         configuration = {
             "adapter_version": ADAPTER_VERSION,
             "model": MODEL_ID,
             "provider": self.runtime.provider,
             "schema": response["name"],
             "temperature": 0,
+            "reasoning": dict(REASONING_CONFIG),
+            "max_output_tokens": MAX_EXTRACTION_OUTPUT_TOKENS,
             "window_ids": [item.window_id for item in windows],
             "content_fields": list(CONTENT_FIELD_PATHS),
+            "field_value_contract_sha256": _digest(value_contract),
+            "max_proposals": MAX_PROVIDER_PROPOSALS,
+            "proposal_rejection_policy": "hash_only_per_item_fail_closed",
         }
         config_sha = json_sha256(configuration)
         payload = {
@@ -210,9 +292,32 @@ class OpenRouterQuoteExtractor:
                 "source_role": source.role.value,
             },
             "allowed_fields": list(CONTENT_FIELD_PATHS),
+            "field_value_contract": value_contract,
             "rules": {
                 "quote_must_be_verbatim": True,
                 "value_must_be_fully_supported_by_quote": True,
+                "value_json_must_decode_to_field_schema": True,
+                "text_values_preserve_units_and_qualifiers": (
+                    "A quoted value such as 7B must be encoded as the JSON string "
+                    "\"7B\", never as the number 7. Do not normalize or infer units."
+                ),
+                "list_fields_require_one_zero_based_index": True,
+                "absence_markers_are_omitted_not_proposed": [
+                    "Not specified",
+                    "Not applicable",
+                ],
+                "maximum_proposals": MAX_PROVIDER_PROPOSALS,
+                "proposal_selection": (
+                    "Return only the highest-value nonredundant facts, up to the "
+                    "maximum. Prefer exact-target identity, model details, training, "
+                    "evaluation, intended uses, limitations, risks, and mitigations."
+                ),
+                "publisher_reported_risk": {
+                    "field_path": PUBLISHER_RISK_FIELD + "[INDEX]",
+                    "origin": "source_stated",
+                    "value_fields": list(PUBLISHER_RISK_PROPOSAL_FIELDS),
+                    "generated_wrapper_metadata": "omit; constructed locally",
+                },
                 "unknown_or_ambiguous_claims": "omit",
                 "base_family_sibling_claims_keep_relation": True,
                 "source_id_must_equal": source.source_id,
@@ -239,7 +344,7 @@ class OpenRouterQuoteExtractor:
                 "provided frozen public-source windows. Return the strict JSON object."
             ),
             user_prompt=_canonical(payload),
-            max_output_tokens=8192,
+            max_output_tokens=MAX_EXTRACTION_OUTPUT_TOKENS,
             context_metadata={
                 "stage": "quote_extraction",
                 "source_id": source.source_id,
@@ -248,22 +353,25 @@ class OpenRouterQuoteExtractor:
         )
 
         def validate(value: Mapping[str, Any]) -> None:
-            proposals = proposals_from_provider_value(value)
-            if any(item.source_id != source.source_id for item in proposals):
-                raise ProviderAdapterError("extractor returned another source identifier")
+            Draft202012Validator(response["schema"]).validate(value)
 
         result = self.runtime.invoke(
             spec,
             decision_name=f"extract-{source.source_id}-{source_catalog_sha256[:16]}.json",
             validator=validate,
         )
-        proposals = proposals_from_provider_value(result.decision)
+        validate(result.decision)
+        proposals, rejections = normalize_provider_proposals(
+            result.decision,
+            expected_source_id=source.source_id,
+        )
         return ExtractionBatch.build(
             target=target,
             source_catalog_sha256=source_catalog_sha256,
             provider=self.runtime.provider,
             inference_config_sha256=config_sha,
             proposals=proposals,
+            rejections=rejections,
         )
 
 
@@ -361,7 +469,7 @@ class OpenRouterClaimChecker:
                 "evidence. Accept or withhold; never rewrite any candidate attribute."
             ),
             user_prompt=_canonical(payload),
-            max_output_tokens=256,
+            max_output_tokens=MAX_CLAIM_OUTPUT_TOKENS,
             context_metadata={
                 "stage": gate.value,
                 "candidate_id": candidate.candidate_id,
@@ -474,7 +582,7 @@ class OpenRouterFactChecker:
                 "contexts. Return support, contradiction, or neutral with cited chunk IDs."
             ),
             user_prompt=_canonical(payload),
-            max_output_tokens=512,
+            max_output_tokens=MAX_FACT_OUTPUT_TOKENS,
             context_metadata={
                 "stage": "factreasoner",
                 "atom_id": request.atom.atom_id,
@@ -587,7 +695,7 @@ class OpenRouterApplicabilityChecker:
                 "evidence-backed use context. Do not treat it as publisher-reported harm."
             ),
             user_prompt=_canonical(payload),
-            max_output_tokens=768,
+            max_output_tokens=MAX_RISK_OUTPUT_TOKENS,
             context_metadata={
                 "stage": "risk_applicability",
                 "risk_candidate_id": candidate.candidate_id,
@@ -784,6 +892,10 @@ __all__ = [
     "ADAPTER_VERSION",
     "CLAIM_CHECKER_ID",
     "FACT_CHECKER_ID",
+    "MAX_CLAIM_OUTPUT_TOKENS",
+    "MAX_EXTRACTION_OUTPUT_TOKENS",
+    "MAX_FACT_OUTPUT_TOKENS",
+    "MAX_RISK_OUTPUT_TOKENS",
     "OpenRouterApplicabilityChecker",
     "OpenRouterClaimChecker",
     "OpenRouterFactChecker",

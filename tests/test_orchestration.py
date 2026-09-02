@@ -7,10 +7,16 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from model_cards.extraction import ExtractionBatch
-from model_cards.pipeline import run_offline_pipeline
-from model_cards.provider import MODEL_ID
-from model_cards.provider_adapters import FACT_CHECKER_ID
+from model_cards.extraction import EXTRACTION_VERSION, ExtractionBatch
+from model_cards.factreasoner import FACTREASONER_KERNEL_VERSION
+from model_cards.pipeline import PIPELINE_VERSION, run_offline_pipeline
+from model_cards.provider import (
+    MODEL_ID,
+    PINNED_PROVIDER,
+    PROVIDER_RUNTIME_VERSION,
+    ProviderResponseError,
+)
+from model_cards.provider_adapters import ADAPTER_VERSION, FACT_CHECKER_ID
 from model_cards.orchestration import (
     ORCHESTRATION_MANIFEST_FILENAME,
     OrchestrationError,
@@ -37,6 +43,13 @@ OTHER_REVISION = "b" * 40
 SUMMARY = "This exact checkpoint summarizes public research papers."
 OFFICIAL_USE = "The publisher intends the exact model for research assistants."
 OFFICIAL_URL = "https://github.com/acme/exact"
+PUBLISHER_RISK_NAME = "Misinformation risk"
+PUBLISHER_RISK_DESCRIPTION = "The model may produce incorrect factual statements."
+PUBLISHER_RISK_RATIONALE = "This risk applies to the exact checkpoint."
+PUBLISHER_RISK_QUOTE = (
+    f"{PUBLISHER_RISK_NAME}. {PUBLISHER_RISK_DESCRIPTION} "
+    f"{PUBLISHER_RISK_RATIONALE}"
+)
 
 
 class BundleAdapter:
@@ -90,6 +103,24 @@ class OfficialLinkedBundleAdapter(BundleAdapter):
                     + "\n[Official code]("
                     + OFFICIAL_URL
                     + ")\n"
+                ).encode("utf-8"),
+            )
+        return super().fetch_file(
+            model_id, revision, repo_path, max_bytes=max_bytes
+        )
+
+
+class PublisherRiskBundleAdapter(BundleAdapter):
+    def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
+        if repo_path == "README.md":
+            return RemoteObject(
+                FetchStatus.OK,
+                (
+                    "# Summary\n"
+                    + SUMMARY
+                    + "\n\n# Risks\n"
+                    + PUBLISHER_RISK_QUOTE
+                    + "\n"
                 ).encode("utf-8"),
             )
         return super().fetch_file(
@@ -223,6 +254,62 @@ class CombinedSourceFakeCall(ResumableFakeCall):
         return super()._decision(spec)
 
 
+class PublisherRiskFakeCall(ResumableFakeCall):
+    def _decision(self, spec):
+        if spec.context_metadata["stage"] == "quote_extraction":
+            payload = json.loads(spec.user_prompt)
+            return {
+                "proposals": [
+                    {
+                        "source_id": payload["source"]["source_id"],
+                        "field_path": "use_and_risk.identified_risks[0]",
+                        "value_json": json.dumps(
+                            {
+                                "name": PUBLISHER_RISK_NAME,
+                                "description": PUBLISHER_RISK_DESCRIPTION,
+                                "applicability_rationale": PUBLISHER_RISK_RATIONALE,
+                            }
+                        ),
+                        "quote": PUBLISHER_RISK_QUOTE,
+                        "claim_entity": (
+                            payload["target"]["model_id"]
+                            + "@"
+                            + payload["target"]["revision"]
+                        ),
+                        "relation": "exact_target",
+                        "benchmark_scope_json": None,
+                        "origin": "source_stated",
+                    }
+                ]
+            }
+        return super()._decision(spec)
+
+
+class OneCheckerFailureFakeCall(ResumableFakeCall):
+    def __init__(self, *, reason_code="http_bad_request"):
+        super().__init__()
+        self.reason_code = reason_code
+        self.failed = False
+
+    def __call__(self, spec, **kwargs):
+        if spec.context_metadata["stage"] == "value_support" and not self.failed:
+            self.failed = True
+            self.specs.append(spec)
+            self.kwargs.append(kwargs)
+            self.invocations.append(
+                (
+                    spec.context_metadata["stage"],
+                    spec.logical_call_id,
+                    str(kwargs["decision_path"]),
+                )
+            )
+            raise ProviderResponseError(
+                "synthetic closed provider response failure",
+                reason_code=self.reason_code,
+            )
+        return super().__call__(spec, **kwargs)
+
+
 class OrchestrationTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -237,7 +324,7 @@ class OrchestrationTests(unittest.TestCase):
 
     def invoke(self, fake, **kwargs):
         values = {
-            "provider": "Baidu",
+            "provider": "Together",
             "ledger_path": self.ledger,
             "decision_dir": self.decisions,
             "environment": {"OPENROUTER_API_KEY": "fixture-only"},
@@ -276,8 +363,8 @@ class OrchestrationTests(unittest.TestCase):
         self.assertEqual(1, len(extraction), "JSON sources must stay on the local path")
         self.assertEqual(["field_fit", "value_support"], gates)
         self.assertEqual(MODEL_ID, result.to_dict()["model"])
-        self.assertEqual("Baidu", result.provider)
-        self.assertTrue(all(spec.provider == "Baidu" for spec in fake.specs))
+        self.assertEqual("Together", result.provider)
+        self.assertTrue(all(spec.provider == "Together" for spec in fake.specs))
         self.assertTrue(
             all(item["transport"] is self.transport for item in fake.kwargs)
         )
@@ -302,7 +389,7 @@ class OrchestrationTests(unittest.TestCase):
         injected = downstream.call_args.kwargs
         self.assertEqual(1, len(injected["quote_batches"]))
         self.assertIsInstance(injected["quote_batches"][0], ExtractionBatch)
-        self.assertEqual("Baidu", injected["quote_batches"][0].provider)
+        self.assertEqual("Together", injected["quote_batches"][0].provider)
         self.assertEqual(2, len(injected["prose_checker_decisions"]))
         self.assertEqual(
             {"field_fit", "value_support"},
@@ -310,6 +397,83 @@ class OrchestrationTests(unittest.TestCase):
         )
         self.assertEqual(FACT_CHECKER_ID, injected["fact_checker"].checker_id)
         self.assertTrue((self.run / "public-card.json").is_file())
+        original_fact = json.loads(
+            (self.run / "factreasoner-original.json").read_text()
+        )
+        final_fact = json.loads((self.run / "factreasoner.json").read_text())
+        for record in (original_fact, final_fact):
+            self.assertTrue(record["decisions"])
+            self.assertIn(
+                "support", {item["outcome"] for item in record["decisions"]}
+            )
+
+    def test_publisher_risk_is_locally_wrapped_gated_and_exported_end_to_end(self):
+        self.bundle = self.root / "publisher-risk-bundle"
+        collect_hf_source_bundle(
+            "acme/Exact", self.bundle, PublisherRiskBundleAdapter()
+        )
+        fake = PublisherRiskFakeCall()
+
+        result = self.invoke(fake)
+
+        self.assertEqual(1, len(result.quote_candidate_ids))
+        card = json.loads((self.run / "public-card.json").read_text())
+        risks = card["use_and_risk"]["identified_risks"]
+        self.assertEqual(1, len(risks))
+        risk = risks[0]
+        self.assertEqual("publisher_reported", risk["identification_origin"])
+        self.assertIsNone(risk["taxonomy"])
+        self.assertTrue(risk["risk_id"].startswith("publisher-risk:"))
+        self.assertEqual("source_binding", risk["mapping_provenance"]["method"])
+        self.assertEqual("generated_unreviewed", risk["review_status"])
+        self.assertTrue(risk["source_refs"])
+        self.assertTrue(
+            card["provenance"]["field_references"][
+                "use_and_risk.identified_risks[0]"
+            ]
+        )
+        self.assertNotIn("derivations", card["provenance"])
+        self.assertEqual(
+            tuple(result.quote_candidate_ids),
+            result.pipeline_result.risk.publisher_reported_risk_candidate_ids,
+        )
+        self.assertEqual(0, result.pipeline_result.risk.taxonomy_candidate_count)
+        self.assertEqual(0, result.pipeline_result.risk.taxonomy_included_count)
+
+        gates = json.loads((self.run / "claim-gates.json").read_text())
+        publisher_record = next(
+            record
+            for record in gates["records"]
+            if record["candidate"]["field_path"]
+            == "use_and_risk.identified_risks[0]"
+        )
+        self.assertTrue(publisher_record["projection_eligible"])
+        self.assertEqual(
+            {"accepted"},
+            {decision["status"] for decision in publisher_record["decisions"]},
+        )
+
+        provider_decision = next(
+            value for value in fake.cached.values() if "proposals" in value
+        )
+        provider_value = json.loads(
+            provider_decision["proposals"][0]["value_json"]
+        )
+        self.assertEqual(
+            {"name", "description", "applicability_rationale"},
+            set(provider_value),
+        )
+        self.assertNotIn("risk_id", provider_value)
+        self.assertNotIn("mapping_provenance", provider_value)
+
+        paid_paths = list(fake.paid_paths)
+        replayed = self.invoke(fake)
+        self.assertEqual(paid_paths, fake.paid_paths)
+        self.assertEqual(result.result_sha256, replayed.result_sha256)
+        self.assertEqual(
+            result.pipeline_result.result_sha256,
+            replayed.pipeline_result.result_sha256,
+        )
 
     def test_provider_extracts_hf_and_ancestry_bound_official_text_once_each(self):
         self.bundle = self.root / "linked-bundle"
@@ -364,6 +528,24 @@ class OrchestrationTests(unittest.TestCase):
             sorted(first.extraction_batch_sha256s), list(first.extraction_batch_sha256s)
         )
 
+    def test_one_checker_response_failure_withholds_candidate_and_continues(self):
+        result = self.invoke(OneCheckerFailureFakeCall())
+        self.assertTrue((self.run / "public-card.json").is_file())
+        self.assertEqual(2, len(result.prose_decision_sha256s))
+        gates = json.loads((self.run / "claim-gates.json").read_text())
+        reasons = {
+            decision["reason"]
+            for record in gates["records"]
+            for decision in record["decisions"]
+        }
+        self.assertIn("provider_response_unavailable", reasons)
+
+    def test_route_identity_failure_remains_fatal(self):
+        with self.assertRaises(ProviderResponseError):
+            self.invoke(
+                OneCheckerFailureFakeCall(reason_code="returned_provider_mismatch")
+            )
+
     def test_summary_and_admission_do_not_serialize_source_text_prompts_or_paths(self):
         result = self.invoke(ResumableFakeCall())
         summary = json.dumps(result.to_dict(), sort_keys=True)
@@ -377,6 +559,18 @@ class OrchestrationTests(unittest.TestCase):
             self.assertNotIn("windows", serialized)
         self.assertNotIn("README.md", summary)
         self.assertEqual("immutable_source_state_catalog", result.to_dict()["scope"])
+        admitted = json.loads(admission)
+        self.assertEqual(PINNED_PROVIDER, admitted["provider"])
+        self.assertEqual(ADAPTER_VERSION, admitted["adapter_version"])
+        self.assertEqual(EXTRACTION_VERSION, admitted["extraction_version"])
+        self.assertEqual(
+            FACTREASONER_KERNEL_VERSION,
+            admitted["factreasoner_kernel_version"],
+        )
+        self.assertEqual(PIPELINE_VERSION, admitted["pipeline_version"])
+        self.assertEqual(
+            PROVIDER_RUNTIME_VERSION, admitted["provider_runtime_version"]
+        )
 
     def test_target_or_catalog_drift_halts_before_another_provider_decision(self):
         fake = ResumableFakeCall()
@@ -396,7 +590,7 @@ class OrchestrationTests(unittest.TestCase):
                 run_provider_assisted_pipeline(
                     other_bundle,
                     self.run,
-                    provider="Baidu",
+                    provider="Together",
                     ledger_path=self.ledger,
                     decision_dir=self.decisions,
                     environment={"OPENROUTER_API_KEY": "fixture-only"},
@@ -417,11 +611,15 @@ class OrchestrationTests(unittest.TestCase):
             run_provider_assisted_pipeline(
                 self.bundle, self.run, provider="", **common
             )
+        with self.assertRaisesRegex(OrchestrationError, "pinned"):
+            run_provider_assisted_pipeline(
+                self.bundle, self.run, provider="Baidu", **common
+            )
         with self.assertRaisesRegex(OrchestrationError, "inside"):
             run_provider_assisted_pipeline(
                 self.bundle,
                 self.run,
-                provider="Baidu",
+                provider="Together",
                 ledger_path=self.root / "outside.jsonl",
                 decision_dir=self.decisions,
                 call=fake,
@@ -431,7 +629,7 @@ class OrchestrationTests(unittest.TestCase):
             run_provider_assisted_pipeline(
                 self.bundle,
                 self.run,
-                provider="Baidu",
+                provider="Together",
                 ledger_path=self.run / "other.jsonl",
                 decision_dir=self.decisions,
                 call=fake,
@@ -441,7 +639,7 @@ class OrchestrationTests(unittest.TestCase):
             run_provider_assisted_pipeline(
                 self.bundle,
                 self.run,
-                provider="Baidu",
+                provider="Together",
                 ledger_path=self.ledger,
                 decision_dir=self.decisions,
                 call=None,
@@ -456,7 +654,7 @@ class OrchestrationTests(unittest.TestCase):
             run_provider_assisted_pipeline(
                 self.bundle,
                 self.run,
-                provider="Baidu",
+                provider="Together",
                 ledger_path=self.ledger,
                 decision_dir=self.decisions,
                 call=fake,
@@ -491,7 +689,7 @@ class OrchestrationTests(unittest.TestCase):
         ):
             actual = _build_risk_interfaces(
                 RISK_CATALOG,
-                provider="Baidu",
+                provider="Together",
                 ledger_path=self.ledger,
                 decision_dir=self.decisions,
                 environment=environment,
@@ -502,7 +700,7 @@ class OrchestrationTests(unittest.TestCase):
 
         self.assertEqual((detector, checker, "nexus_provider_enabled"), actual)
         build_engine.assert_called_once_with(
-            provider="Baidu",
+            provider="Together",
             ledger_path=self.ledger,
             decision_dir=self.decisions,
             environment=environment,
@@ -511,7 +709,7 @@ class OrchestrationTests(unittest.TestCase):
         )
         build_detector.assert_called_once_with(engine, max_risks=4)
         build_checker.assert_called_once_with(
-            provider="Baidu",
+            provider="Together",
             ledger_path=self.ledger,
             decision_dir=self.decisions,
             environment=environment,
