@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [deepseek\-v3\-base\.json](<./deepseek-v3-base.json>)<br>
-SHA-256: `e2dd516a409b887887d19fd1aa79400efcab86a275df7815eb1c5d376c0dbe91`
+SHA-256: `ea53d90c6ec6cc06803c0cbdd344abf6153bdea0d7d86d9f055ad17e117eaf3f`
 
 ## Identity
 
@@ -12,7 +12,8 @@ SHA-256: `e2dd516a409b887887d19fd1aa79400efcab86a275df7815eb1c5d376c0dbe91`
 | Model ID | deepseek\-ai/DeepSeek\-V3\-Base |
 | Name | DeepSeek\-V3\-Base |
 | Developed by | deepseek\-ai |
-| Model type | deepseek\_v3 config model type |
+| Model type | text\-generation |
+| License | the Model License; commercial use supported: https://huggingface\.co/deepseek\-ai/DeepSeek\-V3\-Base/blob/afb92e1fa402c2be2a9eb085312bb02e0384d6c7/LICENSE\-MODEL |
 | Version | afb92e1fa402c2be2a9eb085312bb02e0384d6c7 |
 | Summary | DeepSeek\-V3\-Base is listed with 671B total parameters, 37B activated parameters per token, 128K context length\. |
 
@@ -52,13 +53,13 @@ SHA-256: `e2dd516a409b887887d19fd1aa79400efcab86a275df7815eb1c5d376c0dbe91`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The frozen README provides 12 exact\-target benchmark scores in this capped publication set; examples: Pile\-test: 0\.548; BBH: 87\.5; MMLU: 87\.1\. |
+| Results summary | The frozen README provides 32 exact\-target benchmark scores; examples: Pile\-test: 0\.548; BBH: 87\.5; MMLU: 87\.1\. |
 
 ### Benchmark Scores
 
 | Benchmark | Metric | Score | Setting | Split |
 | --- | --- | ---: | --- | --- |
-| Pile\-test | BPB | 0\.548 | Standard Benchmarks; setting not stated | Not reported |
+| Pile\-test | BPB | 0\.548 | README table; setting not stated | Not reported |
 | BBH | EM | 87\.5 | 3\-shot | Not reported |
 | MMLU | Acc\. | 87\.1 | 5\-shot | Not reported |
 | MMLU\-Redux | Acc\. | 86\.2 | 5\-shot | Not reported |
@@ -70,6 +71,26 @@ SHA-256: `e2dd516a409b887887d19fd1aa79400efcab86a275df7815eb1c5d376c0dbe91`
 | PIQA | Acc\. | 84\.7 | 0\-shot | Not reported |
 | WinoGrande | Acc\. | 84\.9 | 5\-shot | Not reported |
 | RACE\-Middle | Acc\. | 67\.1 | 5\-shot | Not reported |
+| RACE\-High | Acc\. | 51\.3 | 5\-shot | Not reported |
+| TriviaQA | EM | 82\.9 | 5\-shot | Not reported |
+| NaturalQuestions | EM | 40\.0 | 5\-shot | Not reported |
+| AGIEval | Acc\. | 79\.6 | 0\-shot | Not reported |
+| HumanEval | Pass@1 | 65\.2 | 0\-shot | Not reported |
+| MBPP | Pass@1 | 75\.4 | 3\-shot | Not reported |
+| LiveCodeBench\-Base | Pass@1 | 19\.4 | 3\-shot | Not reported |
+| CRUXEval\-I | Acc\. | 67\.3 | 2\-shot | Not reported |
+| CRUXEval\-O | Acc\. | 69\.8 | 2\-shot | Not reported |
+| GSM8K | EM | 89\.3 | 8\-shot | Not reported |
+| MATH | EM | 61\.6 | 4\-shot | Not reported |
+| MGSM | EM | 79\.8 | 8\-shot | Not reported |
+| CMath | EM | 90\.7 | 3\-shot | Not reported |
+| CLUEWSC | EM | 82\.7 | 5\-shot | Not reported |
+| C\-Eval | Acc\. | 90\.1 | 5\-shot | Not reported |
+| CMMLU | Acc\. | 88\.8 | 5\-shot | Not reported |
+| CMRC | EM | 76\.3 | 1\-shot | Not reported |
+| C3 | Acc\. | 78\.6 | 0\-shot | Not reported |
+| CCPM | Acc\. | 92\.0 | 0\-shot | Not reported |
+| MMMLU\-non\-English | Acc\. | 79\.4 | 5\-shot | Not reported |
 
 ## Links
 
@@ -82,4 +103,4 @@ SHA-256: `e2dd516a409b887887d19fd1aa79400efcab86a275df7815eb1c5d376c0dbe91`
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.license`, `identity.release_date`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.

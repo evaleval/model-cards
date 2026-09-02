@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import unittest
+from unittest import mock
 
 from jsonschema import ValidationError
 
@@ -19,10 +21,16 @@ from model_cards.factreasoner import (
     FactAtom,
     ReferentHypothesis,
     build_source_chunks,
+    check_request_sha256,
     retrieve_chunks,
 )
 from model_cards.models import RelationToTarget, SourceDocument, SourceRole, TargetIdentity
-from model_cards.provider import MODEL_ID
+from model_cards.provider import (
+    MODEL_ID,
+    ProviderResponseError,
+    StructuredCallSpec,
+    structured_json_call,
+)
 from model_cards.provider_adapters import (
     MAX_CLAIM_OUTPUT_TOKENS,
     MAX_EXTRACTION_OUTPUT_TOKENS,
@@ -32,8 +40,13 @@ from model_cards.provider_adapters import (
     OpenRouterFactChecker,
     OpenRouterQuoteExtractor,
     ProviderAdapterError,
+    _AggregatePaidCallBudget,
+    _Runtime,
     build_nexus_openrouter_inference_engine,
+    summarize_aggregate_budget,
 )
+from model_cards.quality_report import QualityReportError, _provider_metrics
+from model_cards.run_ledger import AttemptBinding, BudgetCapError, UsageLedger
 from model_cards.risk_mapping import (
     INFERENCE_MODEL,
     NEXUS_PACKAGE_VERSION,
@@ -137,7 +150,6 @@ class ProviderAdapterTests(unittest.TestCase):
                     "quote": "The exact model is intended for research summarization.",
                     "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
                     "relation": "exact_target",
-                    "benchmark_scope_json": None,
                     "origin": "source_stated",
                 }
             ]
@@ -154,6 +166,10 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual(MODEL_ID, MODEL_ID)
         self.assertEqual(0, payload["windows"][0]["normalized_start"])
         self.assertFalse(spec.json_schema["additionalProperties"])
+        self.assertNotIn(
+            "benchmark_scope_json",
+            spec.json_schema["properties"]["proposals"]["items"]["properties"],
+        )
         self.assertEqual(MAX_EXTRACTION_OUTPUT_TOKENS, spec.max_output_tokens)
         self.assertIn(
             "model_details.num_parameters",
@@ -198,6 +214,64 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual("quote_extraction", spec.context_metadata["stage"])
         self.assertNotIn("excerpt", spec.context_metadata)
 
+    def test_quote_extractor_runs_dedicated_use_risk_pass_even_with_core_context(self) -> None:
+        intended = "The model is intended for research summarization."
+        limitation = "The model may produce inaccurate summaries."
+        main = {
+            "proposals": [
+                {
+                    "source_id": "src_" + "b" * 24,
+                    "field_path": "use_and_risk.intended_uses[0]",
+                    "value_json": json.dumps(intended),
+                    "quote": intended,
+                    "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
+                    "relation": "exact_target",
+                    "origin": "source_stated",
+                }
+            ]
+        }
+        recovery = {
+            "proposals": [
+                {
+                    "source_id": "src_" + "b" * 24,
+                    "field_path": "use_and_risk.limitations[0]",
+                    # Reproduces the provider shape that previously failed the
+                    # nested JSON parse despite being safe quoted prose.
+                    "value_json": limitation,
+                    "quote": limitation,
+                    "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
+                    "relation": "exact_target",
+                    "origin": "source_stated",
+                }
+            ]
+        }
+        fake = FakeCalls(main, recovery)
+        batch = OpenRouterQuoteExtractor(**self.kwargs(fake)).extract_source(
+            source(
+                f"# Intended Uses\n{intended}\n\n"
+                f"# Limitations and Risks\n{limitation}"
+            ),
+            target=TARGET,
+            source_catalog_sha256="c" * 64,
+        )
+        self.assertEqual(2, len(batch.proposals))
+        recovered = next(
+            item
+            for item in batch.proposals
+            if item.field_path == "use_and_risk.limitations[0]"
+        )
+        self.assertEqual(limitation, recovered.value)
+        self.assertEqual(
+            ["quote_extraction", "quote_extraction_use_risk"],
+            [item.context_metadata["stage"] for item in fake.specs],
+        )
+        risk_schema = fake.specs[1].json_schema
+        field_pattern = risk_schema["properties"]["proposals"]["items"][
+            "properties"
+        ]["field_path"]["pattern"]
+        self.assertIn("use_and_risk", field_pattern)
+        self.assertNotIn("identity", field_pattern)
+
     def test_quote_extractor_withholds_invented_source_and_rejects_wrong_target(self) -> None:
         fake = FakeCalls(
             {
@@ -209,7 +283,6 @@ class ProviderAdapterTests(unittest.TestCase):
                         "quote": "x",
                         "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
                         "relation": "exact_target",
-                        "benchmark_scope_json": None,
                         "origin": "source_stated",
                     }
                 ]
@@ -237,7 +310,6 @@ class ProviderAdapterTests(unittest.TestCase):
                     "quote": "q" * 801,
                     "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
                     "relation": "exact_target",
-                    "benchmark_scope_json": None,
                     "origin": "source_stated",
                 }
             ]
@@ -259,7 +331,6 @@ class ProviderAdapterTests(unittest.TestCase):
             "quote": "The exact model is intended for research summarization.",
             "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
             "relation": "exact_target",
-            "benchmark_scope_json": None,
             "origin": "source_stated",
         }
         invalid_value = {
@@ -314,7 +385,6 @@ class ProviderAdapterTests(unittest.TestCase):
             "quote": "summary",
             "claim_entity": f"{TARGET.model_id}@{TARGET.revision}",
             "relation": "exact_target",
-            "benchmark_scope_json": None,
             "origin": "source_stated",
         }
         for field, value in (
@@ -323,7 +393,7 @@ class ProviderAdapterTests(unittest.TestCase):
             ("value_json", '"' + "v" * 1_600 + '"'),
             ("quote", "q" * 801),
             ("claim_entity", "e" * 257),
-            ("benchmark_scope_json", '"' + "s" * 1_000 + '"'),
+            ("origin", "source_stated" * 20),
         ):
             proposal = dict(base)
             proposal[field] = value
@@ -388,9 +458,13 @@ class ProviderAdapterTests(unittest.TestCase):
         chunk_id = contexts[0].chunk.chunk_id
         fake = FakeCalls(
             {
-                "outcome": "support",
-                "reason_code": "support_in_context",
-                "cited_chunk_ids": [chunk_id],
+                "decisions": [
+                    {
+                        "request_sha256": check_request_sha256(request),
+                        "outcome": "support",
+                        "cited_chunk_ids": [chunk_id],
+                    }
+                ]
             }
         )
         response = OpenRouterFactChecker(**self.kwargs(fake)).check(request)
@@ -398,18 +472,402 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertEqual((chunk_id,), response.cited_chunk_ids)
         payload = json.loads(fake.specs[0].user_prompt)
         self.assertEqual(MAX_FACT_OUTPUT_TOKENS, fake.specs[0].max_output_tokens)
-        self.assertEqual(request.hypothesis, payload["hypothesis"])
+        self.assertEqual(request.hypothesis, payload["checks"][0]["hypothesis"])
         self.assertEqual({chunk_id}, {item["chunk_id"] for item in payload["contexts"]})
+        self.assertEqual("factreasoner_batch", fake.specs[0].context_metadata["stage"])
 
         bad = FakeCalls(
             {
-                "outcome": "support",
-                "reason_code": "support_in_context",
-                "cited_chunk_ids": ["chunk-invented"],
+                "decisions": [
+                    {
+                        "request_sha256": check_request_sha256(request),
+                        "outcome": "support",
+                        "cited_chunk_ids": ["chunk-invented"],
+                    }
+                ]
             }
         )
         with self.assertRaises(ProviderAdapterError):
             OpenRouterFactChecker(**self.kwargs(bad)).check(request)
+
+        class InvalidThenValid(FakeCalls):
+            def __call__(self, spec, **kwargs):
+                self.specs.append(spec)
+                self.kwargs.append(kwargs)
+                if len(self.specs) == 1:
+                    raise ProviderResponseError(
+                        "synthetic invalid structured decision",
+                        reason_code="structured_decision_invalid",
+                    )
+                decision = self.decisions.pop(0)
+                kwargs["validator"](decision)
+                return SimpleNamespace(
+                    decision=decision,
+                    receipt=SimpleNamespace(prompt_tokens=10, completion_tokens=3),
+                    resumed=False,
+                )
+
+        retried = InvalidThenValid(
+            {
+                "decisions": [
+                    {
+                        "request_sha256": check_request_sha256(request),
+                        "outcome": "neutral",
+                        "cited_chunk_ids": [chunk_id],
+                    }
+                ]
+            }
+        )
+        retried_response = OpenRouterFactChecker(**self.kwargs(retried)).check(request)
+        self.assertEqual("neutral", retried_response.outcome.value)
+        self.assertEqual("no_complete_support", retried_response.reason_code)
+        self.assertEqual(2, len(retried.specs))
+        self.assertTrue(retried.specs[0].attempt_id.endswith(".attempt1"))
+        self.assertTrue(retried.specs[1].attempt_id.endswith(".attempt2"))
+        self.assertEqual(
+            retried.specs[0].logical_call_id,
+            retried.specs[1].logical_call_id,
+        )
+
+    def test_fact_checker_batches_and_exact_request_cache_avoid_repeat_calls(self) -> None:
+        document = source("# Summary\nThe exact model emits grounded summaries.")
+        chunks = build_source_chunks((document,)).chunks
+        requests = []
+        for ordinal, statement in enumerate(
+            ("The exact model emits summaries.", "The exact model is grounded.")
+        ):
+            atom = FactAtom(
+                atom_version=ATOM_VERSION,
+                target=TARGET,
+                field_path="identity.summary",
+                value_path=f"identity.summary[{ordinal}]",
+                ordinal=ordinal,
+                statement=statement,
+                hypothesis=ReferentHypothesis(
+                    f"{TARGET.model_id}@{TARGET.revision}",
+                    RelationToTarget.EXACT_TARGET,
+                ),
+                field_value_sha256="e" * 64,
+            )
+            contexts = retrieve_chunks(atom, chunks)
+            requests.append(
+                CheckRequest(
+                    atom=atom,
+                    stage=CheckStage.RETRIEVAL,
+                    contexts=contexts,
+                    fallback_complete=True,
+                )
+            )
+        decisions = {
+            "decisions": [
+                {
+                    "request_sha256": check_request_sha256(request),
+                    "outcome": "support",
+                    "cited_chunk_ids": [request.contexts[0].chunk.chunk_id],
+                }
+                for request in requests
+            ]
+        }
+        fake = FakeCalls(decisions)
+        checker = OpenRouterFactChecker(**self.kwargs(fake))
+
+        first = checker.check_many(tuple(requests))
+        replayed = tuple(checker.check(item) for item in requests)
+
+        self.assertEqual(first, replayed)
+        self.assertEqual(1, len(fake.specs))
+        self.assertEqual(2, fake.specs[0].context_metadata["request_count"])
+        with self.assertRaisesRegex(ProviderAdapterError, "between 1 and 64"):
+            checker.check_many(tuple(requests[0] for _ in range(65)))
+
+    def test_shared_aggregate_budget_caps_fresh_calls_but_allows_replay(self) -> None:
+        from tests.test_provider import (
+            FixtureTransport,
+            SCHEMA,
+            route_payload,
+            success_payload,
+            validator,
+        )
+
+        aggregate = self.root / "aggregate-budget.jsonl"
+
+        def spec(name: str) -> StructuredCallSpec:
+            return StructuredCallSpec(
+                logical_call_id=f"aggregate.{name}",
+                attempt_id=f"aggregate.{name}.attempt1",
+                provider="Together",
+                schema_name=f"aggregate_{name}",
+                json_schema=SCHEMA,
+                system_prompt="Return one fixture value.",
+                user_prompt="Return the normalized fixture value.",
+                max_output_tokens=32,
+                context_metadata={"stage": "fixture"},
+            )
+
+        first_transport = FixtureTransport(
+            [(200, success_payload(provider="Together"))],
+            routes=[route_payload(provider="Together")],
+        )
+        first_runtime = _Runtime.build(
+            provider="Together",
+            ledger_path=self.root / "target-1" / "usage.jsonl",
+            decision_dir=self.root / "target-1" / "decisions",
+            aggregate_budget_path=aggregate,
+            environment={"OPENROUTER_API_KEY": "fixture-key"},
+            transport=first_transport,
+            call=structured_json_call,
+        )
+        initial = first_runtime.invoke(
+            spec("first"),
+            decision_name="aggregate-first.json",
+            validator=validator,
+        )
+        self.assertFalse(initial.resumed)
+        journal_before = aggregate.read_bytes()
+
+        blocked_transport = FixtureTransport(
+            [(200, success_payload(provider="Together"))],
+            routes=[route_payload(provider="Together")],
+        )
+        with mock.patch("model_cards.provider_adapters.GLOBAL_PAID_CALL_CAP", 1):
+            with self.assertRaisesRegex(BudgetCapError, "paid-call cap"):
+                _Runtime.build(
+                    provider="Together",
+                    ledger_path=self.root / "target-2" / "usage.jsonl",
+                    decision_dir=self.root / "target-2" / "decisions",
+                    aggregate_budget_path=aggregate,
+                    environment={"OPENROUTER_API_KEY": "fixture-key"},
+                    transport=blocked_transport,
+                    call=structured_json_call,
+                ).invoke(
+                    spec("second"),
+                    decision_name="aggregate-second.json",
+                    validator=validator,
+                )
+
+            forbidden = FixtureTransport([])
+            replay = _Runtime.build(
+                provider="Together",
+                ledger_path=self.root / "target-1" / "usage.jsonl",
+                decision_dir=self.root / "target-1" / "decisions",
+                aggregate_budget_path=aggregate,
+                environment={},
+                transport=forbidden,
+                call=structured_json_call,
+            ).invoke(
+                spec("first"),
+                decision_name="aggregate-first.json",
+                validator=validator,
+            )
+
+        self.assertTrue(replay.resumed)
+        self.assertEqual(0, blocked_transport.paid_count)
+        self.assertEqual([], forbidden.requests)
+        self.assertEqual(journal_before, aggregate.read_bytes())
+        summary = summarize_aggregate_budget(aggregate)
+        self.assertEqual(1, summary["paid_calls"])
+        self.assertEqual("0", summary["reserved_usd_capacity"])
+        self.assertNotIn(str(self.root), aggregate.read_text())
+
+    def test_shared_aggregate_budget_enforces_usd_cap_before_paid_send(self) -> None:
+        from tests.test_provider import (
+            FixtureTransport,
+            SCHEMA,
+            route_payload,
+            success_payload,
+            validator,
+        )
+
+        aggregate = self.root / "aggregate-usd-budget.jsonl"
+
+        def invoke(name: str, transport: FixtureTransport):
+            call_spec = StructuredCallSpec(
+                logical_call_id=f"aggregate.usd.{name}",
+                attempt_id=f"aggregate.usd.{name}.attempt1",
+                provider="Together",
+                schema_name=f"aggregate_usd_{name}",
+                json_schema=SCHEMA,
+                system_prompt="Return one fixture value.",
+                user_prompt="Return the normalized fixture value.",
+                max_output_tokens=32,
+                context_metadata={"stage": "fixture"},
+            )
+            return _Runtime.build(
+                provider="Together",
+                ledger_path=self.root / name / "usage.jsonl",
+                decision_dir=self.root / name / "decisions",
+                aggregate_budget_path=aggregate,
+                environment={"OPENROUTER_API_KEY": "fixture-key"},
+                transport=transport,
+                call=structured_json_call,
+            ).invoke(
+                call_spec,
+                decision_name=f"aggregate-usd-{name}.json",
+                validator=validator,
+            )
+
+        first_transport = FixtureTransport(
+            [(200, success_payload(provider="Together", cost="0.001"))],
+            routes=[route_payload(provider="Together")],
+        )
+        invoke("first-usd", first_transport)
+        first_summary = summarize_aggregate_budget(aggregate)
+        first_commitment = Decimal(first_summary["total_usd_commitment"])
+        self.assertGreater(first_commitment, Decimal("0"))
+        journal_before = aggregate.read_bytes()
+
+        blocked_transport = FixtureTransport(
+            [(200, success_payload(provider="Together", cost="0.001"))],
+            routes=[route_payload(provider="Together")],
+        )
+        with mock.patch(
+            "model_cards.provider_adapters.GLOBAL_USD_CAP",
+            first_commitment * Decimal("1.5"),
+        ):
+            with self.assertRaisesRegex(BudgetCapError, "USD cap"):
+                invoke("second-usd", blocked_transport)
+
+        self.assertEqual(0, blocked_transport.paid_count)
+        self.assertEqual(journal_before, aggregate.read_bytes())
+
+    def test_existing_ledger_with_another_provider_is_rejected(self) -> None:
+        UsageLedger(self.ledger).begin_attempt(
+            AttemptBinding(
+                logical_call_id="foreign.fixture",
+                attempt_id="foreign.fixture.attempt1",
+                model=MODEL_ID,
+                provider="OtherProvider",
+                request_sha256="1" * 64,
+                schema_sha256="2" * 64,
+                sidecar_path_sha256="3" * 64,
+                context_metadata={"stage": "fixture"},
+            )
+        )
+
+        with self.assertRaisesRegex(ProviderAdapterError, "unpinned provider"):
+            _Runtime.build(
+                provider="Together",
+                ledger_path=self.ledger,
+                decision_dir=self.decisions,
+                environment={},
+                transport=None,
+                call=structured_json_call,
+            )
+        self.assertFalse(self.decisions.exists())
+
+    def test_quality_metrics_reject_another_provider_identity(self) -> None:
+        UsageLedger(self.ledger).begin_attempt(
+            AttemptBinding(
+                logical_call_id="foreign.fixture",
+                attempt_id="foreign.fixture.attempt1",
+                model=MODEL_ID,
+                provider="OtherProvider",
+                request_sha256="1" * 64,
+                schema_sha256="2" * 64,
+                sidecar_path_sha256="3" * 64,
+                context_metadata={"stage": "fixture"},
+            )
+        )
+
+        with self.assertRaisesRegex(QualityReportError, "provider summary"):
+            _provider_metrics(self.ledger)
+
+    def test_semantic_retry_replays_attempt_two_from_its_own_sidecar(self) -> None:
+        from tests.test_provider import FixtureTransport, route_payload, success_payload
+
+        schema = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"value": {"type": "string"}},
+            "required": ["value"],
+        }
+
+        def validate(value):
+            if not isinstance(value, dict) or set(value) != {"value"}:
+                raise ValueError("decision shape is invalid")
+            if not isinstance(value["value"], str):
+                raise ValueError("decision value is invalid")
+
+        spec = StructuredCallSpec(
+            logical_call_id="semantic.retry.fixture",
+            attempt_id="semantic.retry.fixture.attempt1",
+            provider="Together",
+            schema_name="semantic_retry_fixture",
+            json_schema=schema,
+            system_prompt="Return one fixture value.",
+            user_prompt="Return the normalized fixture value.",
+            max_output_tokens=32,
+            context_metadata={"stage": "fixture"},
+        )
+        transport = FixtureTransport(
+            [
+                (
+                    200,
+                    success_payload(
+                        decision={"wrong": "shape"}, provider="Together"
+                    ),
+                ),
+                (
+                    200,
+                    success_payload(
+                        decision={"value": "normalized"}, provider="Together"
+                    ),
+                ),
+            ],
+            routes=[
+                route_payload(provider="Together"),
+                route_payload(provider="Together"),
+            ],
+        )
+        runtime = _Runtime.build(
+            provider="Together",
+            ledger_path=self.ledger,
+            decision_dir=self.decisions,
+            aggregate_budget_path=self.root / "aggregate-budget.jsonl",
+            environment={"OPENROUTER_API_KEY": "fixture-key"},
+            transport=transport,
+            call=structured_json_call,
+        )
+
+        initial = runtime.invoke(
+            spec,
+            decision_name="semantic-retry.json",
+            validator=validate,
+            semantic_retries=1,
+        )
+
+        self.assertFalse(initial.resumed)
+        self.assertEqual({"value": "normalized"}, initial.decision)
+        self.assertFalse((self.decisions / "semantic-retry.attempt1.json").exists())
+        self.assertTrue((self.decisions / "semantic-retry.attempt2.json").is_file())
+        self.assertEqual(2, transport.paid_count)
+        aggregate_before_replay = (self.root / "aggregate-budget.jsonl").read_bytes()
+
+        forbidden = FixtureTransport([])
+        replay = _Runtime.build(
+            provider="Together",
+            ledger_path=self.ledger,
+            decision_dir=self.decisions,
+            aggregate_budget_path=self.root / "aggregate-budget.jsonl",
+            environment={},
+            transport=forbidden,
+            call=structured_json_call,
+        ).invoke(
+            spec,
+            decision_name="semantic-retry.json",
+            validator=validate,
+            semantic_retries=1,
+        )
+
+        self.assertTrue(replay.resumed)
+        self.assertEqual(initial.decision, replay.decision)
+        self.assertEqual([], forbidden.requests)
+        self.assertEqual(2, UsageLedger(self.ledger).audit_state()["paid_calls"])
+        self.assertEqual(
+            aggregate_before_replay,
+            (self.root / "aggregate-budget.jsonl").read_bytes(),
+        )
 
     def test_risk_applicability_keeps_taxonomy_inference_distinct(self) -> None:
         use_context = UseContext(

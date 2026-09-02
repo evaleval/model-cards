@@ -25,6 +25,7 @@ from .bindings import binding_id_for
 from .claim_gate import (
     ClaimCandidate,
     ClaimGateRecord,
+    DecisionStatus,
     GateName,
     ProseCheckerDecision,
     evaluate_claim_gate,
@@ -40,9 +41,11 @@ from .composer import (
     compose_model_card,
 )
 from .extraction import (
+    DETERMINISTIC_PUBLISHER_CONTEXT_VERSION,
     EXTRACTION_VERSION,
     ExtractionBatch,
     ExtractionResult,
+    deterministic_publisher_context_candidates,
     deterministic_structured_candidates,
     materialize_quote_batch,
 )
@@ -79,6 +82,7 @@ from .models import (
     Disposition,
     EvidenceKind,
     LifecycleStatus,
+    RelationToTarget,
     TargetIdentity,
     TaxonomyRiskDerivation,
     ValidationCheck,
@@ -90,6 +94,8 @@ from .publication import project_publication_card
 from .publication_schema import validate_publication_card
 from .publication_schema import PUBLICATION_SCHEMA
 from .publication_sources import (
+    PUBLICATION_CONFLICT_VERSION,
+    PUBLICATION_SOURCE_RULESET,
     PublicationSourceError,
     assert_no_source_excerpt,
     enrich_publication_card,
@@ -126,9 +132,9 @@ from .schema import (
 from .source_state import SourceStateMode, load_source_state
 
 
-PIPELINE_VERSION = "offline-model-card-pipeline/v9"
+PIPELINE_VERSION = "offline-model-card-pipeline/v18"
 PRIVACY_SCAN_VERSION = "public-card-privacy-scan/v1"
-RISK_STAGE_VERSION = "pipeline-risk-stage/v1"
+RISK_STAGE_VERSION = "pipeline-risk-stage/v2"
 REPAIR_STAGE_VERSION = "pipeline-fact-withholding/v1"
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -136,9 +142,29 @@ _CLAIM_RE = re.compile(r"^claim-[0-9a-f]{24}$")
 _RUN_RE = re.compile(r"^model_card_run_[0-9a-f]{24}$")
 _CARD_RE = re.compile(r"^card_[0-9a-f]{24}$")
 _CODE_RE = re.compile(r"^[a-z][a-z0-9_.:-]{1,127}$")
-_CONTEXT_FIELDS = frozenset(
+_CONTEXT_CORE_FIELDS = frozenset(
     {"use_and_risk.intended_uses", "use_and_risk.out_of_scope_uses"}
 )
+_CONTEXT_STATEMENT_QUALIFIER_FIELDS = frozenset(
+    {"use_and_risk.limitations", "use_and_risk.known_biases"}
+)
+_CONTEXT_PROPERTY_QUALIFIER_LABELS = {
+    "identity.model_type": "Model type",
+    "model_details.modalities": "Modality",
+    "model_details.model_stage": "Model stage",
+    "model_details.access_type": "Access type",
+    "training.training_data": "Training-data context",
+    "training.adaptations": "Adaptation context",
+    "evaluation.safety_evals": "Publisher safety-evaluation context",
+}
+_CONTEXT_CORE_LABELS = {
+    "use_and_risk.intended_uses": "Intended use",
+    "use_and_risk.out_of_scope_uses": "Out-of-scope use",
+}
+_CONTEXT_STATEMENT_QUALIFIER_LABELS = {
+    "use_and_risk.limitations": "Limitation",
+    "use_and_risk.known_biases": "Known bias",
+}
 
 
 class PipelineError(RuntimeError):
@@ -744,6 +770,8 @@ class PipelineResult:
     composition_sha256: str
     claims: tuple[ClaimPipelineReference, ...]
     conflict_count: int
+    publication_conflict_count: int
+    publication_conflicts_sha256: str
     omission_audit_sha256: str
     source_present_omission_count: int
     content_factreasoner_sha256: str
@@ -774,6 +802,7 @@ class PipelineResult:
             "source_manifest_sha256",
             "source_catalog_sha256",
             "composition_sha256",
+            "publication_conflicts_sha256",
             "omission_audit_sha256",
             "content_factreasoner_sha256",
             "publication_original_factreasoner_sha256",
@@ -802,6 +831,7 @@ class PipelineResult:
         object.__setattr__(self, "claims", claims)
         for value in (
             self.conflict_count,
+            self.publication_conflict_count,
             self.source_present_omission_count,
         ):
             if not isinstance(value, int) or isinstance(value, bool) or value < 0:
@@ -812,6 +842,12 @@ class PipelineResult:
             raise PipelineError("pipeline result validation records are malformed")
         if self.privacy.scanned_card_sha256 != self.public_card_sha256:
             raise PipelineError("privacy scan is stale for the public card")
+        if self.validation.conflicts_clear != (
+            self.conflict_count + self.publication_conflict_count == 0
+        ):
+            raise PipelineError(
+                "pipeline conflict validation digest differs from conflict counts"
+            )
         if not isinstance(self.artifact_id, str) or not _CARD_RE.fullmatch(
             self.artifact_id
         ):
@@ -842,6 +878,8 @@ class PipelineResult:
             "composition_sha256": self.composition_sha256,
             "claims": [item.to_dict() for item in self.claims],
             "conflict_count": self.conflict_count,
+            "publication_conflict_count": self.publication_conflict_count,
+            "publication_conflicts_sha256": self.publication_conflicts_sha256,
             "omission_audit_sha256": self.omission_audit_sha256,
             "source_present_omission_count": self.source_present_omission_count,
             "content_factreasoner_sha256": self.content_factreasoner_sha256,
@@ -878,6 +916,8 @@ class PipelineResult:
                 "composition_sha256",
                 "claims",
                 "conflict_count",
+                "publication_conflict_count",
+                "publication_conflicts_sha256",
                 "omission_audit_sha256",
                 "source_present_omission_count",
                 "content_factreasoner_sha256",
@@ -911,6 +951,8 @@ class PipelineResult:
             composition_sha256=item["composition_sha256"],
             claims=tuple(ClaimPipelineReference.from_dict(x) for x in item["claims"]),
             conflict_count=item["conflict_count"],
+            publication_conflict_count=item["publication_conflict_count"],
+            publication_conflicts_sha256=item["publication_conflicts_sha256"],
             omission_audit_sha256=item["omission_audit_sha256"],
             source_present_omission_count=item["source_present_omission_count"],
             content_factreasoner_sha256=item["content_factreasoner_sha256"],
@@ -1063,15 +1105,47 @@ def _extraction_summary(result: ExtractionResult) -> dict[str, Any]:
 
 
 def _candidate_inventory(
-    structured: ExtractionResult, quote_results: Sequence[ExtractionResult]
+    *results: ExtractionResult,
 ) -> tuple[ClaimCandidate, ...]:
     by_id: dict[str, ClaimCandidate] = {}
-    for result in (structured, *quote_results):
+    for result in results:
+        if not isinstance(result, ExtractionResult):
+            raise PipelineError("candidate inventories must be extraction results")
         for candidate in result.candidates:
             previous = by_id.setdefault(candidate.candidate_id, candidate)
             if previous.to_dict() != candidate.to_dict():
                 raise PipelineError("candidate identifier collision")
     return tuple(sorted(by_id.values(), key=lambda item: item.candidate_id))
+
+
+def _deterministic_publisher_context_decisions(
+    result: ExtractionResult,
+) -> tuple[ProseCheckerDecision, ...]:
+    """Attest only the closed local classifications produced by this pipeline."""
+
+    decisions: list[ProseCheckerDecision] = []
+    for candidate in result.candidates:
+        decisions.extend(
+            (
+                ProseCheckerDecision.for_candidate(
+                    candidate,
+                    gate=GateName.FIELD_FIT,
+                    checker="model_cards/deterministic_publisher_context",
+                    method="closed_official_section_or_statement_classifier",
+                    status=DecisionStatus.ACCEPTED,
+                    reason="official_context_field_fit",
+                ),
+                ProseCheckerDecision.for_candidate(
+                    candidate,
+                    gate=GateName.VALUE_SUPPORT,
+                    checker="model_cards/deterministic_publisher_context",
+                    method="exact_quote_wrapper_value_support",
+                    status=DecisionStatus.ACCEPTED,
+                    reason="exact_official_quote_supported",
+                ),
+            )
+        )
+    return tuple(sorted(decisions, key=lambda item: item.content_sha256))
 
 
 def _group_prose_decisions(
@@ -1212,50 +1286,147 @@ def _empty_omission_audit(
     )
 
 
-def _use_contexts(
+def _normalized_context_text(value: str) -> str:
+    return " ".join(value.split()).strip()
+
+
+def _candidate_source_refs(candidate: ClaimCandidate) -> tuple[str, ...]:
+    return tuple(sorted({item.source_id for item in candidate.evidence}))
+
+
+def _context_statement(
+    candidate: ClaimCandidate,
+    *,
+    labels: Mapping[str, str],
+) -> tuple[str, str, tuple[str, ...]] | None:
+    """Return one evidence-bound context statement without inventing prose."""
+
+    base = canonical_field_path(candidate.field_path)
+    if base not in labels or not isinstance(candidate.value, dict):
+        return None
+    value = candidate.value
+    origin = value.get("origin")
+    if origin not in {"publisher_reported", "source_derived"}:
+        return None
+    context_id = value.get("context_id")
+    description = value.get("description")
+    wrapper_refs = value.get("source_refs")
+    if (
+        not isinstance(context_id, str)
+        or not isinstance(description, str)
+        or not isinstance(wrapper_refs, list)
+        or not all(isinstance(item, str) for item in wrapper_refs)
+    ):
+        raise PipelineError("included model context wrapper is malformed")
+    description = _normalized_context_text(description)
+    if not description:
+        raise PipelineError("included model context description is empty")
+    evidence_refs = _candidate_source_refs(candidate)
+    if tuple(sorted(set(wrapper_refs))) != evidence_refs:
+        raise PipelineError("model context source references differ from claim evidence")
+    origin_label = (
+        "Publisher-reported" if origin == "publisher_reported" else "Source-derived"
+    )
+    return (
+        context_id,
+        f"{origin_label} {labels[base].casefold()}: {description}",
+        evidence_refs,
+    )
+
+
+def _model_use_contexts(
     candidates: Sequence[ClaimCandidate], included_ids: set[str]
 ) -> tuple[UseContext, ...]:
-    accumulated: dict[str, dict[str, Any]] = {}
+    """Adapt accepted claims to the supported generic Nexus use-case interface.
+
+    An intended or out-of-scope use is mandatory.  Exact-target properties,
+    limitations, and biases may qualify that core, but can never create a use
+    case on their own.  Every input sentence remains traceable to the accepted
+    claim, field path, and frozen source identifiers that supplied it.
+    """
+
+    cores: dict[str, dict[str, Any]] = {}
+    qualifiers: dict[tuple[str, str], dict[str, Any]] = {}
     for candidate in candidates:
-        if candidate.candidate_id not in included_ids:
+        if (
+            candidate.candidate_id not in included_ids
+            or candidate.relation is not RelationToTarget.EXACT_TARGET
+        ):
             continue
         base = canonical_field_path(candidate.field_path)
-        if base not in _CONTEXT_FIELDS or not isinstance(candidate.value, dict):
+        if base in _CONTEXT_CORE_FIELDS:
+            statement = _context_statement(candidate, labels=_CONTEXT_CORE_LABELS)
+            if statement is None:
+                continue
+            context_id, text, refs = statement
+            slot = cores.setdefault(
+                context_id,
+                {
+                    "description": text,
+                    "fields": set(),
+                    "candidate_ids": set(),
+                    "source_refs": set(),
+                },
+            )
+            if slot["description"] != text:
+                raise PipelineError("model use-context identifier collision")
+            slot["fields"].add(candidate.field_path)
+            slot["candidate_ids"].add(candidate.candidate_id)
+            slot["source_refs"].update(refs)
             continue
-        value = candidate.value
-        if value.get("origin") not in {"publisher_reported", "source_derived"}:
+        if base in _CONTEXT_STATEMENT_QUALIFIER_FIELDS:
+            statement = _context_statement(
+                candidate, labels=_CONTEXT_STATEMENT_QUALIFIER_LABELS
+            )
+            if statement is None:
+                continue
+            _context_id, text, refs = statement
+        elif base in _CONTEXT_PROPERTY_QUALIFIER_LABELS:
+            if not isinstance(candidate.value, str):
+                raise PipelineError("included model context property is not text")
+            value = _normalized_context_text(candidate.value)
+            if not value or value in {NOT_SPECIFIED, NOT_APPLICABLE}:
+                continue
+            text = f"{_CONTEXT_PROPERTY_QUALIFIER_LABELS[base]}: {value}"
+            refs = _candidate_source_refs(candidate)
+        else:
             continue
-        context_id = value.get("context_id")
-        description = value.get("description")
-        refs = value.get("source_refs")
-        if not isinstance(context_id, str) or not isinstance(description, str) or not isinstance(
-            refs, list
-        ):
-            raise PipelineError("included publisher context wrapper is malformed")
-        slot = accumulated.setdefault(
-            context_id,
+        key = (candidate.field_path, text)
+        slot = qualifiers.setdefault(
+            key,
             {
-                "description": description,
+                "description": text,
                 "fields": set(),
                 "candidate_ids": set(),
                 "source_refs": set(),
             },
         )
-        if slot["description"] != description:
-            raise PipelineError("publisher context identifier collision")
         slot["fields"].add(candidate.field_path)
         slot["candidate_ids"].add(candidate.candidate_id)
         slot["source_refs"].update(refs)
-    return tuple(
-        UseContext(
-            context_id=context_id,
-            description=value["description"],
-            supporting_fields=tuple(value["fields"]),
-            supporting_candidate_ids=tuple(value["candidate_ids"]),
-            source_refs=tuple(value["source_refs"]),
+
+    qualifier_values = tuple(value for _key, value in sorted(qualifiers.items()))
+    result: list[UseContext] = []
+    for context_id, core in sorted(cores.items()):
+        descriptions = [core["description"]]
+        fields = set(core["fields"])
+        candidate_ids = set(core["candidate_ids"])
+        source_refs = set(core["source_refs"])
+        for qualifier in qualifier_values:
+            descriptions.append(qualifier["description"])
+            fields.update(qualifier["fields"])
+            candidate_ids.update(qualifier["candidate_ids"])
+            source_refs.update(qualifier["source_refs"])
+        result.append(
+            UseContext(
+                context_id=context_id,
+                description="\n".join(descriptions),
+                supporting_fields=tuple(fields),
+                supporting_candidate_ids=tuple(candidate_ids),
+                source_refs=tuple(source_refs),
+            )
         )
-        for context_id, value in sorted(accumulated.items())
-    )
+    return tuple(result)
 
 
 def _risk_stage(
@@ -1266,10 +1437,23 @@ def _risk_stage(
     detector: RiskDetector | None,
     checker: ApplicabilityChecker | None,
 ) -> tuple[RiskStageSummary, RiskMappingReport | None, tuple[UseContext, ...]]:
-    contexts = _use_contexts(candidates, included_ids)
+    contexts = _model_use_contexts(candidates, included_ids)
     context_digest = _digest([item.to_dict() for item in contexts])
+    core_candidate_ids = {
+        candidate.candidate_id
+        for candidate in candidates
+        if candidate.candidate_id in included_ids
+        and canonical_field_path(candidate.field_path) in _CONTEXT_CORE_FIELDS
+    }
     publisher_context_ids = tuple(
-        sorted({cid for item in contexts for cid in item.supporting_candidate_ids})
+        sorted(
+            {
+                cid
+                for item in contexts
+                for cid in item.supporting_candidate_ids
+                if cid in core_candidate_ids
+            }
+        )
     )
     publisher_risks = tuple(
         sorted(
@@ -1855,6 +2039,8 @@ def run_offline_pipeline(
     if not all(isinstance(item, ExtractionBatch) for item in quote_batch_values):
         raise PipelineError("quote batches must be typed ExtractionBatch records")
     prose_values = tuple(prose_checker_decisions)
+    if not all(isinstance(item, ProseCheckerDecision) for item in prose_values):
+        raise PipelineError("prose checker decisions must be typed")
     hint_values = tuple(sorted(tuple(availability_hints), key=lambda x: x.field_path))
     if not all(isinstance(item, FieldAvailabilityHint) for item in hint_values):
         raise PipelineError("availability hints must be typed")
@@ -1868,6 +2054,35 @@ def run_offline_pipeline(
         except RiskMappingError:
             risk_catalog = None
 
+    # These are pure replay operations. Computing them before run admission lets
+    # the manifest bind the deterministic classifier and its local attestations.
+    structured = deterministic_structured_candidates(catalog)
+    quote_results = tuple(
+        materialize_quote_batch(item, catalog) for item in quote_batch_values
+    )
+    quote_candidates = _candidate_inventory(*quote_results)
+    quote_grouped_checks = _group_prose_decisions(quote_candidates, prose_values)
+    quote_gate_records = tuple(
+        evaluate_claim_gate(
+            candidate,
+            catalog.documents,
+            quote_grouped_checks.get(candidate.candidate_id, ()),
+        )
+        for candidate in quote_candidates
+    )
+    publisher_context = deterministic_publisher_context_candidates(
+        catalog, existing_gate_records=quote_gate_records
+    )
+    deterministic_prose_values = _deterministic_publisher_context_decisions(
+        publisher_context
+    )
+    all_prose_values = tuple(
+        sorted(
+            (*prose_values, *deterministic_prose_values),
+            key=lambda item: item.content_sha256,
+        )
+    )
+
     checker_id, checker_revision = _checker_identity(fact_checker)
     manifest = RunManifest(
         target=catalog.target,
@@ -1876,6 +2091,14 @@ def run_offline_pipeline(
         configuration={
             "pipeline_version": PIPELINE_VERSION,
             "extraction_version": EXTRACTION_VERSION,
+            "publication_source_ruleset": PUBLICATION_SOURCE_RULESET,
+            "publication_conflict_version": PUBLICATION_CONFLICT_VERSION,
+            "deterministic_publisher_context_version": (
+                DETERMINISTIC_PUBLISHER_CONTEXT_VERSION
+            ),
+            "deterministic_publisher_context_result_sha256": (
+                publisher_context.result_sha256
+            ),
             "source_state_mode": source_state.mode.value,
             "hf_bundle_id": source_state.hf_bundle_id,
             "hf_manifest_sha256": source_state.hf_manifest_sha256,
@@ -1887,9 +2110,13 @@ def run_offline_pipeline(
             "quote_batch_set_sha256": _digest(
                 [item.batch_sha256 for item in quote_batch_values]
             ),
-            "prose_decision_count": len(prose_values),
+            "supplied_prose_decision_count": len(prose_values),
+            "deterministic_prose_decision_count": len(
+                deterministic_prose_values
+            ),
+            "prose_decision_count": len(all_prose_values),
             "prose_decision_set_sha256": _digest(
-                sorted(item.content_sha256 for item in prose_values)
+                [item.content_sha256 for item in all_prose_values]
             ),
             "fact_checker_id": checker_id,
             "fact_checker_revision": checker_revision,
@@ -1948,16 +2175,15 @@ def run_offline_pipeline(
         )
     )
 
-    structured = deterministic_structured_candidates(catalog)
-    quote_results = tuple(
-        materialize_quote_batch(item, catalog) for item in quote_batch_values
+    candidates = _candidate_inventory(
+        structured, publisher_context, *quote_results
     )
-    candidates = _candidate_inventory(structured, quote_results)
     extraction_payload = {
         "extraction_version": EXTRACTION_VERSION,
         "target": catalog.target.to_dict(),
         "catalog_sha256": catalog.catalog_sha256,
         "structured": _extraction_summary(structured),
+        "publisher_context": _extraction_summary(publisher_context),
         "quote_batches": [item.to_dict() for item in quote_batch_values],
         "quote_results": [_extraction_summary(item) for item in quote_results],
         "candidates": [item.to_dict() for item in candidates],
@@ -1976,6 +2202,9 @@ def run_offline_pipeline(
             metrics={
                 "candidate_count": len(candidates),
                 "quote_batch_count": len(quote_batch_values),
+                "deterministic_publisher_context_count": len(
+                    publisher_context.candidates
+                ),
                 "provider_proposal_rejection_count": sum(
                     len(item.rejections) for item in quote_batch_values
                 ),
@@ -1983,7 +2212,7 @@ def run_offline_pipeline(
         )
     )
 
-    grouped_checks = _group_prose_decisions(candidates, prose_values)
+    grouped_checks = _group_prose_decisions(candidates, all_prose_values)
     gate_records = tuple(
         evaluate_claim_gate(
             candidate,
@@ -2596,6 +2825,34 @@ def run_offline_pipeline(
         base_publication_card,
         withheld_fields=derived_withheld_fields,
     )
+    if final_publication.conflicts != initial_publication.conflicts:
+        raise PipelineError(
+            "publication conflict inventory changed during field withholding"
+        )
+    publication_conflict_payload = final_publication.conflicts_dict()
+    publication_conflict_count = len(final_publication.conflicts)
+    artifact_refs.append(
+        _record_artifact(
+            store,
+            stage="publication_validate",
+            logical_id="source_values",
+            status="withheld" if publication_conflict_count else "completed",
+            reason=(
+                "conflicting_source_values_withheld"
+                if publication_conflict_count
+                else "no_publication_source_conflicts"
+            ),
+            filename="publication-conflicts.json",
+            value=publication_conflict_payload,
+            input_sha256s=(catalog.catalog_sha256,),
+            metrics={
+                "conflict_count": publication_conflict_count,
+                "conflict_field_count": len(
+                    {item.field_path for item in final_publication.conflicts}
+                ),
+            },
+        )
+    )
     public_card = remove_publication_fields(
         final_publication.card,
         direct_withheld_fields,
@@ -2756,7 +3013,7 @@ def run_offline_pipeline(
         schema_passed=True,
         risk_passed=risk_summary.passed,
         privacy_passed=privacy_report.passed_without_withholding,
-        conflicts_clear=conflict_count == 0,
+        conflicts_clear=(conflict_count + publication_conflict_count == 0),
         omissions_clear=(
             not omission_audit.source_present_omissions
             and publication_omission_count == 0
@@ -2776,7 +3033,7 @@ def run_offline_pipeline(
         privacy_withheld=len(privacy_report.withheld_candidate_ids),
         omission_audit=omission_audit,
         publication_omission_count=publication_omission_count,
-        conflict_count=conflict_count,
+        conflict_count=conflict_count + publication_conflict_count,
     )
     artifact = CardArtifact(
         target=catalog.target,
@@ -2816,6 +3073,7 @@ def run_offline_pipeline(
                 omission_audit.content_sha256,
                 privacy_report.report_sha256,
                 risk_summary.summary_sha256,
+                final_publication.conflicts_sha256,
             ),
             metrics={
                 "binding_count": len(artifact.bindings),
@@ -2826,6 +3084,7 @@ def run_offline_pipeline(
                 "publication_withheld_count": len(
                     publication_validation.withheld_field_paths
                 ),
+                "publication_conflict_count": publication_conflict_count,
             },
         )
     )
@@ -2867,6 +3126,8 @@ def run_offline_pipeline(
         composition_sha256=composition_sha256,
         claims=claims,
         conflict_count=conflict_count,
+        publication_conflict_count=publication_conflict_count,
+        publication_conflicts_sha256=final_publication.conflicts_sha256,
         omission_audit_sha256=omission_audit.content_sha256,
         source_present_omission_count=(
             len(omission_audit.source_present_omissions)

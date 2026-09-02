@@ -41,6 +41,7 @@ from .provider import (
     RetryExhaustedError,
     TransportUncertainError,
 )
+from .provider_adapters import summarize_aggregate_budget
 from .quality_report import (
     QualityReportError,
     build_quality_report,
@@ -77,6 +78,8 @@ from .source_bundle import (
 _EXACT_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 _SAFE_CODE_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 _PROVIDER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._:/+()-]{0,127}$")
+_AGGREGATE_BUDGET_FILENAME = "aggregate-budget.jsonl"
+_AGGREGATE_BUDGET_SUMMARY_FILENAME = "aggregate-budget-summary.json"
 
 
 class CliCommandError(ValueError):
@@ -480,8 +483,11 @@ def _generate_target(
     offline_bundle: Path | None,
     offline_official_bundle: Path | None = None,
     provider: str | None = None,
+    aggregate_budget_path: Path | None = None,
 ) -> dict[str, Any]:
     parsed_model_id, requested_revision = _requested_target(model_id, revision)
+    if aggregate_budget_path is not None and provider is None:
+        raise CliCommandError("aggregate_budget_requires_provider")
     provider = _provider_mode(output, provider)
     bundle_directory = _prepare_generation_bundle(
         model_id=parsed_model_id,
@@ -505,6 +511,7 @@ def _generate_target(
                 provider=provider,
                 ledger_path=output / "usage.jsonl",
                 decision_dir=output / "provider-decisions",
+                aggregate_budget_path=aggregate_budget_path,
             )
             result = assisted.pipeline_result
         elif expected_path.exists() or expected_path.is_symlink():
@@ -615,6 +622,11 @@ def _cmd_generate(args: argparse.Namespace) -> int:
             else None
         ),
         provider=args.provider,
+        aggregate_budget_path=(
+            Path(args.aggregate_budget_journal)
+            if args.aggregate_budget_journal
+            else None
+        ),
     )
     _print_json(summary)
     return 0
@@ -652,6 +664,55 @@ def _read_batch_requests(value: str) -> tuple[str, ...]:
 def _batch_target_directory(request: str) -> str:
     digest = hashlib.sha256(request.encode("utf-8")).hexdigest()[:20]
     return f"target-{digest}"
+
+
+def _validate_batch_aggregate_budget_path(output: Path, journal: Path) -> None:
+    """Keep the shared journal disjoint from files the batch owns or replaces."""
+
+    if journal.is_symlink() or journal.parent.is_symlink():
+        raise CliCommandError("aggregate_budget_path_conflict")
+    try:
+        lexical_output = Path(os.path.abspath(output))
+        lexical_journal = Path(os.path.abspath(journal))
+        resolved_output = output.resolve(strict=False)
+        resolved_journal = journal.resolve(strict=False)
+    except OSError as exc:
+        raise CliCommandError("aggregate_budget_path_conflict") from exc
+    control_names = (
+        "batch-request.json",
+        "batch-result.json",
+        _AGGREGATE_BUDGET_SUMMARY_FILENAME,
+    )
+    lexical_controls = tuple(lexical_output / name for name in control_names)
+    resolved_controls = tuple(
+        resolved_output / name
+        for name in control_names
+    )
+    if lexical_journal in lexical_controls or resolved_journal in resolved_controls:
+        raise CliCommandError("aggregate_budget_path_conflict")
+    for candidate, target_root in (
+        (lexical_journal, lexical_output / "targets"),
+        (resolved_journal, resolved_output / "targets"),
+    ):
+        try:
+            candidate.relative_to(target_root)
+        except ValueError:
+            continue
+        raise CliCommandError("aggregate_budget_path_conflict")
+    if lexical_journal == lexical_output or resolved_journal == resolved_output:
+        raise CliCommandError("aggregate_budget_path_conflict")
+    if journal.exists():
+        default_journal = resolved_output / _AGGREGATE_BUDGET_FILENAME
+        aliases = (*resolved_controls, default_journal)
+        for candidate in aliases:
+            if resolved_journal == candidate or not candidate.exists():
+                continue
+            try:
+                aliases_batch_file = os.path.samefile(journal, candidate)
+            except OSError as exc:
+                raise CliCommandError("aggregate_budget_path_conflict") from exc
+            if aliases_batch_file:
+                raise CliCommandError("aggregate_budget_path_conflict")
 
 
 def _parse_batch_offline_bundles(
@@ -702,8 +763,23 @@ def _batch_failure_code(exc: Exception) -> str:
     return "generation_failed"
 
 
+def _batch_failure_artifacts(target_output: Path, relative_directory: str) -> list[str]:
+    """Expose only body-free controls needed to account for a failed target."""
+
+    artifacts = []
+    for name in (ORCHESTRATION_MANIFEST_FILENAME, "usage.jsonl"):
+        path = target_output / name
+        if path.is_file() and not path.is_symlink():
+            artifacts.append(
+                _safe_relative_name(f"{relative_directory}/{name}")
+            )
+    return sorted(artifacts)
+
+
 def _cmd_batch(args: argparse.Namespace) -> int:
     requests = _read_batch_requests(args.targets)
+    if args.aggregate_budget_journal and args.provider is None:
+        raise CliCommandError("aggregate_budget_requires_provider")
     offline = _parse_batch_offline_bundles(args.offline_bundle, requests)
     offline_official = _parse_batch_offline_bundles(
         args.offline_official_bundle, requests
@@ -711,6 +787,17 @@ def _cmd_batch(args: argparse.Namespace) -> int:
     output = Path(args.output)
     if output.is_symlink() or (output.exists() and not output.is_dir()):
         raise CliCommandError("batch_output_unsafe")
+    aggregate_budget_path = (
+        Path(args.aggregate_budget_journal)
+        if args.aggregate_budget_journal
+        else (
+            output / _AGGREGATE_BUDGET_FILENAME
+            if args.provider is not None
+            else None
+        )
+    )
+    if aggregate_budget_path is not None:
+        _validate_batch_aggregate_budget_path(output, aggregate_budget_path)
     output.mkdir(parents=True, exist_ok=True)
     request_payload = {"targets": list(requests)}
     _atomic_json_update(output / "batch-request.json", request_payload, immutable=True)
@@ -727,6 +814,8 @@ def _cmd_batch(args: argparse.Namespace) -> int:
                 output=target_output,
                 offline_bundle=offline.get(request),
                 offline_official_bundle=offline_official.get(request),
+                provider=args.provider,
+                aggregate_budget_path=aggregate_budget_path,
             )
             records.append(
                 {
@@ -746,13 +835,33 @@ def _cmd_batch(args: argparse.Namespace) -> int:
                     "request": request,
                     "status": "failed",
                     "reason": _batch_failure_code(exc),
-                    "artifacts": [],
+                    "artifacts": _batch_failure_artifacts(
+                        target_output, relative_directory
+                    ),
                 }
             )
+    batch_artifacts = ["batch-request.json", "batch-result.json"]
+    if aggregate_budget_path is not None:
+        budget_summary = summarize_aggregate_budget(aggregate_budget_path)
+        local_budget = (
+            aggregate_budget_path.resolve()
+            == (output / _AGGREGATE_BUDGET_FILENAME).resolve()
+        )
+        _atomic_json_update(
+            output / _AGGREGATE_BUDGET_SUMMARY_FILENAME,
+            {
+                **budget_summary,
+                "journal_scope": "batch_root" if local_budget else "external_shared",
+            },
+            immutable=False,
+        )
+        batch_artifacts.append(_AGGREGATE_BUDGET_SUMMARY_FILENAME)
+        if local_budget:
+            batch_artifacts.append(_AGGREGATE_BUDGET_FILENAME)
     aggregate = {
         "status": "completed" if not failure_count else "completed_with_failures",
         "targets": records,
-        "artifacts": ["batch-request.json", "batch-result.json"],
+        "artifacts": sorted(batch_artifacts),
     }
     _atomic_json_update(output / "batch-result.json", aggregate, immutable=False)
     _print_json(aggregate)
@@ -1011,6 +1120,13 @@ def build_parser() -> argparse.ArgumentParser:
             "provider and model; uses OPENROUTER_API_KEY"
         ),
     )
+    generate.add_argument(
+        "--aggregate-budget-journal",
+        help=(
+            "shared append-only 300-call budget journal for provider-assisted "
+            "targets; reuse the same path across a bounded cohort"
+        ),
+    )
     generate.set_defaults(handler=_cmd_generate)
 
     batch = subparsers.add_parser(
@@ -1018,6 +1134,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     batch.add_argument("targets", help="JSON array text or path to a JSON array file")
     batch.add_argument("--output", required=True, help="batch output directory")
+    batch.add_argument(
+        "--provider",
+        choices=(PINNED_PROVIDER,),
+        metavar=PINNED_PROVIDER,
+        help=(
+            "enable assisted extraction and validation for every target on the "
+            "pinned OpenRouter provider and one shared aggregate budget"
+        ),
+    )
+    batch.add_argument(
+        "--aggregate-budget-journal",
+        help=(
+            "shared append-only 300-call budget journal; provider batches default "
+            "to OUTPUT/aggregate-budget.jsonl"
+        ),
+    )
     batch.add_argument(
         "--offline-bundle",
         action="append",

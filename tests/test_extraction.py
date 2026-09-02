@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 from jsonschema import Draft202012Validator
@@ -17,6 +19,7 @@ from model_cards.claim_gate import (
 from model_cards.extraction import (
     ExtractionBatch,
     ExtractionError,
+    MAX_EXTRACTION_BATCH_PROPOSALS,
     MAX_PROVIDER_ENTITY_CHARS,
     MAX_PROVIDER_FIELD_PATH_CHARS,
     MAX_PROVIDER_PROPOSALS,
@@ -27,12 +30,20 @@ from model_cards.extraction import (
     ProviderProposalRejection,
     QuoteProposal,
     build_source_windows,
+    build_use_risk_windows,
+    deterministic_publisher_context_candidates,
     deterministic_structured_candidates,
     extraction_response_schema,
     materialize_quote_batch,
     proposals_from_provider_value,
 )
-from model_cards.models import RelationToTarget
+from model_cards.models import (
+    RelationToTarget,
+    SourceDocument,
+    SourceRole,
+    TargetIdentity,
+)
+from model_cards.quote import normalize_ws
 from model_cards.source_bundle import (
     FetchStatus,
     RemoteObject,
@@ -67,6 +78,63 @@ PUBLISHER_RISK_QUOTE = (
     f"{PUBLISHER_RISK_NAME}. {PUBLISHER_RISK_DESCRIPTION} "
     f"{PUBLISHER_RISK_RATIONALE}"
 )
+
+OFFICIAL_CONTEXT = """---
+license: custom
+recommended_temperature: 0.6
+---
+# Exact Target System Card
+
+## Intended Uses
+
+The exact target is intended for customer-support assistants that draft responses for human review.
+
+## Out-of-Scope Uses
+
+Do not use the exact target to make autonomous medical decisions.
+
+## Limitations
+
+The exact target may produce inaccurate statements about rapidly changing events.
+
+## Mitigations
+
+Operators should verify model outputs because they may contain inaccurate factual claims.
+
+## Generation Settings
+
+Do not use the temperature parameter without setting top-p first.
+
+## Recommendations
+
+We recommend exploring README_WEIGHTS for additional checkpoints.
+
+## License and Acceptable Use Policy
+
+This model must not be used outside the license terms.
+
+## Community
+
+We recommend joining the developer community for deployment guidance.
+
+## Limitations
+
+### Language Ambiguity and Nuance
+
+Language Ambiguity and Nuance.
+
+## Base Model
+
+### Intended Uses
+
+The base model is intended for unrestricted text completion.
+
+## Sibling Checkpoint
+
+### Out-of-Scope Uses
+
+Do not use acme/Instruct-Large for autonomous medical decisions.
+"""
 
 
 class Adapter:
@@ -114,6 +182,45 @@ class ExtractionTests(unittest.TestCase):
             item for item in self.catalog.documents if item.source_uri.endswith("/README.md")
         )
 
+    def official_catalog(self, text: str = OFFICIAL_CONTEXT):
+        source = replace(
+            self.readme,
+            source_id="official_report",
+            source_uri=(
+                f"https://huggingface.co/{self.catalog.target.model_id}/resolve/"
+                f"{REVISION}/README.md"
+            ),
+            role=SourceRole.HUGGING_FACE_SNAPSHOT,
+            text=text,
+            content_sha256=None,
+        )
+        return SimpleNamespace(
+            target=self.catalog.target,
+            catalog_sha256="c" * 64,
+            documents=(source,),
+            by_id={source.source_id: source},
+        )
+
+    def test_deterministic_context_rejects_unbound_developer_report(self) -> None:
+        catalog = self.official_catalog()
+        source = replace(
+            catalog.documents[0],
+            role=SourceRole.DEVELOPER_REPORT,
+            source_uri="https://example.com/acme/instruct/system-card",
+            content_sha256=None,
+        )
+        report_catalog = SimpleNamespace(
+            target=catalog.target,
+            catalog_sha256="a" * 64,
+            documents=(source,),
+            by_id={source.source_id: source},
+        )
+
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(report_catalog).candidates,
+        )
+
     def proposal(self, **changes) -> QuoteProposal:
         values = {
             "source_id": self.readme.source_id,
@@ -153,6 +260,7 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(1, len(windows))
         self.assertLessEqual(len(windows[0].excerpt), 500)
         self.assertEqual(windows, build_source_windows(self.readme, window_chars=500, overlap=50))
+        self.assertEqual(windows, build_use_risk_windows(self.readme, windows=windows))
         self.assertFalse(hasattr(windows[0], "to_dict"))
         self.assertNotIn("/Users/", repr(windows[0]))
         with self.assertRaises(ExtractionError):
@@ -346,6 +454,456 @@ class ExtractionTests(unittest.TestCase):
             gate = evaluate_claim_gate(candidate, self.catalog.documents)
             self.assertTrue(gate.projection_eligible, candidate.field_path)
 
+    def test_deterministic_official_context_is_exact_scoped_and_gate_eligible(self) -> None:
+        catalog = self.official_catalog()
+        result = deterministic_publisher_context_candidates(catalog)
+        by_field = {item.field_path: item for item in result.candidates}
+        self.assertEqual(
+            {
+                "use_and_risk.intended_uses[0]",
+                "use_and_risk.out_of_scope_uses[0]",
+                "use_and_risk.limitations[0]",
+                "use_and_risk.mitigations[0]",
+            },
+            set(by_field),
+        )
+        serialized = json.dumps([item.to_dict() for item in result.candidates])
+        for denied in (
+            "recommended_temperature",
+            "temperature parameter",
+            "README_WEIGHTS",
+            "license terms",
+            "developer community",
+            "Language Ambiguity and Nuance",
+            "unrestricted text completion",
+            "Instruct-Large",
+        ):
+            self.assertNotIn(denied, serialized)
+        self.assertNotIn("identified_risks", serialized)
+        normalized_source = normalize_ws(catalog.documents[0].text)
+        for candidate in result.candidates:
+            evidence = candidate.evidence[0]
+            description = candidate.value["description"]
+            self.assertEqual(RelationToTarget.EXACT_TARGET, candidate.relation)
+            self.assertTrue(evidence.verified)
+            self.assertEqual(
+                evidence.quote,
+                normalized_source[evidence.char_start : evidence.char_end],
+            )
+            self.assertEqual(description, evidence.quote)
+            gate = evaluate_claim_gate(
+                candidate,
+                catalog.documents,
+                (
+                    self.checker(candidate, GateName.FIELD_FIT),
+                    self.checker(candidate, GateName.VALUE_SUPPORT),
+                ),
+            )
+            self.assertTrue(gate.projection_eligible, candidate.field_path)
+
+    def test_mixed_llama_use_sentence_is_split_by_exact_checkpoint_stage(self) -> None:
+        mixed = (
+            "Instruction tuned text only models are intended for assistant-like "
+            "chat, whereas pretrained models can be adapted for a variety of "
+            "natural language generation tasks."
+        )
+        source_text = (
+            f"# Model Card\n\n## Intended Use\n\n"
+            f"**Intended Use Cases** {mixed}\n"
+        )
+        expected = {
+            "meta-llama/Llama-3.1-8B": (
+                "pretrained models can be adapted for a variety of natural "
+                "language generation tasks."
+            ),
+            "meta-llama/Llama-3.1-8B-Instruct": (
+                "Instruction tuned text only models are intended for "
+                "assistant-like chat"
+            ),
+        }
+        for model_id, clause in expected.items():
+            with self.subTest(model_id=model_id):
+                target = TargetIdentity(model_id, REVISION)
+                source = replace(
+                    self.readme,
+                    source_id="llama_publisher_readme",
+                    source_uri=(
+                        f"https://huggingface.co/{model_id}/resolve/"
+                        f"{REVISION}/README.md"
+                    ),
+                    role=SourceRole.HUGGING_FACE_SNAPSHOT,
+                    target=target,
+                    text=source_text,
+                    content_sha256=None,
+                )
+                catalog = SimpleNamespace(
+                    target=target,
+                    catalog_sha256=hashlib.sha256(
+                        model_id.encode("utf-8")
+                    ).hexdigest(),
+                    documents=(source,),
+                    by_id={source.source_id: source},
+                )
+                result = deterministic_publisher_context_candidates(catalog)
+                self.assertEqual(1, len(result.candidates))
+                candidate = result.candidates[0]
+                self.assertEqual(
+                    "use_and_risk.intended_uses[0]", candidate.field_path
+                )
+                self.assertEqual(clause, candidate.value["description"])
+                self.assertEqual(clause, candidate.evidence[0].quote)
+                self.assertTrue(candidate.evidence[0].verified)
+                self.assertNotEqual(mixed, candidate.value["description"])
+
+        unrelated = TargetIdentity("meta-llama/Llama-3.1-8B-Instruct", REVISION)
+        source = replace(
+            self.readme,
+            source_id="unrelated_publisher_readme",
+            source_uri="https://example.com/acme/model-card",
+            role=SourceRole.DEVELOPER_REPORT,
+            target=unrelated,
+            text=source_text,
+            content_sha256=None,
+        )
+        catalog = SimpleNamespace(
+            target=unrelated,
+            catalog_sha256="e" * 64,
+            documents=(source,),
+            by_id={source.source_id: source},
+        )
+        self.assertEqual(
+            (), deterministic_publisher_context_candidates(catalog).candidates
+        )
+
+        for model_id in (
+            "meta-llama/Llama-3.1-999B",
+            "meta-llama/Llama-3.1-999B-Instruct",
+            "meta-llama/Llama-3.1-8.5B-Instruct",
+        ):
+            with self.subTest(unregistered_model_id=model_id):
+                target = TargetIdentity(model_id, REVISION)
+                unregistered_source = replace(
+                    source,
+                    source_id="unregistered_llama_readme",
+                    source_uri=(
+                        f"https://huggingface.co/{model_id}/resolve/"
+                        f"{REVISION}/README.md"
+                    ),
+                    role=SourceRole.HUGGING_FACE_SNAPSHOT,
+                    target=target,
+                    content_sha256=None,
+                )
+                unregistered_catalog = SimpleNamespace(
+                    target=target,
+                    catalog_sha256=hashlib.sha256(model_id.encode()).hexdigest(),
+                    documents=(unregistered_source,),
+                    by_id={unregistered_source.source_id: unregistered_source},
+                )
+                self.assertEqual(
+                    (),
+                    deterministic_publisher_context_candidates(
+                        unregistered_catalog
+                    ).candidates,
+                )
+
+        wrong_host = replace(
+            source,
+            source_id="wrong_host_publisher_readme",
+            source_uri=(
+                f"https://unrelated.example/{unrelated.model_id}/resolve/"
+                f"{REVISION}/README.md"
+            ),
+            role=SourceRole.HUGGING_FACE_SNAPSHOT,
+        )
+        catalog = SimpleNamespace(
+            target=unrelated,
+            catalog_sha256="f" * 64,
+            documents=(wrong_host,),
+            by_id={wrong_host.source_id: wrong_host},
+        )
+        self.assertEqual(
+            (), deterministic_publisher_context_candidates(catalog).candidates
+        )
+
+    def test_deterministic_context_rejects_sentence_initial_pronouns(self) -> None:
+        ambiguous = self.official_catalog(
+            "# System Card\n\n## Limitations\n\n"
+            "The benchmark contains English prompts. "
+            "It may not represent other languages.\n"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(ambiguous).candidates,
+        )
+
+        superficially_grounded = self.official_catalog(
+            "# System Card\n\n## Limitations\n\n"
+            "Models generate responses from learned statistical patterns. "
+            "They may generate incorrect factual statements.\n"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(
+                superficially_grounded
+            ).candidates,
+        )
+
+        non_initial = self.official_catalog(
+            "# System Card\n\n## Limitations\n\n"
+            "During deployment, it may produce incorrect factual statements.\n"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(non_initial).candidates,
+        )
+
+    def test_deterministic_context_rejects_unknown_nested_entity_heading(self) -> None:
+        for heading in ("Falcon", "OtherModel", "Example-Base"):
+            with self.subTest(heading=heading):
+                catalog = self.official_catalog(
+                    "# System Card\n\n## Limitations\n\n"
+                    f"### {heading}\n\n"
+                    "The model may produce incorrect factual statements.\n"
+                )
+                self.assertEqual(
+                    (),
+                    deterministic_publisher_context_candidates(catalog).candidates,
+                )
+
+    def test_deterministic_mitigation_requires_explicit_target_reference(self) -> None:
+        unrelated_outputs = self.official_catalog(
+            "# System Card\n\n## Mitigations\n\n"
+            "Operators should verify benchmark outputs because they may be inaccurate. "
+            "Operators should review dataset outputs because they may contain sensitive data.\n"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(unrelated_outputs).candidates,
+        )
+
+        explicit_target = self.official_catalog(
+            "# System Card\n\n## Mitigations\n\n"
+            "Operators should verify this model's outputs because they may be inaccurate.\n"
+        )
+        candidates = deterministic_publisher_context_candidates(
+            explicit_target
+        ).candidates
+        self.assertEqual(1, len(candidates))
+        self.assertEqual("use_and_risk.mitigations[0]", candidates[0].field_path)
+
+    def test_deterministic_context_uses_only_root_hub_readme_and_preserves_provider_field(self) -> None:
+        hub_context = deterministic_publisher_context_candidates(self.catalog)
+        self.assertTrue(hub_context.candidates)
+        self.assertEqual(
+            {"use_and_risk.limitations"},
+            {
+                item.field_path.rsplit("[", 1)[0]
+                for item in hub_context.candidates
+            },
+        )
+        self.assertTrue(
+            all(
+                item.evidence[0].source_role is SourceRole.HUGGING_FACE_SNAPSHOT
+                for item in hub_context.candidates
+            )
+        )
+        other_snapshot = replace(
+            self.readme,
+            source_id="declared_safety",
+            source_uri=self.readme.source_uri.removesuffix("README.md") + "SAFETY.md",
+            text=(
+                "# Intended Uses\n\nThe exact target is intended for autonomous "
+                "decision making in high-impact settings.\n"
+            ),
+            content_sha256=None,
+        )
+        other_catalog = SimpleNamespace(
+            target=self.catalog.target,
+            catalog_sha256="d" * 64,
+            documents=(other_snapshot,),
+            by_id={other_snapshot.source_id: other_snapshot},
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(other_catalog).candidates,
+        )
+
+        catalog = self.official_catalog()
+        intended = (
+            "The exact target is intended for customer-support assistants that "
+            "draft responses for human review."
+        )
+        provider = QuoteProposal(
+            source_id=catalog.documents[0].source_id,
+            field_path="use_and_risk.intended_uses[0]",
+            value=intended,
+            quote=intended,
+            claim_entity=f"acme/Instruct@{REVISION}",
+            relation=RelationToTarget.EXACT_TARGET,
+        )
+        batch = ExtractionBatch.build(
+            target=catalog.target,
+            source_catalog_sha256=catalog.catalog_sha256,
+            provider="Together",
+            inference_config_sha256="b" * 64,
+            proposals=(provider,),
+        )
+        provider_candidate = materialize_quote_batch(batch, catalog).candidates[0]
+        unaccepted_gate = evaluate_claim_gate(
+            provider_candidate,
+            catalog.documents,
+            (),
+        )
+        deterministic = deterministic_publisher_context_candidates(
+            catalog, existing_gate_records=(unaccepted_gate,)
+        )
+        self.assertIn(
+            "use_and_risk.intended_uses",
+            {item.field_path.rsplit("[", 1)[0] for item in deterministic.candidates},
+        )
+
+        accepted_gate = evaluate_claim_gate(
+            provider_candidate,
+            catalog.documents,
+            (
+                self.checker(provider_candidate, GateName.FIELD_FIT),
+                self.checker(provider_candidate, GateName.VALUE_SUPPORT),
+            ),
+        )
+        self.assertTrue(accepted_gate.projection_eligible)
+        deterministic = deterministic_publisher_context_candidates(
+            catalog, existing_gate_records=(accepted_gate,)
+        )
+        self.assertNotIn(
+            "use_and_risk.intended_uses",
+            {item.field_path.rsplit("[", 1)[0] for item in deterministic.candidates},
+        )
+        self.assertEqual(
+            {
+                "use_and_risk.out_of_scope_uses[0]",
+                "use_and_risk.limitations[0]",
+                "use_and_risk.mitigations[0]",
+            },
+            {item.field_path for item in deterministic.candidates},
+        )
+
+    def test_frozen_pilot_context_allowlist_is_precision_locked(self) -> None:
+        pilot = (
+            Path(__file__).resolve().parents[2]
+            / "model-card-system"
+            / "pilot"
+        )
+        roster_path = pilot / "roster12" / "targets.txt"
+        bundle_root = pilot / "bundles"
+        if not roster_path.is_file() or not bundle_root.is_dir():
+            self.skipTest("the frozen 12-target pilot corpus is not available")
+
+        llama_values = {
+            (
+                "use_and_risk.intended_uses[0]",
+                "Llama 3.1 is intended for commercial and research use in multiple languages.",
+            ),
+            (
+                "use_and_risk.out_of_scope_uses[0]",
+                "Use in any manner that violates applicable laws or regulations (including trade compliance laws).",
+            ),
+            (
+                "use_and_risk.out_of_scope_uses[1]",
+                "Use in any other way that is prohibited by the Acceptable Use Policy and Llama 3.1 Community License.",
+            ),
+            (
+                "use_and_risk.out_of_scope_uses[2]",
+                "Use in languages beyond those explicitly referenced as supported in this model card**.",
+            ),
+        }
+        expected = {
+            "meta-llama/Llama-3.1-8B": llama_values
+            | {
+                (
+                    "use_and_risk.intended_uses[1]",
+                    "pretrained models can be adapted for a variety of natural "
+                    "language generation tasks.",
+                )
+            },
+            "meta-llama/Llama-3.1-8B-Instruct": llama_values
+            | {
+                (
+                    "use_and_risk.intended_uses[1]",
+                    "Instruction tuned text only models are intended for "
+                    "assistant-like chat",
+                )
+            },
+        }
+        observed: dict[str, set[tuple[str, str]]] = {}
+        serialized_candidates: list[str] = []
+        roster = tuple(
+            line.strip()
+            for line in roster_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
+        self.assertEqual(12, len(roster))
+        for entry in roster:
+            model_id, revision = entry.rsplit("@", 1)
+            prefix = model_id.casefold().replace("/", "-")
+            matches = tuple(
+                path
+                for path in bundle_root.iterdir()
+                if path.is_dir()
+                and path.name.startswith(prefix)
+                and path.name.endswith(revision[:12])
+            )
+            self.assertEqual(1, len(matches), entry)
+            bundle = json.loads(
+                (
+                    matches[0] / "source_bundle" / "source-bundle.json"
+                ).read_text(encoding="utf-8")
+            )
+            readme = next(
+                item for item in bundle["files"] if item["name"] == "README.md"
+            )
+            self.assertEqual(
+                readme["sha256"],
+                hashlib.sha256(readme["content"].encode("utf-8")).hexdigest(),
+            )
+            target = TargetIdentity(model_id, revision)
+            source = SourceDocument(
+                source_id="pilot_readme",
+                source_uri=readme["source_uri"],
+                role=SourceRole.HUGGING_FACE_SNAPSHOT,
+                source_revision=revision,
+                target=target,
+                text=readme["content"],
+                content_sha256=readme["sha256"],
+            )
+            catalog = SimpleNamespace(
+                target=target,
+                catalog_sha256=hashlib.sha256(entry.encode("utf-8")).hexdigest(),
+                documents=(source,),
+                by_id={source.source_id: source},
+            )
+            result = deterministic_publisher_context_candidates(catalog)
+            values = {
+                (item.field_path, item.value["description"])
+                for item in result.candidates
+            }
+            observed[model_id] = values
+            serialized_candidates.extend(
+                json.dumps(item.to_dict(), sort_keys=True)
+                for item in result.candidates
+            )
+
+        self.assertEqual(expected, {key: value for key, value in observed.items() if value})
+        self.assertEqual(10, sum(len(value) for value in observed.values()))
+        joined = "\n".join(serialized_candidates)
+        for denied in (
+            "greedy decoding",
+            "README_WEIGHTS",
+            "Language Ambiguity and Nuance",
+            "looking forward to engaging with the community",
+            "whereas pretrained models",
+        ):
+            self.assertNotIn(denied, joined)
+
     def test_provider_value_boundary_uses_json_strings_and_rejects_duplicates(self) -> None:
         raw = {
             "proposals": [
@@ -363,19 +921,20 @@ class ExtractionTests(unittest.TestCase):
                     "quote": "The reported exact-target score is 73.5 on ExampleBench.",
                     "claim_entity": f"acme/Instruct@{REVISION}",
                     "relation": "exact_target",
-                    "benchmark_scope_json": json.dumps(
-                        {
-                            "benchmark": "ExampleBench",
-                            "metric": "accuracy",
-                            "setting": "zero-shot",
-                        }
-                    ),
                     "origin": "source_stated",
                 }
             ]
         }
         proposal = proposals_from_provider_value(raw)[0]
         self.assertEqual(73.5, proposal.value["score"])
+        self.assertEqual(
+            {
+                "benchmark": "ExampleBench",
+                "metric": "accuracy",
+                "setting": "zero-shot",
+            },
+            proposal.benchmark_scope,
+        )
         bad = json.loads(json.dumps(raw))
         bad["proposals"][0]["value_json"] = '{"score":73.5,"score":99.0}'
         with self.assertRaisesRegex(ExtractionError, "invalid canonical JSON"):
@@ -405,10 +964,7 @@ class ExtractionTests(unittest.TestCase):
             MAX_PROVIDER_ENTITY_CHARS,
             properties["claim_entity"]["maxLength"],
         )
-        self.assertEqual(
-            MAX_PROVIDER_SCOPE_JSON_CHARS,
-            properties["benchmark_scope_json"]["maxLength"],
-        )
+        self.assertNotIn("benchmark_scope_json", properties)
 
         wrong_parameter_type = json.loads(json.dumps(raw))
         wrong_parameter_type["proposals"][0].update(
@@ -416,7 +972,6 @@ class ExtractionTests(unittest.TestCase):
                 "field_path": "model_details.num_parameters",
                 "value_json": "7",
                 "quote": "The model has 7B parameters.",
-                "benchmark_scope_json": None,
             }
         )
         with self.assertRaisesRegex(
@@ -430,7 +985,6 @@ class ExtractionTests(unittest.TestCase):
                 "field_path": "model_details.modalities",
                 "value_json": '["text"]',
                 "quote": "Modalities: text.",
-                "benchmark_scope_json": None,
             }
         )
         with self.assertRaisesRegex(ExtractionError, "item index"):
@@ -459,7 +1013,6 @@ class ExtractionTests(unittest.TestCase):
                     ),
                     "claim_entity": f"acme/Instruct@{REVISION}",
                     "relation": "exact_target",
-                    "benchmark_scope_json": "not applicable",
                     "origin": "source_stated",
                 }
             ]
@@ -469,6 +1022,26 @@ class ExtractionTests(unittest.TestCase):
         self.assertIsNone(proposal.benchmark_scope)
 
         raw["proposals"][0]["field_path"] = "evaluation.benchmark_scores[0]"
+        with self.assertRaisesRegex(ExtractionError, "invalid canonical JSON"):
+            proposals_from_provider_value(raw)
+
+    def test_provider_raw_use_risk_prose_is_typed_and_structured_lists_fail_closed(self) -> None:
+        raw = {
+            "proposals": [
+                {
+                    "source_id": self.readme.source_id,
+                    "field_path": "use_and_risk.limitations[0]",
+                    "value_json": "May produce inaccurate factual statements.",
+                    "quote": "May produce inaccurate factual statements.",
+                    "claim_entity": f"acme/Instruct@{REVISION}",
+                    "relation": "exact_target",
+                    "origin": "source_stated",
+                }
+            ]
+        }
+        proposal = proposals_from_provider_value(raw)[0]
+        self.assertEqual(raw["proposals"][0]["value_json"], proposal.value)
+        raw["proposals"][0]["field_path"] = "model_details.modalities[0]"
         with self.assertRaisesRegex(ExtractionError, "invalid canonical JSON"):
             proposals_from_provider_value(raw)
 
@@ -506,7 +1079,7 @@ class ExtractionTests(unittest.TestCase):
 
         proposals = tuple(
             self.proposal(value=f"value-{index}", quote=f"quote-{index}")
-            for index in range(MAX_PROVIDER_PROPOSALS + 1)
+            for index in range(MAX_EXTRACTION_BATCH_PROPOSALS + 1)
         )
         with self.assertRaisesRegex(ExtractionError, "proposal bound"):
             self.batch(*proposals)

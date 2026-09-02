@@ -1,8 +1,15 @@
 # Held-out evaluation design
 
-This directory defines a future human evaluation. It contains no annotations,
-reviewer identities, source text, or quality results. The checked-in JSON file is
-an empty, schema-valid template only.
+This directory defines a future human evaluation and an offline cross-instrument
+engineering audit. It contains no completed annotations, reviewer identities, source
+text, or new quality results. `annotation.schema.json` and
+`annotation-template.json` cover each per-reviewer held-out study packet.
+`paired-audit-labels.schema.json` is a distinct, row-oriented export for the
+adjudicated cross-condition audit; it is not a replacement for the reviewer packet
+format. Its empty template covers future blinded labels.
+`paired_audit.py` can summarize already-produced privacy-safe quality reports beside
+released Auto-BenchmarkCards aggregates, but it cannot turn those unlike instruments
+into a superiority result. See `PAIRED_AUDIT.md` for its input contract.
 
 ## Study question
 
@@ -66,7 +73,9 @@ original records.
 The local packet builder assigns opaque study, target, claim, fact, risk, and
 warning identifiers. It may attach bounded evidence in the private reviewer
 interface, but the public annotation record stores only those identifiers and
-categorical decisions. Annotator names and contact details are out of scope.
+categorical decisions. The row-oriented paired-label export likewise stores only
+`target_blind_id`; its separately supplied target map is private execution material
+and must not be published. Annotator names and contact details are out of scope.
 
 ## Analysis plan
 

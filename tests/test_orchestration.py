@@ -8,7 +8,10 @@ import unittest
 from unittest.mock import patch
 
 from model_cards.extraction import EXTRACTION_VERSION, ExtractionBatch
-from model_cards.factreasoner import FACTREASONER_KERNEL_VERSION
+from model_cards.factreasoner import (
+    FACTREASONER_KERNEL_VERSION,
+    IBMFactReasonerAdapter,
+)
 from model_cards.pipeline import PIPELINE_VERSION, run_offline_pipeline
 from model_cards.provider import (
     MODEL_ID,
@@ -16,7 +19,8 @@ from model_cards.provider import (
     PROVIDER_RUNTIME_VERSION,
     ProviderResponseError,
 )
-from model_cards.provider_adapters import ADAPTER_VERSION, FACT_CHECKER_ID
+from model_cards.provider_adapters import ADAPTER_VERSION
+from model_cards.run_ledger import AttemptBinding, UsageLedger
 from model_cards.orchestration import (
     ORCHESTRATION_MANIFEST_FILENAME,
     OrchestrationError,
@@ -183,21 +187,27 @@ class ResumableFakeCall:
                             + payload["target"]["revision"]
                         ),
                         "relation": "exact_target",
-                        "benchmark_scope_json": None,
                         "origin": "source_stated",
                     }
                 ]
             }
+        if stage == "quote_extraction_use_risk":
+            return {"proposals": []}
         if stage == "field_fit":
             return {"status": "accepted", "reason": "semantic_field_fit"}
         if stage == "value_support":
             return {"status": "accepted", "reason": "semantic_value_support"}
-        if stage == "factreasoner":
+        if stage == "factreasoner_batch":
             payload = json.loads(spec.user_prompt)
             return {
-                "outcome": "support",
-                "reason_code": "support_in_context",
-                "cited_chunk_ids": [payload["contexts"][0]["chunk_id"]],
+                "decisions": [
+                    {
+                        "request_sha256": item["request_sha256"],
+                        "outcome": "support",
+                        "cited_chunk_ids": [item["context_ids"][0]],
+                    }
+                    for item in payload["checks"]
+                ]
             }
         raise AssertionError(f"unexpected fake provider stage: {stage}")
 
@@ -246,7 +256,6 @@ class CombinedSourceFakeCall(ResumableFakeCall):
                             + payload["target"]["revision"]
                         ),
                         "relation": "exact_target",
-                        "benchmark_scope_json": None,
                         "origin": "source_stated",
                     }
                 ]
@@ -277,7 +286,6 @@ class PublisherRiskFakeCall(ResumableFakeCall):
                             + payload["target"]["revision"]
                         ),
                         "relation": "exact_target",
-                        "benchmark_scope_json": None,
                         "origin": "source_stated",
                     }
                 ]
@@ -322,7 +330,7 @@ class OrchestrationTests(unittest.TestCase):
         self.transport = object()
         collect_hf_source_bundle("acme/Exact", self.bundle, BundleAdapter())
 
-    def invoke(self, fake, **kwargs):
+    def invoke(self, fake, *, factreasoner_available=True, **kwargs):
         values = {
             "provider": "Together",
             "ledger_path": self.ledger,
@@ -336,15 +344,56 @@ class OrchestrationTests(unittest.TestCase):
         # Risk is unavailable in this fixture because it has no accepted use
         # context; patching the optional interface also makes the test independent
         # of whether the large Nexus extra is installed in the test environment.
-        with patch(
-            "model_cards.orchestration._build_risk_interfaces",
-            return_value=(None, None, "nexus_dependency_unavailable"),
-        ):
+        def run():
             return run_provider_assisted_pipeline(
                 self.bundle,
                 self.run,
                 **values,
             )
+
+        installation_status = (
+            "ibm_factreasoner_pinned_dependency_available"
+            if factreasoner_available
+            else "ibm_factreasoner_dependency_unavailable"
+        )
+        with (
+            patch(
+                "model_cards.orchestration._build_risk_interfaces",
+                return_value=(None, None, "nexus_dependency_unavailable"),
+            ),
+            patch.object(
+                IBMFactReasonerAdapter,
+                "installation_status",
+                return_value=installation_status,
+            ),
+        ):
+            if not factreasoner_available:
+                return run()
+
+            def fixture_check(adapter, request):
+                return adapter._nli_checker.check(request)
+
+            def fixture_check_many(adapter, requests):
+                return adapter._nli_checker.check_many(requests)
+
+            with (
+                patch.object(
+                    IBMFactReasonerAdapter,
+                    "validate_installation",
+                    return_value=None,
+                ),
+                patch.object(
+                    IBMFactReasonerAdapter,
+                    "check",
+                    new=fixture_check,
+                ),
+                patch.object(
+                    IBMFactReasonerAdapter,
+                    "check_many",
+                    new=fixture_check_many,
+                ),
+            ):
+                return run()
 
     def test_exact_provider_flow_two_gates_and_downstream_injection(self):
         fake = ResumableFakeCall()
@@ -395,7 +444,14 @@ class OrchestrationTests(unittest.TestCase):
             {"field_fit", "value_support"},
             {item.gate.value for item in injected["prose_checker_decisions"]},
         )
-        self.assertEqual(FACT_CHECKER_ID, injected["fact_checker"].checker_id)
+        self.assertEqual(
+            IBMFactReasonerAdapter.checker_id,
+            injected["fact_checker"].checker_id,
+        )
+        self.assertEqual(
+            "ibm_factreasoner_fr1_enabled",
+            result.factreasoner_interface_status,
+        )
         self.assertTrue((self.run / "public-card.json").is_file())
         original_fact = json.loads(
             (self.run / "factreasoner-original.json").read_text()
@@ -508,17 +564,25 @@ class OrchestrationTests(unittest.TestCase):
 
     def test_resume_order_is_deterministic_and_does_not_duplicate_paid_work(self):
         fake = ResumableFakeCall()
-        first = self.invoke(fake)
+        aggregate_budget = self.root / "batch-aggregate-paid-calls.jsonl"
+        first = self.invoke(fake, aggregate_budget_path=aggregate_budget)
         first_invocations = list(fake.invocations)
         first_paid = list(fake.paid_paths)
+        # The fake caches by sidecar key but bypasses the real runtime writer;
+        # materialize placeholders so the aggregate guard observes the same
+        # completed-sidecar condition as a real deterministic replay.
+        for decision_path in first_paid:
+            Path(decision_path).touch()
+        aggregate_after_first = aggregate_budget.read_bytes()
 
-        second = self.invoke(fake)
+        second = self.invoke(fake, aggregate_budget_path=aggregate_budget)
         second_invocations = fake.invocations[len(first_invocations) :]
         self.assertEqual(
             [(stage, logical) for stage, logical, _ in first_invocations],
             [(stage, logical) for stage, logical, _ in second_invocations],
         )
         self.assertEqual(first_paid, fake.paid_paths)
+        self.assertEqual(aggregate_after_first, aggregate_budget.read_bytes())
         self.assertEqual(first.result_sha256, second.result_sha256)
         self.assertEqual(
             first.pipeline_result.result_sha256,
@@ -527,6 +591,11 @@ class OrchestrationTests(unittest.TestCase):
         self.assertEqual(
             sorted(first.extraction_batch_sha256s), list(first.extraction_batch_sha256s)
         )
+        admission = json.loads(
+            (self.run / ORCHESTRATION_MANIFEST_FILENAME).read_text()
+        )
+        self.assertIsNotNone(admission["aggregate_budget_path_sha256"])
+        self.assertNotIn(str(aggregate_budget), json.dumps(admission))
 
     def test_one_checker_response_failure_withholds_candidate_and_continues(self):
         result = self.invoke(OneCheckerFailureFakeCall())
@@ -571,6 +640,49 @@ class OrchestrationTests(unittest.TestCase):
         self.assertEqual(
             PROVIDER_RUNTIME_VERSION, admitted["provider_runtime_version"]
         )
+        self.assertEqual(
+            "ibm_factreasoner_fr1_enabled",
+            admitted["factreasoner_interface_status"],
+        )
+        self.assertEqual(
+            "ibm/factreasoner-fr1", admitted["factreasoner_checker_id"]
+        )
+        self.assertEqual(
+            "ibm_factreasoner_fr1_enabled",
+            result.to_dict()["factreasoner_interface_status"],
+        )
+
+    def test_missing_upstream_factreasoner_is_visible_and_makes_no_fact_call(self):
+        fake = ResumableFakeCall()
+
+        result = self.invoke(fake, factreasoner_available=False)
+
+        self.assertNotIn(
+            "factreasoner_batch", {item[0] for item in fake.invocations}
+        )
+        self.assertEqual(
+            "ibm_factreasoner_dependency_unavailable",
+            result.factreasoner_interface_status,
+        )
+        admission = json.loads(
+            (self.run / ORCHESTRATION_MANIFEST_FILENAME).read_text()
+        )
+        self.assertEqual(
+            "ibm_factreasoner_dependency_unavailable",
+            admission["factreasoner_interface_status"],
+        )
+        self.assertEqual(
+            "ibm/factreasoner-fr1-unavailable",
+            admission["factreasoner_checker_id"],
+        )
+        record = json.loads((self.run / "factreasoner.json").read_text())
+        self.assertEqual(
+            "ibm/factreasoner-fr1-unavailable", record["checker_id"]
+        )
+        self.assertEqual(
+            {"unavailable"}, {item["outcome"] for item in record["decisions"]}
+        )
+        self.assertFalse(result.pipeline_result.validation.factreasoner_passed)
 
     def test_target_or_catalog_drift_halts_before_another_provider_decision(self):
         fake = ResumableFakeCall()
@@ -662,6 +774,27 @@ class OrchestrationTests(unittest.TestCase):
             )
         self.assertEqual([], fake.invocations)
 
+    def test_existing_foreign_provider_ledger_is_rejected_before_admission(self):
+        UsageLedger(self.ledger).begin_attempt(
+            AttemptBinding(
+                logical_call_id="foreign.fixture",
+                attempt_id="foreign.fixture.attempt1",
+                model=MODEL_ID,
+                provider="OtherProvider",
+                request_sha256="1" * 64,
+                schema_sha256="2" * 64,
+                sidecar_path_sha256="3" * 64,
+                context_metadata={"stage": "fixture"},
+            )
+        )
+        fake = ResumableFakeCall()
+
+        with self.assertRaisesRegex(OrchestrationError, "unpinned"):
+            self.invoke(fake)
+
+        self.assertEqual([], fake.invocations)
+        self.assertFalse((self.run / ORCHESTRATION_MANIFEST_FILENAME).exists())
+
     def test_pinned_nexus_interfaces_share_the_exact_provider_runtime(self):
         engine = object()
         detector = object()
@@ -706,6 +839,7 @@ class OrchestrationTests(unittest.TestCase):
             environment=environment,
             transport=transport,
             call=fake,
+            aggregate_budget_path=None,
         )
         build_detector.assert_called_once_with(engine, max_risks=4)
         build_checker.assert_called_once_with(
@@ -715,6 +849,7 @@ class OrchestrationTests(unittest.TestCase):
             environment=environment,
             transport=transport,
             call=fake,
+            aggregate_budget_path=None,
         )
 
 

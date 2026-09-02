@@ -5,6 +5,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path, PurePosixPath
+import shutil
 import tempfile
 from unittest import mock
 import unittest
@@ -20,8 +21,17 @@ from model_cards.field_repair import (
 from model_cards.models import TargetIdentity
 from model_cards.official_sources import OfficialFetchStatus, OfficialRemoteObject
 from model_cards.pipeline import PipelineResult
-from model_cards.provider import ProviderTerminalAttemptError, RetryExhaustedError
-from model_cards.quality_report import load_quality_report
+from model_cards.provider import (
+    MissingCredentialError,
+    ProviderTerminalAttemptError,
+    RetryExhaustedError,
+)
+from model_cards.quality_report import (
+    QualityReportError,
+    build_quality_report,
+    load_quality_report,
+    serialize_quality_report,
+)
 from model_cards.publication_schema import validate_publication_card
 from model_cards.source_bundle import (
     FetchStatus,
@@ -244,6 +254,53 @@ class E2ECommandLineTests(unittest.TestCase):
                     "Baidu",
                 ]
             )
+
+    def test_generate_threads_shared_aggregate_budget_only_in_provider_mode(self) -> None:
+        frozen = self.bundle()
+        output = self.root / "aggregate-budget-run"
+        aggregate = self.root / "cohort-paid-call-budget.jsonl"
+        arguments = [
+            "generate",
+            "acme/Instruct",
+            "--revision",
+            COMMIT,
+            "--output",
+            str(output),
+            "--offline-bundle",
+            str(frozen),
+            "--provider",
+            "Together",
+            "--aggregate-budget-journal",
+            str(aggregate),
+        ]
+        with mock.patch(
+            "model_cards.cli.run_provider_assisted_pipeline",
+            side_effect=MissingCredentialError("fixture"),
+        ) as assisted:
+            result, stdout, stderr = self.invoke(arguments)
+        self.assertEqual(2, result)
+        self.assertEqual("", stdout)
+        self.assertIn("openrouter_key_unavailable", stderr)
+        self.assertEqual(
+            aggregate,
+            assisted.call_args.kwargs["aggregate_budget_path"],
+        )
+
+        rejected_output = self.root / "aggregate-without-provider"
+        rejected, rejected_stdout, rejected_stderr = self.invoke(
+            [
+                "generate",
+                "acme/Instruct",
+                "--output",
+                str(rejected_output),
+                "--aggregate-budget-journal",
+                str(aggregate),
+            ]
+        )
+        self.assertEqual(2, rejected)
+        self.assertEqual("", rejected_stdout)
+        self.assertIn("aggregate_budget_requires_provider", rejected_stderr)
+        self.assertFalse(rejected_output.exists())
 
     def test_normal_generate_automatically_freezes_and_replays_official_sources(self) -> None:
         output = self.root / "online-run"
@@ -596,6 +653,286 @@ class E2ECommandLineTests(unittest.TestCase):
             },
         )
         self.assert_private_text_absent(resumed_stdout + resumed_stderr)
+
+    def test_provider_batch_threads_one_shared_aggregate_budget(self) -> None:
+        requests = [f"acme/First@{COMMIT}", f"acme/Second@{SECOND_COMMIT}"]
+        output = self.root / "provider-batch"
+
+        def generated(**kwargs):
+            return {
+                "target": {
+                    "model_id": kwargs["model_id"],
+                    "revision": kwargs["revision"],
+                },
+                "status": "generated_unreviewed",
+                "artifacts": ["public-card.json"],
+            }
+
+        with mock.patch(
+            "model_cards.cli._generate_target", side_effect=generated
+        ) as generate:
+            result, stdout, stderr = self.invoke(
+                [
+                    "batch",
+                    json.dumps(requests),
+                    "--output",
+                    str(output),
+                    "--provider",
+                    "Together",
+                ]
+            )
+        self.assertEqual(0, result, stderr)
+        self.assertEqual("completed", json.loads(stdout)["status"])
+        self.assertEqual(2, generate.call_count)
+        for call in generate.call_args_list:
+            self.assertEqual("Together", call.kwargs["provider"])
+            self.assertEqual(
+                output / "aggregate-budget.jsonl",
+                call.kwargs["aggregate_budget_path"],
+            )
+
+        rejected_output = self.root / "batch-budget-without-provider"
+        rejected, rejected_stdout, rejected_stderr = self.invoke(
+            [
+                "batch",
+                json.dumps(requests),
+                "--output",
+                str(rejected_output),
+                "--aggregate-budget-journal",
+                str(self.root / "shared.jsonl"),
+            ]
+        )
+        self.assertEqual(2, rejected)
+        self.assertEqual("", rejected_stdout)
+        self.assertIn("aggregate_budget_requires_provider", rejected_stderr)
+        self.assertFalse(rejected_output.exists())
+
+    def test_provider_batch_rejects_budget_journal_aliases_before_writes(self) -> None:
+        request = f"acme/Exact@{COMMIT}"
+        aliases = (
+            "batch-request.json",
+            "batch-result.json",
+            "aggregate-budget-summary.json",
+            "targets/target-arbitrary/usage.jsonl",
+        )
+        for index, relative in enumerate(aliases):
+            with self.subTest(relative=relative):
+                output = self.root / f"budget-alias-{index}"
+                journal = output.joinpath(*PurePosixPath(relative).parts)
+                with mock.patch("model_cards.cli._generate_target") as generate:
+                    result, stdout, stderr = self.invoke(
+                        [
+                            "batch",
+                            json.dumps([request]),
+                            "--output",
+                            str(output),
+                            "--provider",
+                            "Together",
+                            "--aggregate-budget-journal",
+                            str(journal),
+                        ]
+                    )
+                self.assertEqual(2, result)
+                self.assertEqual("", stdout)
+                self.assertIn("aggregate_budget_path_conflict", stderr)
+                self.assertFalse(output.exists())
+                generate.assert_not_called()
+
+    def test_successful_provider_batch_is_immediately_reportable(self) -> None:
+        from model_cards.factreasoner import IBMFactReasonerAdapter
+        from model_cards.orchestration import (
+            run_provider_assisted_pipeline as actual_assisted_pipeline,
+        )
+        from tests.test_orchestration import RISK_CATALOG, ResumableFakeCall
+
+        request = f"acme/ProviderReport@{COMMIT}"
+        frozen = self.bundle("acme/ProviderReport", COMMIT)
+        output = self.root / "provider-report-batch"
+        fake = ResumableFakeCall()
+
+        def assisted(*args, **kwargs):
+            with (
+                mock.patch(
+                    "model_cards.orchestration._build_risk_interfaces",
+                    return_value=(None, None, "nexus_dependency_unavailable"),
+                ),
+                mock.patch.object(
+                    IBMFactReasonerAdapter,
+                    "installation_status",
+                    return_value="ibm_factreasoner_dependency_unavailable",
+                ),
+            ):
+                return actual_assisted_pipeline(
+                    *args,
+                    **kwargs,
+                    environment={"OPENROUTER_API_KEY": "fixture-only"},
+                    call=fake,
+                    risk_catalog=RISK_CATALOG,
+                )
+
+        with mock.patch(
+            "model_cards.cli.run_provider_assisted_pipeline",
+            side_effect=assisted,
+        ):
+            result, stdout, stderr = self.invoke(
+                [
+                    "batch",
+                    json.dumps([request]),
+                    "--output",
+                    str(output),
+                    "--provider",
+                    "Together",
+                    "--offline-bundle",
+                    f"{request}={frozen}",
+                ]
+            )
+
+        self.assertEqual(0, result, stderr)
+        batch = json.loads(stdout)
+        self.assertIn("aggregate-budget.jsonl", batch["artifacts"])
+        self.assertIn("aggregate-budget-summary.json", batch["artifacts"])
+        self.assertTrue(
+            any(
+                item.endswith("/provider-orchestration.json")
+                for item in batch["targets"][0]["artifacts"]
+            )
+        )
+        self.assertTrue(
+            any(
+                item.endswith("/provider-result.json")
+                for item in batch["targets"][0]["artifacts"]
+            )
+        )
+
+        report = build_quality_report(output)
+        value = report.to_dict()
+        self.assertEqual(
+            "batch_root",
+            value["aggregate"]["aggregate_budget"]["journal_scope"],
+        )
+        self.assertEqual(
+            "25", value["aggregate"]["aggregate_budget"]["usd_cap"]
+        )
+        self.assertEqual(
+            value["aggregate"]["provider"]["committed_usd"],
+            value["aggregate"]["aggregate_budget"]["committed_usd"],
+        )
+        self.assertEqual(
+            "0",
+            value["aggregate"]["aggregate_budget"]["reserved_usd_capacity"],
+        )
+        self.assertFalse(value["aggregate"]["aggregate_budget"]["global_halt"])
+        self.assertEqual(1, value["targets"][0]["provider"]["ledger_count"])
+        self.assertNotIn(
+            "journal_path_sha256", value["aggregate"]["aggregate_budget"]
+        )
+        self.assertNotIn(
+            str(self.root).encode("utf-8"), serialize_quality_report(report)
+        )
+
+        stale = self.root / "provider-report-stale-admission"
+        shutil.copytree(output, stale)
+        admission_path = next(stale.glob("targets/*/provider-orchestration.json"))
+        admission = json.loads(admission_path.read_text())
+        admission["eligible_source_set_sha256"] = "0" * 64
+        admission_path.write_bytes(_json_bytes(admission) + b"\n")
+        with self.assertRaises(QualityReportError):
+            build_quality_report(stale)
+
+        stale_budget = self.root / "provider-report-stale-budget"
+        shutil.copytree(output, stale_budget)
+        budget_path = stale_budget / "aggregate-budget-summary.json"
+        budget = json.loads(budget_path.read_text())
+        budget["reserved_usd_capacity"] = "1"
+        budget_path.write_bytes(_json_bytes(budget) + b"\n")
+        with self.assertRaises(QualityReportError):
+            build_quality_report(stale_budget)
+
+    def test_failed_provider_target_cost_is_retained_and_budget_bound(self) -> None:
+        from model_cards.factreasoner import IBMFactReasonerAdapter
+        from model_cards.orchestration import (
+            run_provider_assisted_pipeline as actual_assisted_pipeline,
+        )
+        from tests.test_orchestration import RISK_CATALOG
+        from tests.test_provider import (
+            FixtureTransport,
+            route_payload,
+            success_payload,
+        )
+
+        request = f"acme/ProviderFailure@{COMMIT}"
+        frozen = self.bundle("acme/ProviderFailure", COMMIT)
+        output = self.root / "provider-failure-batch"
+        transport = FixtureTransport(
+            [
+                (
+                    200,
+                    success_payload(
+                        decision={"wrong": "shape"}, provider="Together"
+                    ),
+                )
+            ],
+            routes=[route_payload(provider="Together")],
+        )
+
+        def assisted(*args, **kwargs):
+            with (
+                mock.patch(
+                    "model_cards.orchestration._build_risk_interfaces",
+                    return_value=(None, None, "nexus_dependency_unavailable"),
+                ),
+                mock.patch.object(
+                    IBMFactReasonerAdapter,
+                    "installation_status",
+                    return_value="ibm_factreasoner_dependency_unavailable",
+                ),
+            ):
+                return actual_assisted_pipeline(
+                    *args,
+                    **kwargs,
+                    environment={"OPENROUTER_API_KEY": "fixture-only"},
+                    transport=transport,
+                    risk_catalog=RISK_CATALOG,
+                )
+
+        with mock.patch(
+            "model_cards.cli.run_provider_assisted_pipeline",
+            side_effect=assisted,
+        ):
+            result, stdout, stderr = self.invoke(
+                [
+                    "batch",
+                    json.dumps([request]),
+                    "--output",
+                    str(output),
+                    "--provider",
+                    "Together",
+                    "--offline-bundle",
+                    f"{request}={frozen}",
+                ]
+            )
+
+        self.assertEqual(1, result, stderr)
+        batch = json.loads(stdout)
+        self.assertEqual("failed", batch["targets"][0]["status"])
+        self.assertTrue(
+            any(
+                item.endswith("/provider-orchestration.json")
+                for item in batch["targets"][0]["artifacts"]
+            )
+        )
+        self.assertTrue(
+            any(
+                item.endswith("/usage.jsonl")
+                for item in batch["targets"][0]["artifacts"]
+            )
+        )
+
+        value = build_quality_report(output).to_dict()
+        self.assertEqual(1, value["targets"][0]["provider"]["paid_calls"])
+        self.assertEqual(1, value["aggregate"]["provider"]["paid_calls"])
+        self.assertEqual(1, value["aggregate"]["aggregate_budget"]["paid_calls"])
+        self.assertEqual(1, value["aggregate"]["aggregate_budget"]["ledger_count"])
 
     def test_report_command_builds_a_paired_body_free_batch_report(self) -> None:
         request = f"acme/Report@{COMMIT}"

@@ -10,13 +10,15 @@ tables, live services, or unpinned sources.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dataclass_field
 from decimal import Decimal, ROUND_HALF_UP
+import hashlib
 import html
+import json
 import re
 from typing import Any, Iterable, Mapping
 import unicodedata
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from .publication_contract import FIELD_PATH_SET, NOT_APPLICABLE, NOT_SPECIFIED
 from .publication_schema import (
@@ -28,7 +30,16 @@ from .publication_schema import (
 from .source_documents import SourceDocumentCatalog
 
 
-PUBLICATION_SOURCE_RULESET = "publication-source-enrichment/v4"
+PUBLICATION_SOURCE_RULESET = "publication-source-enrichment/v12"
+PUBLICATION_CONFLICT_VERSION = "publication-conflict-record/v1"
+
+_PUBLICATION_CONFLICT_REASONS = frozenset(
+    {
+        "benchmark_coordinate_scores_disagree",
+        "metadata_base_model_declarations_disagree",
+    }
+)
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 # Public prose may summarize facts from frozen sources, but it must not become
 # a quotation channel.  Twelve consecutive normalized source words is a
@@ -78,18 +89,21 @@ _PUBLICATION_SOURCE_RULE_SUFFIXES = frozenset(
         "adaptation_stage_from_exact_it_title_and_family_description",
         "adaptations_from_exact_posttraining_release_paragraph",
         "adaptations_from_exact_posttraining_statement",
+        "adaptations_from_exact_readme_base_relation",
         "adaptations_from_exact_size_model_merging_statement",
         "adaptations_from_exact_target_training_stage",
         "adaptations_from_posttraining_and_distillation_statements",
         "adaptations_from_tuned_variant_architecture_statement",
         "architecture_classification_from_exact_config",
         "base_models_from_exact_metadata_declarations",
+        "base_models_from_exact_readme_relation",
         "benchmark_scores_from_exact_target_readme_rows_or_columns",
         "citation_from_unique_readme_bibtex_entry",
         "code_repository_from_explicit_readme_link",
         "context_length_from_config_with_qualifier",
         "context_length_from_exact_readme",
         "data_cutoff_from_explicit_readme_label",
+        "developer_from_explicit_readme_label",
         "derivatives_from_exact_prefixed_readme_model_links",
         "developer_from_metadata_author",
         "downloads_from_frozen_metadata",
@@ -97,6 +111,7 @@ _PUBLICATION_SOURCE_RULE_SUFFIXES = frozenset(
         "exact_target_revision",
         "input_output_from_pipeline_architecture_and_target_stage",
         "license_from_card_metadata",
+        "license_from_explicit_readme_statement",
         "likes_from_frozen_metadata",
         "model_card_from_pinned_readme_source",
         "model_family_from_config_model_type",
@@ -108,9 +123,11 @@ _PUBLICATION_SOURCE_RULE_SUFFIXES = frozenset(
         "results_summary_from_exact_target_score_selection",
         "results_summary_from_scoped_safety_evaluation",
         "safety_evaluation_from_exact_target_score_row",
+        "safety_evaluation_from_scoped_family_risk_sections",
         "safety_evaluation_from_scoped_readme_results_section",
         "stored_precision_from_safetensors_dtype_counts",
         "summary_from_exact_target_readme_description",
+        "technical_report_from_explicit_readme_link",
         "technical_report_from_tagged_readme_bibtex",
         "tensor_payload_from_safetensors_dtype_counts",
         "training_data_from_dedicated_readme_section",
@@ -142,6 +159,43 @@ _BIBTEX_START_RE = re.compile(
     r"proceedings|software|techreport)\s*\{",
     re.I,
 )
+_AFFIRMATIVE_COMMERCIAL_USE_RE = re.compile(
+    r"\b(?:supports?|permits?|allows?)\s+commercial\s+use\b|"
+    r"\bcommercial\s+use\s+(?:is|remains)\s+"
+    r"(?:supported|permitted|allowed)\b",
+    re.IGNORECASE,
+)
+_COMMERCIAL_USE_NEGATION_MARKER_RE = re.compile(
+    r"\b(?:not|no|never|without|cannot|unsupported|unpermitted|unauthorized|"
+    r"prohibit(?:s|ed|ing)?|forbid(?:s|den|ding)?|"
+    r"disallow(?:s|ed|ing)?|exclude(?:s|d|ing)?|restrict(?:s|ed|ing)?)\b|"
+    r"\b(?:doesn|don|isn|aren|can|won|mustn|shouldn|wouldn|couldn)"
+    r"['’]t\b",
+    re.IGNORECASE,
+)
+
+
+def _affirmative_commercial_use(body: str) -> re.Match[str] | None:
+    """Return an affirmative phrase only when its sentence has no negation marker."""
+
+    for match in _AFFIRMATIVE_COMMERCIAL_USE_RE.finditer(body):
+        start = max(
+            body.rfind(".", 0, match.start()),
+            body.rfind("!", 0, match.start()),
+            body.rfind("?", 0, match.start()),
+            body.rfind("\n", 0, match.start()),
+        ) + 1
+        following = tuple(
+            index
+            for marker in (".", "!", "?", "\n")
+            for index in (body.find(marker, match.end()),)
+            if index >= 0
+        )
+        end = min(following) + 1 if following else len(body)
+        sentence = body[start:end]
+        if _COMMERCIAL_USE_NEGATION_MARKER_RE.search(sentence) is None:
+            return match
+    return None
 
 _DTYPE_BITS: dict[str, int] = {
     "BOOL": 8,
@@ -174,6 +228,25 @@ class PublicationSourceError(ValueError):
     """Frozen source evidence cannot be safely projected into a public card."""
 
 
+def _canonical(value: Any) -> bytes:
+    try:
+        return json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise PublicationSourceError(
+            "publication source values must be finite JSON"
+        ) from exc
+
+
+def _digest(value: Any) -> str:
+    return hashlib.sha256(_canonical(value)).hexdigest()
+
+
 @dataclass(frozen=True, order=True)
 class SourcePointer:
     """One local-only pointer into a frozen catalog document."""
@@ -197,6 +270,106 @@ class SourcePointer:
 
     def to_dict(self) -> dict[str, str]:
         return {"source_id": self.source_id, "pointer": self.pointer}
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "SourcePointer":
+        if not isinstance(value, dict) or set(value) != {"source_id", "pointer"}:
+            raise PublicationSourceError("serialized source pointer is malformed")
+        return cls(source_id=value["source_id"], pointer=value["pointer"])
+
+
+@dataclass(frozen=True)
+class PublicationConflictRecord:
+    """Local-only evidence that competing source values were withheld.
+
+    The record deliberately stores hashes instead of the conflicting values.
+    Exact source coordinates stay available for local audit without adding a
+    conflict channel to the seven-section public card.
+    """
+
+    field_path: str
+    reason: str
+    sources: tuple[SourcePointer, ...]
+    value_sha256s: tuple[str, ...]
+    conflict_sha256: str = dataclass_field(init=False)
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.field_path, str)
+            or self.field_path not in FIELD_PATH_SET
+        ):
+            raise PublicationSourceError("conflict field_path is invalid")
+        if self.reason not in _PUBLICATION_CONFLICT_REASONS:
+            raise PublicationSourceError("conflict reason is invalid")
+        expected_field = {
+            "benchmark_coordinate_scores_disagree": "evaluation.benchmark_scores",
+            "metadata_base_model_declarations_disagree": "lineage.base_models",
+        }[self.reason]
+        if self.field_path != expected_field:
+            raise PublicationSourceError(
+                "conflict reason does not match its publication field"
+            )
+        raw_sources = tuple(self.sources)
+        if not raw_sources or not all(
+            isinstance(item, SourcePointer) for item in raw_sources
+        ):
+            raise PublicationSourceError("conflict sources are invalid")
+        sources = tuple(sorted(set(raw_sources)))
+        raw_digests = tuple(self.value_sha256s)
+        if any(
+            not isinstance(item, str) or _SHA256_RE.fullmatch(item) is None
+            for item in raw_digests
+        ):
+            raise PublicationSourceError(
+                "conflict value hashes must contain at least two distinct digests"
+            )
+        digests = tuple(sorted(set(raw_digests)))
+        if len(digests) < 2:
+            raise PublicationSourceError(
+                "conflict value hashes must contain at least two distinct digests"
+            )
+        object.__setattr__(self, "sources", sources)
+        object.__setattr__(self, "value_sha256s", digests)
+        object.__setattr__(self, "conflict_sha256", _digest(self._payload()))
+
+    def _payload(self) -> dict[str, Any]:
+        return {
+            "conflict_version": PUBLICATION_CONFLICT_VERSION,
+            "field_path": self.field_path,
+            "reason": self.reason,
+            "sources": [item.to_dict() for item in self.sources],
+            "value_sha256s": list(self.value_sha256s),
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**self._payload(), "conflict_sha256": self.conflict_sha256}
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "PublicationConflictRecord":
+        if not isinstance(value, dict) or set(value) != {
+            "conflict_version",
+            "field_path",
+            "reason",
+            "sources",
+            "value_sha256s",
+            "conflict_sha256",
+        }:
+            raise PublicationSourceError("serialized publication conflict is malformed")
+        if value["conflict_version"] != PUBLICATION_CONFLICT_VERSION or not isinstance(
+            value["sources"], list
+        ) or not isinstance(value["value_sha256s"], list):
+            raise PublicationSourceError(
+                "serialized publication conflict version or arrays are invalid"
+            )
+        result = cls(
+            field_path=value["field_path"],
+            reason=value["reason"],
+            sources=tuple(SourcePointer.from_dict(item) for item in value["sources"]),
+            value_sha256s=tuple(value["value_sha256s"]),
+        )
+        if value["conflict_sha256"] != result.conflict_sha256:
+            raise PublicationSourceError("publication conflict digest is inconsistent")
+        return result
 
 
 @dataclass(frozen=True)
@@ -234,6 +407,7 @@ class PublicationEnrichmentResult:
 
     card: dict[str, dict[str, Any]]
     provenance: tuple[PublicationFieldProvenance, ...]
+    conflicts: tuple[PublicationConflictRecord, ...] = ()
 
     def __post_init__(self) -> None:
         validate_publication_card(self.card)
@@ -242,11 +416,47 @@ class PublicationEnrichmentResult:
             "provenance",
             tuple(sorted(self.provenance, key=lambda item: item.field_path)),
         )
+        raw_conflicts = tuple(self.conflicts)
+        if not all(
+            isinstance(item, PublicationConflictRecord) for item in raw_conflicts
+        ):
+            raise PublicationSourceError("publication conflicts must be typed records")
+        conflicts = tuple(
+            sorted(
+                raw_conflicts,
+                key=lambda item: (
+                    item.field_path,
+                    item.reason,
+                    item.conflict_sha256,
+                ),
+            )
+        )
+        if len({item.conflict_sha256 for item in conflicts}) != len(conflicts):
+            raise PublicationSourceError("publication conflicts are duplicated")
+        object.__setattr__(self, "conflicts", conflicts)
 
     def provenance_dict(self) -> dict[str, Any]:
         return {
             "ruleset": PUBLICATION_SOURCE_RULESET,
             "fields": [item.to_dict() for item in self.provenance],
+        }
+
+    @property
+    def conflicts_sha256(self) -> str:
+        return _digest(self._conflicts_payload())
+
+    def _conflicts_payload(self) -> dict[str, Any]:
+        return {
+            "conflict_version": PUBLICATION_CONFLICT_VERSION,
+            "ruleset": PUBLICATION_SOURCE_RULESET,
+            "records": [item.to_dict() for item in self.conflicts],
+        }
+
+    def conflicts_dict(self) -> dict[str, Any]:
+        return {
+            **self._conflicts_payload(),
+            "conflict_count": len(self.conflicts),
+            "conflicts_sha256": self.conflicts_sha256,
         }
 
 
@@ -279,6 +489,13 @@ class _ReadmeTable:
     start: int
     end: int
     headings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _ScoreCandidate:
+    value: dict[str, Any]
+    start: int
+    end: int
 
 
 @dataclass(frozen=True)
@@ -364,6 +581,60 @@ def _catalog_inputs(catalog: SourceDocumentCatalog) -> _Inputs:
     )
 
 
+def _is_exact_target_root_readme(inputs: _Inputs) -> bool:
+    """Return whether the README URI is the pinned root file for this target."""
+
+    if inputs.readme_uri is None:
+        return False
+    parsed = urlsplit(inputs.readme_uri)
+    target = inputs.catalog.target
+    expected = {
+        f"/{target.model_id}/resolve/{target.revision}/README.md",
+        f"/{target.model_id}/blob/{target.revision}/README.md",
+    }
+    return (
+        parsed.scheme == "https"
+        and parsed.netloc.casefold() == "huggingface.co"
+        and parsed.path in expected
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+_FAMILY_TARGET_PATTERNS = {
+    "deepseek_v3": re.compile(
+        r"deepseek-ai/DeepSeek-V3(?:-Base)?", re.IGNORECASE
+    ),
+    "gemma3": re.compile(
+        r"google/gemma-3-(?:1b|4b|12b|27b)-(?:pt|it)", re.IGNORECASE
+    ),
+    "llama31": re.compile(
+        r"meta-llama/Llama-3\.1-(?:8B|70B|405B)(?:-Instruct)?",
+        re.IGNORECASE,
+    ),
+    "olmo2_1124": re.compile(
+        r"allenai/OLMo-2-1124-(?:7B|13B)(?:-(?:Instruct|SFT|DPO|RM))?",
+        re.IGNORECASE,
+    ),
+    "qwen3": re.compile(
+        r"Qwen/Qwen3-(?:0\.6B|1\.7B|4B|8B|14B|32B|30B-A3B|235B-A22B)"
+        r"(?:-Base)?",
+        re.IGNORECASE,
+    ),
+}
+
+
+def _is_exact_family_target(inputs: _Inputs, family: str) -> bool:
+    """Gate family-specific prose rules to their documented publisher target."""
+
+    pattern = _FAMILY_TARGET_PATTERNS.get(family)
+    return (
+        pattern is not None
+        and pattern.fullmatch(inputs.catalog.target.model_id) is not None
+        and _is_exact_target_root_readme(inputs)
+    )
+
+
 def _target_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
     target = inputs.catalog.target
     target_source = _pointer(inputs.metadata_source_id, "/id")
@@ -400,35 +671,223 @@ def _tags(metadata: Mapping[str, Any] | None) -> tuple[str, ...]:
     return tuple(item for item in metadata["tags"] if isinstance(item, str))
 
 
+def _resolved_readme_link(inputs: _Inputs, href: str) -> str | None:
+    """Resolve one explicit README link against its pinned source URI."""
+
+    value = html.unescape(href).strip().rstrip(".,;")
+    if not value or value.startswith(("#", "mailto:")):
+        return None
+    if inputs.readme_uri is None:
+        parsed = urlsplit(value)
+        return value if parsed.scheme == "https" and parsed.netloc else None
+    resolved = urljoin(inputs.readme_uri, value)
+    parsed = urlsplit(resolved)
+    if parsed.scheme != "https" or not parsed.netloc:
+        return None
+    return resolved.replace("/resolve/", "/blob/", 1)
+
+
+def _link_label_matches_target(inputs: _Inputs, label: str) -> bool:
+    """Require an explicit resource label to identify the target release/family."""
+
+    target_name = inputs.catalog.target.model_id.rsplit("/", 1)[-1]
+    target_label = _normalized_header(target_name)
+    label_normalized = _normalized_header(label)
+    if target_label in label_normalized:
+        return True
+    identity_tokens = tuple(
+        item
+        for item in _model_tokens(target_name)
+        if item not in {"base", "pt", "it", "instruct", "chat"}
+        and item not in _size_tokens(target_name)
+        and not (item.isdigit() and len(item) == 4)
+    )
+    if (
+        not identity_tokens
+        or (len(identity_tokens) < 2 and not any(
+            any(character.isdigit() for character in item)
+            for item in identity_tokens
+        ))
+        or not set(identity_tokens) <= set(_model_tokens(label))
+    ):
+        return False
+    label_sizes = _size_tokens(label)
+    target_sizes = _size_tokens(target_name)
+    if target_sizes and label_sizes and target_sizes.isdisjoint(label_sizes):
+        return False
+    label_stage = _label_stage(label)
+    return label_stage is None or label_stage == _target_stage(inputs)
+
+
+def _readme_prose_start(readme: str) -> int:
+    """Return the first byte after optional Hugging Face YAML front matter."""
+
+    if not readme.startswith("---"):
+        return 0
+    marker = readme.find("\n---", 3)
+    return marker + 4 if marker >= 0 else 0
+
+
+def _explicit_developer(
+    inputs: _Inputs,
+) -> tuple[str, tuple[SourcePointer, ...]] | None:
+    if inputs.readme is None or inputs.readme_source_id is None:
+        return None
+    prose_start = _readme_prose_start(inputs.readme)
+    prose = inputs.readme[prose_start:]
+    match = re.search(
+        r"(?im)^\s*\*{0,2}(?:model\s+developer|authors?)\*{0,2}\s*:\s*"
+        r"(?P<value>[^\n]{1,240})\s*$",
+        prose,
+    )
+    if match is None:
+        return None
+    absolute_start = prose_start + match.start()
+    if not _position_is_target_scoped(inputs, absolute_start):
+        return None
+    value = _clean_readme_text(match.group("value")).strip().rstrip(".")
+    if not value or len(value) > 200:
+        return None
+    return value, (
+        SourcePointer(
+            inputs.readme_source_id,
+            f"text:{absolute_start}-{prose_start + match.end()}",
+        ),
+    )
+
+
+def _explicit_license(
+    inputs: _Inputs,
+) -> tuple[str, tuple[SourcePointer, ...]] | None:
+    """Return an explicitly labeled model/weights license, never a code license."""
+
+    if inputs.readme is None or inputs.readme_source_id is None:
+        return None
+    readme = inputs.readme
+    source_id = inputs.readme_source_id
+    prose_start = _readme_prose_start(readme)
+    prose = readme[prose_start:]
+
+    labeled = re.search(
+        r"(?im)^\s*\*{0,2}license\*{0,2}\s*:\s*(?P<body>[^\n]{1,800})\s*$",
+        prose,
+    )
+    if labeled is not None and not _position_is_target_scoped(
+        inputs,
+        prose_start + labeled.start(),
+    ):
+        labeled = None
+    if labeled is not None:
+        body = labeled.group("body")
+        if (
+            re.search(r"(?i)\b(?:models?|weights?|checkpoints?)\b", body) is None
+            and not _prose_scope_matches_target(
+                inputs,
+                body,
+                allow_family_size_omission=True,
+            )
+        ):
+            labeled = None
+    if labeled is not None:
+        body = labeled.group("body")
+        cleaned = _clean_readme_text(body).strip().rstrip(".")
+        link = next(
+            (
+                _resolved_readme_link(inputs, item.group(2))
+                for item in _MARKDOWN_LINK_RE.finditer(body)
+            ),
+            None,
+        )
+        value = (
+            f"{cleaned}: {link}"
+            if cleaned and link and link not in cleaned
+            else cleaned
+        )
+        if value:
+            return value, (
+                SourcePointer(
+                    source_id,
+                    f"text:{prose_start + labeled.start()}-"
+                    f"{prose_start + labeled.end()}",
+                ),
+            )
+
+    section = _section_span(readme, "license")
+    if section is None:
+        return None
+    body, start, _end = section
+    statement = re.search(
+        r"(?is)(?P<sentence>[^.\n]{0,400}\bmodels?\b[^.\n]{0,300}?"
+        r"\bsubject\s+to\s+\[(?P<label>[^]\n]*model[^]\n]*license[^]\n]*)\]"
+        r"\((?P<href>[^)\s]+)\)[^.\n]*\.)",
+        body,
+    )
+    if statement is None:
+        return None
+    sentence = statement.group("sentence")
+    family_tokens = tuple(
+        item
+        for item in _model_tokens(inputs.catalog.target.model_id.rsplit("/", 1)[-1])
+        if any(character.isalpha() for character in item)
+        and item not in {"base", "chat", "instruct", "it", "pt"}
+    )
+    if not family_tokens or family_tokens[0] not in set(_model_tokens(sentence)):
+        return None
+    link = _resolved_readme_link(inputs, statement.group("href"))
+    if link is None:
+        return None
+    label = _clean_readme_text(statement.group("label")).strip()
+    commercial_match = _affirmative_commercial_use(body)
+    commercial = commercial_match is not None
+    qualifier = "; commercial use supported" if commercial else ""
+    value = f"{label}{qualifier}: {link}"
+    pointers = [
+        SourcePointer(
+            source_id,
+            f"text:{start + statement.start()}-{start + statement.end()}",
+        )
+    ]
+    if commercial and commercial_match is not None:
+        pointers.append(
+            SourcePointer(
+                source_id,
+                f"text:{start + commercial_match.start()}-"
+                f"{start + commercial_match.end()}",
+            )
+        )
+    return value, tuple(pointers)
+
+
 def _identity_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
     metadata = inputs.metadata
-    if metadata is None:
-        return
     source_id = inputs.metadata_source_id
-    author = _string(metadata.get("author"))
-    if author is not None:
+    explicit_developer = _explicit_developer(inputs)
+    if explicit_developer is not None:
         yield _Candidate(
-            "identity.developed_by", author, "developer_from_metadata_author",
-            _pointer(source_id, "/author"),
+            "identity.developed_by",
+            explicit_developer[0],
+            "developer_from_explicit_readme_label",
+            explicit_developer[1],
         )
+    else:
+        author = _string((metadata or {}).get("author"))
+        if author is not None:
+            yield _Candidate(
+                "identity.developed_by", author, "developer_from_metadata_author",
+                _pointer(source_id, "/author"),
+            )
 
     card_data = _card_data(metadata)
-    pipeline = _string(metadata.get("pipeline_tag")) or _string(
+    pipeline = _string((metadata or {}).get("pipeline_tag")) or _string(
         card_data.get("pipeline_tag")
     )
-    config_type = _string((inputs.config or {}).get("model_type"))
-    if pipeline and config_type:
-        model_type = f"{pipeline} task; {config_type} config model type"
-        sources = (
-            *_pointer(source_id, "/pipeline_tag"),
-            *_pointer(inputs.config_source_id, "/model_type"),
-        )
-    elif pipeline:
-        model_type = f"{pipeline} task"
+    architectures = _architectures(inputs.config)
+    if pipeline:
+        model_type = pipeline
         sources = _pointer(source_id, "/pipeline_tag")
-    elif config_type:
-        model_type = f"{config_type} config model type"
-        sources = _pointer(inputs.config_source_id, "/model_type")
+    elif any("forcausallm" in item.casefold() for item in architectures):
+        model_type = "text-generation"
+        sources = _pointer(inputs.config_source_id, "/architectures")
     else:
         model_type = None
         sources = ()
@@ -438,18 +897,31 @@ def _identity_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
             sources,
         )
 
-    license_name = _string(card_data.get("license"))
-    license_pointer = "/cardData/license"
-    if license_name is None:
-        license_tags = [item.split(":", 1)[1] for item in _tags(metadata) if item.startswith("license:")]
-        if len(set(license_tags)) == 1:
-            license_name = license_tags[0]
-            license_pointer = "/tags"
-    if license_name is not None:
+    explicit_license = _explicit_license(inputs)
+    if explicit_license is not None:
         yield _Candidate(
-            "identity.license", license_name, "license_from_card_metadata",
-            _pointer(source_id, license_pointer),
+            "identity.license",
+            explicit_license[0],
+            "license_from_explicit_readme_statement",
+            explicit_license[1],
         )
+    else:
+        license_name = _string(card_data.get("license"))
+        license_pointer = "/cardData/license"
+        if license_name is None:
+            license_tags = [
+                item.split(":", 1)[1]
+                for item in _tags(metadata)
+                if item.startswith("license:")
+            ]
+            if len(set(license_tags)) == 1:
+                license_name = license_tags[0]
+                license_pointer = "/tags"
+        if license_name is not None:
+            yield _Candidate(
+                "identity.license", license_name, "license_from_card_metadata",
+                _pointer(source_id, license_pointer),
+            )
 
 
 def _summary_from_overview(inputs: _Inputs) -> tuple[str, int, int] | None:
@@ -577,39 +1049,111 @@ def _summary_from_download_table(inputs: _Inputs) -> tuple[str, int, int] | None
 def _summary_from_prose(inputs: _Inputs) -> tuple[str, int, int] | None:
     if inputs.readme is None:
         return None
+    readme = inputs.readme
     target_name = inputs.catalog.target.model_id.rsplit("/", 1)[-1]
-    explicit_base = _label_stage(target_name) == "base"
-    best: tuple[int, str, int, int] | None = None
-    for text, start, end in _paragraphs(inputs.readme):
-        if start > 8_000:
-            break
-        if not _model_label_matches(
-            inputs,
-            text,
-            section_stage=_target_stage(inputs) if _label_stage(text) else None,
+
+    escaped_target = re.escape(target_name)
+    instruct_relation = re.search(
+        rf"(?im)^The\s+{escaped_target}\s+Large\s+Language\s+Model\s+\(LLM\)\s+"
+        r"is\s+an?\s+instruct\s+fine-tuned\s+version\s+of\s+(?:the\s+)?"
+        r"(?P<base>[A-Za-z0-9._-]+)\.\s*$",
+        readme,
+    )
+    if instruct_relation is not None:
+        base = instruct_relation.group("base")
+        return (
+            f"{target_name} is the publisher-documented instruction-fine-tuned "
+            f"version of {base}.",
+            instruct_relation.start(),
+            instruct_relation.end(),
+        )
+
+    base_relation = re.search(
+        rf"(?im)^The\s+{escaped_target}\s+Large\s+Language\s+Model\s+\(LLM\)\s+"
+        r"is\s+an?\s+(?P<base>[A-Za-z0-9._-]+)\s+with\s+extended\s+vocabulary\.\s*$",
+        readme,
+    )
+    if base_relation is not None:
+        base = base_relation.group("base")
+        return (
+            f"{target_name} is the publisher-documented {base} successor with an "
+            "extended vocabulary.",
+            base_relation.start(),
+            base_relation.end(),
+        )
+
+    section = _section_span(readme, "description") or _section_span(
+        readme, "model information"
+    )
+    section_body, section_start = (section[0], section[1]) if section else (readme, 0)
+    family_tokens = tuple(
+        item
+        for item in _model_tokens(target_name)
+        if any(character.isalpha() for character in item)
+        and item not in {"base", "chat", "instruct", "it", "pt"}
+    )
+    candidates: list[tuple[int, str, int, int]] = []
+    for _paragraph, relative_start, relative_end in _paragraphs(section_body):
+        if relative_start > 8_000 or not family_tokens:
+            continue
+        raw = section_body[relative_start:relative_end]
+        for text, start, end in _sentence_spans(
+            raw,
+            offset=section_start + relative_start,
         ):
-            continue
-        lowered = text.casefold()
-        if explicit_base and _label_stage(text) != "base":
-            continue
-        if _target_stage(inputs) == "base" and "pretrained" in lowered and "instruction tuned" in lowered:
-            continue
-        if _target_stage(inputs) == "posttrained" and "pretrained" in lowered and "instruction tuned" in lowered:
-            continue
-        score = len(set(_model_tokens(target_name)) & set(_model_tokens(text)))
-        if best is None or score > best[0]:
-            stage = (
-                "post-trained"
-                if _target_stage(inputs) == "posttrained"
-                else "pretrained"
-            )
-            task = (_pipeline_tag(inputs) or "model inference").replace("-", " ")
-            value = (
-                f"The publisher README identifies {target_name} as a {stage} "
-                f"checkpoint for {task}."
-            )
-            best = score, value, start, end
-    return None if best is None else (best[1], best[2], best[3])
+            tokens = set(_model_tokens(text))
+            if (
+                family_tokens[0] not in tokens
+                or "model" not in text.casefold()
+                or not _prose_scope_matches_target(
+                    inputs,
+                    text,
+                    allow_family_size_omission=True,
+                )
+            ):
+                continue
+            lowered = text.casefold()
+            descriptors: list[str] = []
+            target_stage = _label_stage(target_name)
+            source_stage = _label_stage(text)
+            if target_stage == "posttrained" and (
+                source_stage == "posttrained" or "instruction-tuned variants" in lowered
+            ):
+                descriptors.append("instruction-tuned")
+            elif target_stage == "base" and (
+                source_stage == "base" or "pre-trained variants" in lowered
+            ):
+                descriptors.append("pretrained")
+            if "multimodal" in lowered:
+                descriptors.append("multimodal")
+            if "multilingual" in lowered:
+                descriptors.append("multilingual")
+            if "open weights" in lowered or "open-weight" in lowered:
+                descriptors.append("open-weight")
+
+            capabilities: list[str] = []
+            if re.search(r"(?i)(?:text\s+and\s+image|image\s+and\s+text)\s+input", text):
+                capabilities.append("text-and-image input")
+            if re.search(r"(?i)text\s+in\s*/\s*text\s+out", text):
+                capabilities.append("text input and output")
+            elif re.search(r"(?i)(?:generat(?:e|ing)\s+text\s+output|text\s+out)", text):
+                capabilities.append("text output")
+
+            if not descriptors and not capabilities and source_stage is None:
+                continue
+            descriptor_text = ", ".join(dict.fromkeys(descriptors))
+            article = "an" if descriptor_text[:1].casefold() in {"a", "e", "i", "o", "u"} else "a"
+            value = f"The publisher describes {target_name} as {article}"
+            value += f" {descriptor_text} model" if descriptor_text else " model"
+            if capabilities:
+                value += " with " + " and ".join(dict.fromkeys(capabilities))
+            value += "."
+            score = len(set(_model_tokens(target_name)) & tokens) + len(descriptors) + len(capabilities)
+            candidates.append((score, value, start, end))
+    if not candidates:
+        return None
+    _score, value, start, end = max(candidates, key=lambda item: (item[0], -item[2]))
+    return value, start, end
 
 
 def _readme_identity_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
@@ -645,9 +1189,9 @@ def _readme_identity_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
             )
 
 
-def _base_model_ids(
+def _base_model_surfaces(
     metadata: Mapping[str, Any] | None,
-) -> tuple[tuple[str, ...], str | None]:
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
     def clean(values: Iterable[Any]) -> tuple[str, ...]:
         return tuple(
             sorted(
@@ -663,8 +1207,6 @@ def _base_model_ids(
     card_data = _card_data(metadata)
     declared = card_data.get("base_model")
     explicit = clean(list(declared) if isinstance(declared, list) else [declared])
-    if explicit:
-        return explicit, "/cardData/base_model"
 
     tagged = []
     for tag in _tags(metadata):
@@ -675,11 +1217,114 @@ def _base_model_ids(
             value = value.split(":", 1)[1]
         tagged.append(value)
     fallback = clean(tagged)
+    return explicit, fallback
+
+
+def _base_model_ids(
+    metadata: Mapping[str, Any] | None,
+) -> tuple[tuple[str, ...], str | None]:
+    explicit, fallback = _base_model_surfaces(metadata)
+
+    # Hugging Face exposes the same relation through two metadata surfaces.
+    # Neither surface is authoritative when they disagree: publishing either
+    # identifier would turn a visible source conflict into a silent choice.
+    if explicit and fallback and explicit != fallback:
+        return (), None
+    if explicit:
+        return explicit, "/cardData/base_model"
     return fallback, "/tags" if fallback else None
 
 
+def _readme_base_relation(
+    inputs: _Inputs,
+) -> tuple[str, tuple[SourcePointer, ...], str | None] | None:
+    """Resolve an exact README-declared predecessor through its Hub link."""
+
+    if inputs.readme is None or inputs.readme_source_id is None:
+        return None
+    target_name = inputs.catalog.target.model_id.rsplit("/", 1)[-1]
+    relation = re.search(
+        rf"(?im)^The\s+{re.escape(target_name)}\s+Large\s+Language\s+Model\s+"
+        r"\(LLM\)\s+is\s+an?\s+(?P<base>[A-Za-z0-9._-]+)\s+with\s+"
+        r"(?P<change>extended\s+vocabulary)\.\s*$",
+        inputs.readme,
+    )
+    if relation is None:
+        return None
+    base_label = relation.group("base")
+    target_namespace = inputs.catalog.target.model_id.split("/", 1)[0]
+    link_match = next(
+        (
+            item
+            for item in _MARKDOWN_LINK_RE.finditer(inputs.readme)
+            if _normalized_header(item.group(1)) == _normalized_header(base_label)
+        ),
+        None,
+    )
+    if link_match is None:
+        return None
+    parsed = urlsplit(link_match.group(2))
+    parts = [item for item in parsed.path.split("/") if item]
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc.casefold() != "huggingface.co"
+        or len(parts) < 2
+    ):
+        return None
+    model_id = "/".join(parts[:2])
+    if (
+        model_id.split("/", 1)[0] != target_namespace
+        or _normalized_header(model_id.rsplit("/", 1)[-1])
+        != _normalized_header(base_label)
+        or not _MODEL_ID_RE.fullmatch(model_id)
+    ):
+        return None
+    vocabulary = re.search(
+        r"(?im)^\s*[-*+]\s*Extended\s+vocabulary\s+to\s+"
+        r"(?P<count>[0-9][0-9,]*)\s*$",
+        inputs.readme,
+    )
+    change = None
+    pointers = [
+        SourcePointer(
+            inputs.readme_source_id,
+            f"text:{relation.start()}-{relation.end()}",
+        ),
+        SourcePointer(
+            inputs.readme_source_id,
+            f"text:{link_match.start()}-{link_match.end()}",
+        ),
+    ]
+    if vocabulary is not None:
+        count = int(vocabulary.group("count").replace(",", ""))
+        change = f"vocabulary extended to {count:,} entries"
+        pointers.append(
+            SourcePointer(
+                inputs.readme_source_id,
+                f"text:{vocabulary.start()}-{vocabulary.end()}",
+            )
+        )
+    return model_id, tuple(pointers), change
+
+
 def _lineage_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
+    explicit_bases, tagged_bases = _base_model_surfaces(inputs.metadata)
+    metadata_bases_conflict = (
+        bool(explicit_bases)
+        and bool(tagged_bases)
+        and explicit_bases != tagged_bases
+    )
     base_model_ids, declaration_pointer = _base_model_ids(inputs.metadata)
+    # A README predecessor cannot resolve a disagreement between the two
+    # official metadata surfaces.  Treat the relation as unresolved until the
+    # metadata conflict itself is adjudicated rather than silently changing
+    # the evidence channel used for publication.
+    readme_relation = (
+        None if metadata_bases_conflict else _readme_base_relation(inputs)
+    )
+    if not base_model_ids and readme_relation is not None:
+        base_model_ids = (readme_relation[0],)
+        declaration_pointer = None
     base_models = tuple(
         {
             "model_id": model_id,
@@ -689,11 +1334,20 @@ def _lineage_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
         if model_id != inputs.catalog.target.model_id
     )
     if base_models:
+        sources = (
+            readme_relation[1]
+            if declaration_pointer is None and readme_relation is not None
+            else _pointer(inputs.metadata_source_id, declaration_pointer or "/tags")
+        )
         yield _Candidate(
             "lineage.base_models",
             list(base_models),
-            "base_models_from_exact_metadata_declarations",
-            _pointer(inputs.metadata_source_id, declaration_pointer or "/tags"),
+            (
+                "base_models_from_exact_readme_relation"
+                if declaration_pointer is None and readme_relation is not None
+                else "base_models_from_exact_metadata_declarations"
+            ),
+            sources,
         )
     model_type = _string((inputs.config or {}).get("model_type"))
     if model_type is not None:
@@ -1033,12 +1687,47 @@ def _heading_matches(value: str, *needles: str) -> bool:
     return any(_normalized_header(item) in normalized for item in needles)
 
 
+def _markdown_headings(readme: str) -> tuple[tuple[int, str, int, int], ...]:
+    """Return ATX headings outside fenced code blocks with exact offsets."""
+
+    headings: list[tuple[int, str, int, int]] = []
+    fence_character: str | None = None
+    fence_length = 0
+    offset = 0
+    for line in readme.splitlines(keepends=True):
+        fence = re.match(r"^ {0,3}(?P<marker>`{3,}|~{3,})", line)
+        if fence is not None:
+            marker = fence.group("marker")
+            if fence_character is None:
+                fence_character = marker[0]
+                fence_length = len(marker)
+            elif marker[0] == fence_character and len(marker) >= fence_length:
+                fence_character = None
+                fence_length = 0
+            offset += len(line)
+            continue
+        if fence_character is None:
+            heading = re.match(r"^(#{1,6})[ \t]+(.+?)[ \t]*(?:\r?\n)?$", line)
+            if heading is not None:
+                headings.append(
+                    (
+                        len(heading.group(1)),
+                        heading.group(2).strip(),
+                        offset + heading.start(),
+                        offset + heading.end(),
+                    )
+                )
+        offset += len(line)
+    return tuple(headings)
+
+
 def _heading_context(readme: str, position: int) -> tuple[str, ...]:
     active: dict[int, str] = {}
-    for match in re.finditer(r"(?m)^(#{1,6})\s+(.+?)\s*$", readme[:position]):
-        level = len(match.group(1))
+    for level, title, start, _end in _markdown_headings(readme):
+        if start >= position:
+            break
         active = {key: value for key, value in active.items() if key < level}
-        active[level] = match.group(2).strip()
+        active[level] = title
     return tuple(active[key] for key in sorted(active))
 
 
@@ -1048,16 +1737,15 @@ def _section_span(
 ) -> tuple[str, int, int] | None:
     """Return the first matching Markdown section body and exact offsets."""
 
-    headings = list(re.finditer(r"(?m)^(#{1,6})\s+(.+?)\s*$", readme))
-    for index, match in enumerate(headings):
-        if not _heading_matches(match.group(2), *titles):
+    headings = _markdown_headings(readme)
+    for index, (level, title, _heading_start, heading_end) in enumerate(headings):
+        if not _heading_matches(title, *titles):
             continue
-        level = len(match.group(1))
-        start = match.end()
+        start = heading_end
         end = len(readme)
-        for following in headings[index + 1 :]:
-            if len(following.group(1)) <= level:
-                end = following.start()
+        for following_level, _following_title, following_start, _following_end in headings[index + 1 :]:
+            if following_level <= level:
+                end = following_start
                 break
         return readme[start:end], start, end
     return None
@@ -1109,6 +1797,58 @@ def _paragraphs(readme: str) -> tuple[tuple[str, int, int], ...]:
     return tuple(blocks)
 
 
+def _sentence_spans(text: str, *, offset: int = 0) -> tuple[tuple[str, int, int], ...]:
+    """Return conservative sentence spans with coordinates in the parent text."""
+
+    spans: list[tuple[str, int, int]] = []
+    start = 0
+    for boundary in re.finditer(r"[.!?](?=\s|$)", text):
+        end = boundary.end()
+        raw = text[start:end]
+        leading = len(raw) - len(raw.lstrip())
+        trailing = len(raw.rstrip())
+        if raw.strip():
+            spans.append(
+                (
+                    _clean_readme_text(raw),
+                    offset + start + leading,
+                    offset + start + trailing,
+                )
+            )
+        start = end
+    raw = text[start:]
+    leading = len(raw) - len(raw.lstrip())
+    trailing = len(raw.rstrip())
+    if raw.strip():
+        spans.append(
+            (
+                _clean_readme_text(raw),
+                offset + start + leading,
+                offset + start + trailing,
+            )
+        )
+    return tuple(spans)
+
+
+def _sentence_containing(
+    readme: str,
+    start: int,
+    end: int,
+) -> tuple[str, int, int] | None:
+    """Return the one prose sentence containing an extracted source span."""
+
+    for _paragraph, paragraph_start, paragraph_end in _paragraphs(readme):
+        if paragraph_start <= start and end <= paragraph_end:
+            raw = readme[paragraph_start:paragraph_end]
+            for sentence, sentence_start, sentence_end in _sentence_spans(
+                raw,
+                offset=paragraph_start,
+            ):
+                if sentence_start <= start and end <= sentence_end:
+                    return sentence, sentence_start, sentence_end
+    return None
+
+
 def _model_tokens(value: str) -> tuple[str, ...]:
     return tuple(re.findall(r"[a-z]+\d*|\d+(?:\.\d+)?[a-z]*", value.casefold()))
 
@@ -1124,6 +1864,15 @@ def _target_stage(inputs: _Inputs) -> str:
         or "conversational" in {item.casefold() for item in _tags(inputs.metadata)}
     ):
         return "posttrained"
+    declared_bases, _pointer_name = _base_model_ids(inputs.metadata)
+    if declared_bases:
+        return "posttrained"
+    if inputs.readme is not None:
+        chat_section = _section_span(inputs.readme, "chat model")
+        if chat_section is not None and _normalized_header(name) in _normalized_header(
+            chat_section[0]
+        ):
+            return "posttrained"
     return "base"
 
 
@@ -1136,12 +1885,224 @@ def _label_stage(value: str) -> str | None:
     return None
 
 
+def _label_stages(value: str) -> frozenset[str]:
+    """Return every explicitly named training stage in a prose span."""
+
+    normalized = _normalized_header(value)
+    stages: set[str] = set()
+    if re.search(r"\b(?:base|pretrained|pre trained|pre training|pt)\b", normalized):
+        stages.add("base")
+    if re.search(
+        r"\b(?:instruct|instruction tuned|chat|post trained|post training|sft|dpo|rlvr)\b",
+        normalized,
+    ):
+        stages.add("posttrained")
+    return frozenset(stages)
+
+
 def _size_tokens(value: str) -> frozenset[str]:
     return frozenset(
         item.casefold()
         for item in re.findall(
             r"(?i)(?<![a-z0-9])\d+(?:\.\d+)?[bm](?![a-z0-9])", value
         )
+    )
+
+
+def _prose_scope_matches_target(
+    inputs: _Inputs,
+    text: str,
+    *,
+    allow_family_size_omission: bool = False,
+) -> bool:
+    """Require prose descriptors to identify the target family and stage.
+
+    A README is an exact source file, not proof that every sentence in it is
+    about the target.  This check permits an exact target label or a genuinely
+    family-scoped statement, while rejecting sibling/comparison and stage
+    leakage.
+    """
+
+    if not _is_exact_target_root_readme(inputs):
+        return False
+    if re.search(
+        r"\b(?:while|whereas|however|in contrast|on the other hand|"
+        r"compared (?:with|to)|for comparison|other models?)\b",
+        text,
+        re.IGNORECASE,
+    ):
+        return False
+    target_name = inputs.catalog.target.model_id.rsplit("/", 1)[-1]
+    if _model_label_matches(
+        inputs,
+        text,
+        section_stage=_target_stage(inputs),
+    ):
+        return True
+
+    target_tokens = _model_tokens(target_name)
+    text_tokens = set(_model_tokens(text))
+    target_sizes = _size_tokens(target_name)
+    text_sizes = _size_tokens(text)
+    if target_sizes and text_sizes and target_sizes.isdisjoint(text_sizes):
+        return False
+    if target_sizes and not target_sizes <= text_sizes:
+        if not allow_family_size_omission:
+            return False
+        if re.search(
+            r"\b(?:models?|family|collection|series|variants?)\b",
+            text,
+            re.IGNORECASE,
+        ) is None and not any(
+            any(character.isdigit() for character in item)
+            for item in target_tokens
+            if item not in target_sizes
+            and item not in {"base", "pt", "it", "instruct", "chat"}
+        ):
+            return False
+
+    identity_tokens = tuple(
+        item
+        for item in target_tokens
+        if item not in {"base", "pt", "it", "instruct", "chat"}
+        and item not in target_sizes
+        and not (item.isdigit() and len(item) == 4)
+    )
+    if not identity_tokens or not set(identity_tokens) <= text_tokens:
+        return False
+
+    # Reject a second named assertion subject in the same sentence.  Merely
+    # mentioning the target elsewhere in a sentence cannot bind descriptors
+    # or numeric values asserted about another model.
+    for assertion in re.finditer(
+        r"\b(?P<subject>[A-Z][A-Za-z0-9._-]{2,}(?:\s+[A-Z0-9][A-Za-z0-9._-]*){0,3})\s+"
+        r"(?:is|are|has|offers|supports|provides)\b",
+        text,
+    ):
+        subject_tokens = set(_model_tokens(assertion.group("subject")))
+        if not set(identity_tokens) & subject_tokens:
+            return False
+
+    stages = _label_stages(text)
+    if stages and _target_stage(inputs) not in stages:
+        return False
+
+    # A one-token family name without a size/version is too weak to establish
+    # which checkpoint a prose descriptor concerns.  Require the exact target
+    # label in that ambiguous case.
+    if not target_sizes and len(identity_tokens) < 2:
+        target_label = _normalized_header(target_name)
+        if target_label not in _normalized_header(text):
+            return False
+    return True
+
+
+_GENERIC_TARGET_SCOPE_HEADINGS = frozenset(
+    {
+        "architecture",
+        "benchmark results",
+        "critical and other risks",
+        "description",
+        "ethics and safety",
+        "evaluation",
+        "evaluation results",
+        "evaluations",
+        "inference",
+        "introduction",
+        "intended use",
+        "intended uses",
+        "license",
+        "limitations",
+        "model card",
+        "model data",
+        "model details",
+        "model description",
+        "model information",
+        "model merging",
+        "model overview",
+        "model summary",
+        "overview",
+        "pretraining",
+        "release documentation",
+        "responsibility safety",
+        "results",
+        "safety",
+        "specifications",
+        "stage 1 initial pretraining",
+        "stage 2 fine tuning",
+        "supported languages",
+        "technical specifications",
+        "training",
+        "training data",
+        "training dataset",
+        "use and risk",
+    }
+)
+
+
+def _position_is_target_scoped(inputs: _Inputs, position: int) -> bool:
+    """Fail closed when an unqualified label sits under a sibling heading."""
+
+    if inputs.readme is None or not _is_exact_target_root_readme(inputs):
+        return False
+    headings = _heading_context(inputs.readme, position)
+    if not headings:
+        return True
+    for heading in reversed(headings):
+        normalized = _normalized_header(heading)
+        normalized = re.sub(r"^\d+\s+", "", normalized)
+        if normalized in _GENERIC_TARGET_SCOPE_HEADINGS:
+            continue
+        if _prose_scope_matches_target(
+            inputs,
+            heading,
+            allow_family_size_omission=True,
+        ):
+            return True
+        return False
+    return True
+
+
+def _target_scoped_section_span(
+    inputs: _Inputs,
+    *titles: str,
+    text: str | None = None,
+    offset: int = 0,
+) -> tuple[str, int, int] | None:
+    """Return a section only when its parent heading path remains target-scoped.
+
+    Family rules recognize the section titles in the closed structural-heading
+    registry. Their enclosing path, however, must not name a sibling or comparison
+    model. ``offset`` maps a nested text slice back to the full README coordinates.
+    """
+
+    readme = inputs.readme if text is None else text
+    if readme is None:
+        return None
+    section = _section_span(readme, *titles)
+    if section is None:
+        return None
+    _body, body_start, _body_end = section
+    if not _position_is_target_scoped(inputs, offset + body_start):
+        return None
+    return section
+
+
+def _markers_are_target_scoped(
+    inputs: _Inputs,
+    text: str,
+    offset: int,
+    markers: Iterable[str],
+) -> bool:
+    """Require each semantic marker to occur in target-scoped prose."""
+
+    folded = text.casefold()
+    return all(
+        any(
+            _position_is_target_scoped(inputs, offset + match.start())
+            for match in re.finditer(re.escape(marker.casefold()), folded)
+        )
+        for marker in markers
     )
 
 
@@ -1171,13 +2132,36 @@ def _model_label_matches(
     if target_sizes and not target_sizes <= label_sizes:
         return False
     target_stage = _target_stage(inputs)
+    explicit_target_stage = _label_stage(target_name)
     candidate_stage = _label_stage(label)
     target_normalized = _normalized_header(target_name)
     label_normalized = _normalized_header(label)
     exact_label = label_normalized == target_normalized
-    if section_stage is not None and section_stage != target_stage:
+    # Some publisher READMEs accidentally nest an exact, unmarked base-model
+    # table below an instruction heading.  Permit only that narrow override.
+    # A post-trained target still obeys an explicit Base Model section because
+    # some family READMEs reuse the same column label for base and chat tables.
+    exact_base_override = (
+        exact_label
+        and explicit_target_stage is None
+        and target_stage == "base"
+    )
+    if (
+        section_stage is not None
+        and section_stage != target_stage
+        and not exact_base_override
+    ):
+        return False
+    if candidate_stage is not None and explicit_target_stage is None and not exact_label:
         return False
     if candidate_stage is not None and candidate_stage != target_stage:
+        return False
+    if (
+        explicit_target_stage is not None
+        and candidate_stage is None
+        and not exact_label
+        and section_stage != target_stage
+    ):
         return False
     if (
         target_stage == "posttrained"
@@ -1402,40 +2386,72 @@ def _html_cells(row: str) -> list[str]:
     return cells
 
 
-def _html_context(readme: str, model_id: str) -> tuple[str, int, int] | None:
-    rows = list(re.finditer(r"<tr\b[^>]*>.*?</tr>", readme, re.I | re.S))
-    size_match = re.search(r"(?:^|[-_])(\d+(?:\.\d+)?[Bb])(?:[-_]|$)", model_id.rsplit("/", 1)[-1])
-    target_size = size_match.group(1).casefold() if size_match else None
-    for index, header_row in enumerate(rows):
-        header = [_normalized_header(item) for item in _html_cells(header_row.group(0))]
-        columns = [number for number, item in enumerate(header) if item == "context length"]
-        if len(columns) != 1:
+def _html_context(inputs: _Inputs) -> tuple[str, int, int] | None:
+    if inputs.readme is None:
+        return None
+    for table in _html_tables(inputs.readme):
+        headers = tuple(_normalized_header(item) for item in table.headers)
+        context_columns = [
+            index
+            for index, item in enumerate(headers)
+            if item in {"context length", "context window"}
+        ]
+        model_columns = [
+            index
+            for index, item in enumerate(headers)
+            if item in {
+                "model",
+                "model name",
+                "size",
+                "model size",
+                "params",
+                "parameters",
+            }
+        ]
+        if headers and not headers[0]:
+            model_columns.insert(0, 0)
+        if len(context_columns) != 1 or not model_columns:
             continue
-        column = columns[0]
-        for row_match in rows[index + 1 :]:
-            cells = _html_cells(row_match.group(0))
-            if not cells:
+        context_column = context_columns[0]
+        section_stage = _table_section_stage(table.headings)
+        if section_stage is not None and section_stage != _target_stage(inputs):
+            continue
+        for cells, start, end in table.rows:
+            if context_column >= len(cells):
                 continue
-            if target_size and target_size not in {item.casefold() for item in cells}:
+            label = " ".join(
+                cells[index]
+                for index in model_columns
+                if index < len(cells) and cells[index]
+            )
+            if not label or not _prose_scope_matches_target(inputs, label):
                 continue
-            if column >= len(cells):
-                continue
-            value = _context_value(cells[column])
+            value = _context_value(cells[context_column])
             if value is not None:
-                return value, row_match.start(), row_match.end()
-        break
+                return value, start, end
     return None
 
 
-def _prose_context(readme: str) -> tuple[str, int, int] | None:
+def _prose_context(inputs: _Inputs) -> tuple[str, int, int] | None:
+    if inputs.readme is None:
+        return None
+    readme = inputs.readme
     declared_line = re.search(
         r"(?im)^\s*[-*+]?\s*\*{0,2}context\s+(?:length|window)\*{0,2}\s*:\s*"
         r"(?P<value>[^\n]+?)\s*$",
         readme,
     )
     if declared_line is not None:
+        headings = " ".join(_heading_context(readme, declared_line.start())).casefold()
         value = _context_value(declared_line.group("value"))
-        if value is not None:
+        if (
+            value is not None
+            and _position_is_target_scoped(inputs, declared_line.start())
+            and not re.search(
+                r"\b(?:benchmark|comparison|compared|other models?|baselines?)\b",
+                headings,
+            )
+        ):
             return value, declared_line.start(), declared_line.end()
 
     patterns = (
@@ -1443,12 +2459,17 @@ def _prose_context(readme: str) -> tuple[str, int, int] | None:
         re.compile(r"(?i)context\s+window\s+lengths?\s+up\s+to\s+[*_`]*(\d[\d,]*(?:\.\d+)?\s*[KkMm]?)"),
     )
     for pattern in patterns:
-        match = pattern.search(readme)
-        if match is None:
-            continue
-        value = _context_value(match.group(1))
-        if value is not None:
-            return value, match.start(), match.end()
+        for match in pattern.finditer(readme):
+            sentence = _sentence_containing(readme, match.start(), match.end())
+            if sentence is None or not _prose_scope_matches_target(
+                inputs,
+                sentence[0],
+                allow_family_size_omission=True,
+            ):
+                continue
+            value = _context_value(match.group(1))
+            if value is not None:
+                return value, match.start(), match.end()
     return None
 
 
@@ -1478,8 +2499,8 @@ def _context(inputs: _Inputs) -> tuple[str | None, str, tuple[SourcePointer, ...
     if inputs.readme is not None and inputs.readme_source_id is not None:
         found = (
             _markdown_context(inputs)
-            or _html_context(inputs.readme, inputs.catalog.target.model_id)
-            or _prose_context(inputs.readme)
+            or _html_context(inputs)
+            or _prose_context(inputs)
         )
         if found is not None:
             value, start, end = found
@@ -1505,7 +2526,98 @@ def _stage(model_id: str) -> str | None:
     return None
 
 
+def _readme_input_output(
+    inputs: _Inputs,
+) -> tuple[list[str], tuple[SourcePointer, ...]] | None:
+    """Read exact-target modality cells from a model-information table."""
+
+    if inputs.readme is None or inputs.readme_source_id is None:
+        return None
+    for table in (*_markdown_tables(inputs.readme), *_html_tables(inputs.readme)):
+        if not any(_heading_matches(item, "model information") for item in table.headings):
+            continue
+        headers = tuple(_normalized_header(item) for item in table.headers)
+        input_columns = [
+            index for index, item in enumerate(headers) if item == "input modalities"
+        ]
+        output_columns = [
+            index for index, item in enumerate(headers) if item == "output modalities"
+        ]
+        if len(input_columns) != 1 or len(output_columns) != 1:
+            continue
+        input_column = input_columns[0]
+        output_column = output_columns[0]
+        model_columns = [
+            index
+            for index, item in enumerate(headers)
+            if item
+            in {
+                "model",
+                "model name",
+                "size",
+                "model size",
+                "params",
+                "parameters",
+            }
+        ]
+        if headers and not headers[0]:
+            model_columns.insert(0, 0)
+        if not model_columns:
+            continue
+        section_stage = _table_section_stage(table.headings)
+        if section_stage is not None and section_stage != _target_stage(inputs):
+            continue
+        matched: list[tuple[str, str, int, int]] = []
+        for cells, start, end in table.rows:
+            if max(input_column, output_column) >= len(cells):
+                continue
+            row_label = " ".join(
+                cells[index]
+                for index in model_columns
+                if index < len(cells) and cells[index]
+            )
+            if not row_label or not _prose_scope_matches_target(inputs, row_label):
+                continue
+            input_value = _clean_readme_text(cells[input_column])
+            output_value = _clean_readme_text(cells[output_column])
+            if input_value and output_value:
+                matched.append((input_value, output_value, start, end))
+        if len(matched) != 1:
+            continue
+        input_value, output_value, start, end = matched[0]
+        values = [f"input: {input_value}", f"output: {output_value}"]
+        pointers = [
+            SourcePointer(inputs.readme_source_id, f"text:{start}-{end}")
+        ]
+        languages = re.search(
+            r"(?im)^\s*\*{0,2}supported\s+languages\*{0,2}\s*:\s*"
+            r"(?P<value>[^\n]{1,500})\s*$",
+            inputs.readme,
+        )
+        if languages is not None and _position_is_target_scoped(
+            inputs,
+            languages.start(),
+        ):
+            value = _clean_readme_text(languages.group("value")).strip().rstrip(".")
+            if value:
+                values.append(f"supported languages: {value}")
+                pointers.append(
+                    SourcePointer(
+                        inputs.readme_source_id,
+                        f"text:{languages.start()}-{languages.end()}",
+                    )
+                )
+        return values, tuple(pointers)
+    return None
+
+
 def _input_output(inputs: _Inputs) -> tuple[list[str] | None, tuple[SourcePointer, ...]]:
+    readme_values = _readme_input_output(inputs)
+    if readme_values is not None:
+        values, readme_sources = readme_values
+    else:
+        values = []
+        readme_sources = ()
     pipeline = (_pipeline_tag(inputs) or "").casefold()
     mapping = {
         "text-generation": ["input: text", "output: text"],
@@ -1515,8 +2627,11 @@ def _input_output(inputs: _Inputs) -> tuple[list[str] | None, tuple[SourcePointe
         "automatic-speech-recognition": ["input: audio", "output: text"],
         "image-classification": ["input: image", "output: labels"],
     }
-    values = list(mapping.get(pipeline, ()))
-    sources = list(_pointer(inputs.metadata_source_id, "/pipeline_tag")) if values else []
+    if not values:
+        values = list(mapping.get(pipeline, ()))
+    sources = list(readme_sources)
+    if values and not readme_sources:
+        sources.extend(_pointer(inputs.metadata_source_id, "/pipeline_tag"))
     if not values:
         architectures = " ".join(_architectures(inputs.config)).casefold()
         if "forcausallm" in architectures:
@@ -1626,17 +2741,27 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
     source_id = inputs.readme_source_id
     if readme is None or source_id is None:
         return None
+    is_olmo = _is_exact_family_target(inputs, "olmo2_1124")
+    is_gemma = _is_exact_family_target(inputs, "gemma3")
+    is_llama = _is_exact_family_target(inputs, "llama31")
+    is_qwen = _is_exact_family_target(inputs, "qwen3")
+    is_deepseek = _is_exact_family_target(inputs, "deepseek_v3")
 
     # OLMo instruction checkpoints explicitly enumerate their post-training
     # sources and stages in the release paragraph.  Select that paragraph only
     # for the post-trained target, never for the base checkpoint.
-    if _target_stage(inputs) == "posttrained":
-        release = _section_span(readme, "release documentation")
+    if is_olmo and _target_stage(inputs) == "posttrained":
+        release = _target_scoped_section_span(inputs, "release documentation")
         if release is not None:
             body, start, _ = release
             for text, relative_start, relative_end in _paragraphs(body):
-                if _model_label_matches(inputs, text, section_stage="posttrained") and re.search(
-                    r"(?i)dataset|data|fine.?tun|DPO|RLVR", text
+                absolute_start = start + relative_start
+                if (
+                    _position_is_target_scoped(inputs, absolute_start)
+                    and _model_label_matches(
+                        inputs, text, section_stage="posttrained"
+                    )
+                    and re.search(r"(?i)dataset|data|fine.?tun|DPO|RLVR", text)
                 ):
                     raw = body[relative_start:relative_end]
                     dataset_ids = sorted(
@@ -1661,16 +2786,20 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
                     )
 
     # OLMo base checkpoints have narrowly scoped Stage 1/Stage 2 sections.
-    stage_one = _section_span(readme, "stage 1 initial pretraining")
-    stage_two = _section_span(readme, "stage 2 fine tuning")
-    if _target_stage(inputs) == "base" and stage_one is not None:
+    stage_one = _target_scoped_section_span(
+        inputs, "stage 1 initial pretraining"
+    )
+    stage_two = _target_scoped_section_span(inputs, "stage 2 fine tuning")
+    if is_olmo and _target_stage(inputs) == "base" and stage_one is not None:
         selected = [stage_one]
         if stage_two is not None:
             selected.append(stage_two)
         datasets: list[str] = []
-        for body, _, _ in selected:
+        for body, section_start, _ in selected:
             dataset_line = re.search(r"(?im)^\s*-\s*Dataset:\s*(.+?)\s*$", body)
-            if dataset_line is not None:
+            if dataset_line is not None and _position_is_target_scoped(
+                inputs, section_start + dataset_line.start()
+            ):
                 datasets.append(_clean_readme_text(dataset_line.group(1)))
         pieces: list[str] = []
         if datasets:
@@ -1681,14 +2810,20 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
                 rf"(?im)^\s*-\s*{re.escape(exact_size)}\s+Model:\s*(.+?)\s*$",
                 stage_one[0],
             )
-            if target_line is not None:
+            if target_line is not None and _position_is_target_scoped(
+                inputs, stage_one[1] + target_line.start()
+            ):
                 epochs = re.search(r"(?i)(~?[0-9.]+\s+epochs?)", target_line.group(1))
                 if epochs is not None:
                     pieces.append(
                         f"The {exact_size.upper()} schedule covers {epochs.group(1)}."
                     )
         mix = re.search(r"(?im)^\s*-\s*Mix composition:\s*(.+?)\s*$", stage_two[0] if stage_two else "")
-        if mix is not None:
+        if (
+            mix is not None
+            and stage_two is not None
+            and _position_is_target_scoped(inputs, stage_two[1] + mix.start())
+        ):
             percentage = re.search(r"([0-9]+%)", mix.group(1))
             prefix = (
                 f"Second-stage allocation assigns {percentage.group(1)} to "
@@ -1700,6 +2835,8 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
                 + "quality-filtered material alongside academic, Q&A, instruction, "
                 "and mathematics content."
             )
+        if not pieces:
+            return None
         value = " ".join(pieces)
         return (
             value,
@@ -1711,8 +2848,8 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
     # exact 4B repository is the source, and the prose explicitly scopes the
     # description to "these models" and lists the target size in the same
     # section.
-    training_dataset = _section_span(readme, "training dataset")
-    if training_dataset is not None:
+    training_dataset = _target_scoped_section_span(inputs, "training dataset")
+    if is_gemma and training_dataset is not None:
         body, start, end = training_dataset
         components = []
         for label, rendered in (
@@ -1721,13 +2858,20 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
             ("mathematics", "mathematics"),
             ("images", "images"),
         ):
-            if re.search(rf"(?im)^\s*[-*]?\s*\**{re.escape(label)}\**\s*:", body):
+            component = re.search(
+                rf"(?im)^\s*[-*]?\s*\**{re.escape(label)}\**\s*:", body
+            )
+            if component is not None and _position_is_target_scoped(
+                inputs, start + component.start()
+            ):
                 components.append(rendered)
         languages = re.search(r"(?i)(over|more than)\s+([0-9,]+)\s+languages", body)
         pieces = []
         if components:
             pieces.append("Publisher-listed source categories: " + ", ".join(components) + ".")
-        if languages is not None:
+        if languages is not None and _position_is_target_scoped(
+            inputs, start + languages.start()
+        ):
             pieces.append(
                 f"Language coverage is reported above {languages.group(2)} languages."
             )
@@ -1741,11 +2885,13 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
 
     # Llama's dedicated section distinguishes pretraining from fine-tuning in
     # adjacent sentences.  Do not attach fine-tuning data to the base target.
-    training = _section_span(readme, "training data")
-    if training is not None:
+    training = _target_scoped_section_span(inputs, "training data")
+    if is_llama and training is not None:
         body, start, _ = training
         scale = re.search(r"(?i)pretrained on\s+(~?[0-9.]+\s+trillion tokens)", body)
-        if scale is not None:
+        if scale is not None and _position_is_target_scoped(
+            inputs, start + scale.start()
+        ):
             value = (
                 f"Pretraining scale: {scale.group(1)} from publisher-described "
                 "public-source data."
@@ -1754,6 +2900,10 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
                 r"(?i)(over|more than)\s+([0-9.]+[MBK]?)\s+synthetically generated examples",
                 body,
             )
+            if synthetic is not None and not _position_is_target_scoped(
+                inputs, start + synthetic.start()
+            ):
+                synthetic = None
             if _target_stage(inputs) == "posttrained":
                 value += " Fine-tuning sources include public instruction datasets"
                 if synthetic is not None:
@@ -1767,11 +2917,15 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
 
     # Qwen Base provides an explicit corpus bullet with both composition and
     # scale.  It is not projected onto the separate post-trained repository.
-    if _target_stage(inputs) == "base":
+    if is_qwen and _target_stage(inputs) == "base":
         corpus = _line_span(
             readme,
             re.compile(r"(?im)^\s*-\s*\*\*Expanded Higher-Quality Pre-training Corpus:\*\*.+$"),
         )
+        if corpus is not None:
+            raw, start, end = corpus
+            if not _position_is_target_scoped(inputs, start):
+                corpus = None
         if corpus is not None:
             raw, start, end = corpus
             scale = re.search(r"(?i)([0-9.]+\s+trillion tokens)", raw)
@@ -1798,10 +2952,10 @@ def _readme_training_data(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ..
         r"(?is)(We pre-train DeepSeek-V3 on\s+[^,\n]{1,240}?tokens)(?:,|\.)",
         readme,
     )
-    if deepseek is not None and _model_label_matches(
-        inputs,
-        deepseek.group(1),
-        section_stage=_target_stage(inputs),
+    if (
+        is_deepseek
+        and deepseek is not None
+        and _position_is_target_scoped(inputs, deepseek.start(1))
     ):
         scale = re.search(r"(?i)([0-9.]+\s+trillion)\s+.*?tokens", deepseek.group(1))
         value = (
@@ -1825,6 +2979,7 @@ def _training_size(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str
         return None
     target_name = inputs.catalog.target.model_id.rsplit("/", 1)[-1]
     target_sizes = sorted(_size_tokens(target_name))
+    is_gemma = _is_exact_family_target(inputs, "gemma3")
 
     # A row-oriented specification table, used by OLMo, binds the token count
     # to the exact model-size row.
@@ -1849,13 +3004,13 @@ def _training_size(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str
 
     # Gemma states the count for every size in one sentence; dynamically select
     # only the size token carried by the exact target ID.
-    for size in target_sizes:
+    for size in (target_sizes if is_gemma else ()):
         match = re.search(
             rf"(?i)(?<![A-Za-z0-9]){re.escape(size)}\s+model was trained with\s+"
             r"([0-9][0-9.,]*\s+(?:trillion|billion|million)\s+tokens)",
             readme,
         )
-        if match is not None:
+        if match is not None and _position_is_target_scoped(inputs, match.start()):
             return (
                 f"{size.upper()} model: {_clean_readme_text(match.group(1))}",
                 (SourcePointer(source_id, f"text:{match.start()}-{match.end()}"),),
@@ -1865,20 +3020,33 @@ def _training_size(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str
     # Exact family statements used by DeepSeek, Llama, and Qwen.  Values are
     # copied from the matched source span rather than maintained in code.
     patterns = (
-        re.compile(r"(?i)pre-?train(?:ed)?\s+DeepSeek-V3\s+on\s+([~0-9.]+\s*(?:T|trillion))\s+[^,.]{0,50}?tokens"),
-        re.compile(r"(?i)Llama\s+3\.1\s+was pretrained on\s+([~0-9.]+\s*(?:T|trillion)\s+tokens)"),
-        re.compile(r"(?i)Qwen3\s+is pre-trained on\s+([~0-9.]+\s*(?:T|trillion)\s+tokens)"),
+        (
+            "deepseek_v3",
+            re.compile(r"(?i)pre-?train(?:ed)?\s+DeepSeek-V3\s+on\s+([~0-9.]+\s*(?:T|trillion))\s+[^,.]{0,50}?tokens"),
+        ),
+        (
+            "llama31",
+            re.compile(r"(?i)Llama\s+3\.1\s+was pretrained on\s+([~0-9.]+\s*(?:T|trillion)\s+tokens)"),
+        ),
+        (
+            "qwen3",
+            re.compile(r"(?i)Qwen3\s+is pre-trained on\s+([~0-9.]+\s*(?:T|trillion)\s+tokens)"),
+        ),
     )
-    for pattern in patterns:
+    for family, pattern in patterns:
+        if not _is_exact_family_target(inputs, family):
+            continue
         match = pattern.search(readme)
-        if match is None:
+        if match is None or not _position_is_target_scoped(inputs, match.start()):
             continue
         value = _clean_readme_text(match.group(1))
         if not value.casefold().endswith("tokens"):
             value += " tokens"
         if _target_stage(inputs) == "posttrained" and "Llama" in match.group(0):
             extra = re.search(r"(?i)fine-tuning data includes[^.]*?(over\s+[0-9.]+[MBK]?\s+synthetically generated examples)", readme)
-            if extra is not None:
+            if extra is not None and _position_is_target_scoped(
+                inputs, extra.start()
+            ):
                 value += "; fine-tuning includes " + _clean_readme_text(extra.group(1))
                 sources = (
                     SourcePointer(source_id, f"text:{match.start()}-{match.end()}"),
@@ -1898,11 +3066,13 @@ def _data_cutoff(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...]] | Non
     patterns = (
         re.compile(r"(?im)^\s*-?\s*\*\*Date cutoff:\*\*\s*(.+?)\s*$"),
         re.compile(r"(?im)^\s*\*\*Data Freshness:\*\*\s*(.+?)\s*$"),
-        re.compile(r"(?im)^\s*\*\*Knowledge cutoff\*\*\s*:?\s*(.+?)\s*$"),
+        re.compile(
+            r"(?im)^\s*\*\*Knowledge cutoff\s*:?\*\*\s*:?\s*(.+?)\s*$"
+        ),
     )
     for pattern in patterns:
         match = pattern.search(inputs.readme)
-        if match is not None:
+        if match is not None and _position_is_target_scoped(inputs, match.start()):
             value = _clean_readme_text(match.group(1)).rstrip(".")
             if value:
                 return value, (
@@ -1916,6 +3086,11 @@ def _adaptations(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str] 
     source_id = inputs.readme_source_id
     if readme is None or source_id is None:
         return None
+    is_olmo = _is_exact_family_target(inputs, "olmo2_1124")
+    is_gemma = _is_exact_family_target(inputs, "gemma3")
+    is_llama = _is_exact_family_target(inputs, "llama31")
+    is_qwen = _is_exact_family_target(inputs, "qwen3")
+    is_deepseek = _is_exact_family_target(inputs, "deepseek_v3")
 
     if _target_stage(inputs) == "posttrained":
         # Exact one-sentence fine-tuning declarations (Mistral and OLMo).
@@ -1923,8 +3098,12 @@ def _adaptations(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str] 
             re.compile(r"(?im)^The\s+[^\n]*Instruct[^\n]*is an instruct fine-tuned version of[^\n]*\.\s*$"),
         ):
             match = pattern.search(readme)
-            if match is not None and _model_label_matches(
-                inputs, match.group(0), section_stage="posttrained"
+            if (
+                match is not None
+                and _position_is_target_scoped(inputs, match.start())
+                and _model_label_matches(
+                    inputs, match.group(0), section_stage="posttrained"
+                )
             ):
                 base = re.search(
                     r"(?i)fine-tuned version of\s+(?:the\s+)?(.+?)\.?$",
@@ -1941,13 +3120,20 @@ def _adaptations(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str] 
                     "adaptations_from_exact_posttraining_statement",
                 )
 
-        release = _section_span(readme, "release documentation")
+        release = (
+            _target_scoped_section_span(inputs, "release documentation")
+            if is_olmo
+            else None
+        )
         if release is not None:
             body, start, _ = release
             for text, relative_start, relative_end in _paragraphs(body):
-                if all(
-                    marker in text.casefold()
-                    for marker in ("supervised finetuning", "dpo", "rlvr")
+                if (
+                    _position_is_target_scoped(inputs, start + relative_start)
+                    and all(
+                        marker in text.casefold()
+                        for marker in ("supervised finetuning", "dpo", "rlvr")
+                    )
                 ):
                     return (
                         "Post-training stages: supervised fine-tuning, DPO, then RLVR.",
@@ -1962,15 +3148,18 @@ def _adaptations(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str] 
 
         # DeepSeek chat/post-trained checkpoint.  The base target is excluded by
         # the stage gate above.
-        matches = []
-        for pattern in (
-            re.compile(r"(?i)followed by Supervised Fine-Tuning and Reinforcement Learning stages[^.]*\."),
-            re.compile(r"(?is)We introduce an innovative methodology to distill reasoning capabilities[^.]*?DeepSeek-V3[^.]*\."),
-        ):
-            match = pattern.search(readme)
-            if match is not None:
-                matches.append(match)
-        if matches:
+        matches: list[re.Match[str]] = []
+        if is_deepseek:
+            for pattern in (
+                re.compile(r"(?i)followed by Supervised Fine-Tuning and Reinforcement Learning stages[^.]*\."),
+                re.compile(r"(?is)We introduce an innovative methodology to distill reasoning capabilities[^.]*?DeepSeek-V3[^.]*\."),
+                ):
+                match = pattern.search(readme)
+                if match is not None and _position_is_target_scoped(
+                    inputs, match.start()
+                ):
+                    matches.append(match)
+        if len(matches) == 2:
             return (
                 "Post-training uses supervised fine-tuning and reinforcement learning. "
                 "The README also describes distilling long-chain-of-thought reasoning "
@@ -1981,11 +3170,17 @@ def _adaptations(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str] 
 
         # Llama's architecture paragraph explicitly scopes SFT/RLHF to tuned
         # versions; the target ID supplies the instruction-tuned variant.
-        match = re.search(
-            r"(?i)(The tuned versions use supervised fine-tuning \(SFT\) and reinforcement learning with human feedback \(RLHF\)[^.]*\.)",
-            readme,
+        match = (
+            re.search(
+                r"(?i)(The tuned versions use supervised fine-tuning \(SFT\) and reinforcement learning with human feedback \(RLHF\)[^.]*\.)",
+                readme,
+            )
+            if is_llama
+            else None
         )
-        if match is not None:
+        if match is not None and _position_is_target_scoped(
+            inputs, match.start(1)
+        ):
             return (
                 "Instruction tuning combines SFT with RLHF for preference alignment, "
                 "helpfulness, and safety.",
@@ -1994,7 +3189,7 @@ def _adaptations(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str] 
             )
 
         # Qwen exact-target overview carries an explicit training-stage label.
-        overview = _summary_from_overview(inputs)
+        overview = _summary_from_overview(inputs) if is_qwen else None
         if overview is not None:
             _, start, end = overview
             raw = readme[start:end]
@@ -2008,34 +3203,64 @@ def _adaptations(inputs: _Inputs) -> tuple[str, tuple[SourcePointer, ...], str] 
 
         # Gemma exact IT repository plus family description explicitly identify
         # the instruction-tuned variant; no technique is inferred beyond that.
-        if re.search(r"(?i)instruction-tuned\s+variants", readme):
+        if is_gemma:
             description = re.search(r"(?i)instruction-tuned\s+variants", readme)
-            if description is not None and re.search(
-                r"(?i)(?:^|[-_.])(?:it|instruct)(?:$|[-_.])",
-                inputs.catalog.target.model_id.rsplit("/", 1)[-1],
+            sentence = (
+                _sentence_containing(
+                    readme, description.start(), description.end()
+                )
+                if description is not None
+                else None
+            )
+            if (
+                description is not None
+                and sentence is not None
+                and _position_is_target_scoped(inputs, sentence[1])
+                and _prose_scope_matches_target(
+                    inputs,
+                    sentence[0],
+                    allow_family_size_omission=True,
+                )
+                and re.search(
+                    r"(?i)(?:^|[-_.])(?:it|instruct)(?:$|[-_.])",
+                    inputs.catalog.target.model_id.rsplit("/", 1)[-1],
+                )
             ):
                 return (
                     "Instruction-tuned variant (the frozen README does not specify the tuning recipe).",
                     (
                         *_pointer(inputs.metadata_source_id, "/id"),
-                        SourcePointer(source_id, f"text:{description.start()}-{description.end()}"),
+                        SourcePointer(source_id, f"text:{sentence[1]}-{sentence[2]}"),
                     ),
                     "adaptation_stage_from_exact_it_title_and_family_description",
                 )
     else:
+        relation = _readme_base_relation(inputs)
+        if relation is not None and relation[2] is not None:
+            return (
+                f"Derived from {relation[0]}; {relation[2]}.",
+                relation[1],
+                "adaptations_from_exact_readme_base_relation",
+            )
+
         # A base README may list size-specific merge procedures.  Select only
         # the size carried by the exact target ID.
-        for size in sorted(_size_tokens(inputs.catalog.target.model_id)):
+        for size in (
+            sorted(_size_tokens(inputs.catalog.target.model_id)) if is_olmo else ()
+        ):
             match = re.search(
-                rf"(?im)^\s*-\s*{re.escape(size)}\s+Model:\s*[^\n]*"
+                rf"(?im)^\s*-\s*{re.escape(size)}\s+Model:\s*"
+                r"(?P<count>[0-9]+)\s+versions?\s+trained\s+on\s+"
+                r"(?P<tokens>[0-9.]+[KMBT]?)\s+mix,\s*"
                 r"merged via model souping\s*$",
                 readme,
             )
-            if match is not None and "OLMo" in readme[
-                max(0, match.start() - 1_500) : match.start()
-            ]:
+            if match is not None and _position_is_target_scoped(
+                inputs, match.start()
+            ):
                 return (
-                    f"Three {size.upper()} variants trained on 50B-token mixtures were "
+                    f"{match.group('count')} {size.upper()} variants trained on a "
+                    f"{match.group('tokens')}-token mixture were "
                     "combined using model souping.",
                     (SourcePointer(source_id, f"text:{match.start()}-{match.end()}"),),
                     "adaptations_from_exact_size_model_merging_statement",
@@ -2056,6 +3281,17 @@ def _training_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
     readme_data = _readme_training_data(inputs)
     if readme_data is not None:
         value, sources, rule = readme_data
+        base_model_ids, _base_pointer = _base_model_ids(inputs.metadata)
+        if (
+            _target_stage(inputs) == "posttrained"
+            and base_model_ids
+            and rule
+            in {
+                "training_data_from_dedicated_readme_section",
+                "training_data_from_exact_family_pretraining_statement",
+            }
+        ):
+            value = "Publisher-described family/base pretraining context: " + value
         missing_metadata_values = [item for item in metadata_values if item not in value]
         if missing_metadata_values:
             value += " Declared Hugging Face dataset IDs: " + ", ".join(missing_metadata_values) + "."
@@ -2072,6 +3308,14 @@ def _training_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
     size = _training_size(inputs)
     if size is not None:
         value, sources, rule = size
+        base_model_ids, _base_pointer = _base_model_ids(inputs.metadata)
+        if (
+            _target_stage(inputs) == "posttrained"
+            and base_model_ids
+            and readme_data is not None
+            and readme_data[2] == "training_data_from_dedicated_readme_section"
+        ):
+            value = "Publisher-described family/base pretraining scale: " + value
         yield _Candidate("training_context.training_data_size", value, rule, sources)
 
     cutoff = _data_cutoff(inputs)
@@ -2103,12 +3347,52 @@ def _score_value(value: str) -> int | float | str | None:
     return None
 
 
-def _benchmark_metric(value: str) -> tuple[str, str | None]:
+def _benchmark_qualifiers(
+    value: str,
+) -> tuple[str, str | None, str | None, str | None]:
+    """Split only closed, unambiguous benchmark-name qualifiers.
+
+    README tables commonly place metrics, shot settings, or dataset splits in
+    one trailing parenthetical.  Unknown qualifiers stay inside the benchmark
+    name so strings such as ``MMLU (Pro COT)``, ``XQuAD (all)``, and
+    ``MMMU (pt)`` are not guessed into the wrong schema field.
+    """
+
     cleaned = _clean_readme_text(value)
     match = re.match(r"^(.*?)\s*\(([^()]+)\)\s*$", cleaned)
     if match is None:
-        return cleaned, None
-    return match.group(1).strip(), match.group(2).strip()
+        return cleaned, None, None, None
+
+    metric: str | None = None
+    setting: str | None = None
+    split: str | None = None
+    pieces = tuple(
+        item.strip() for item in match.group(2).split(",") if item.strip()
+    )
+    if not pieces:
+        return cleaned, None, None, None
+    for piece in pieces:
+        shot_match = re.fullmatch(r"(?i)([0-9]+)\s*[- ]?\s*shots?", piece)
+        if shot_match is not None and setting is None:
+            setting = f"{int(shot_match.group(1))} shots"
+            continue
+        if piece.casefold() in {"train", "test", "dev", "val", "validation"} \
+                and split is None:
+            split = piece
+            continue
+        if (
+            re.fullmatch(
+                r"(?i)(?:acc(?:uracy)?\.?|exact match|em|f1|chrf(?:\+\+)?|"
+                r"bleu|rouge(?:-[a-z0-9]+)?|pass@[0-9]+|recall(?:@[0-9]+)?|"
+                r"precision(?:@[0-9]+)?|bpb|perplexity|ppl|win rate|score)",
+                piece,
+            )
+            or ("/" in piece and re.fullmatch(r"[A-Za-z0-9_.+@/-]+", piece))
+        ) and metric is None:
+            metric = piece
+            continue
+        return cleaned, None, None, None
+    return match.group(1).strip(), metric, setting, split
 
 
 def _setting_text(shots: str | None, headings: Iterable[str]) -> str:
@@ -2132,7 +3416,7 @@ def _setting_text(shots: str | None, headings: Iterable[str]) -> str:
 def _row_oriented_scores(
     inputs: _Inputs,
     table: _ReadmeTable,
-) -> tuple[dict[str, Any], ...]:
+) -> tuple[_ScoreCandidate, ...]:
     headers = tuple(_normalized_header(item) for item in table.headers)
     if not headers or headers[0] != "model":
         return ()
@@ -2143,13 +3427,23 @@ def _row_oriented_scores(
         return ()
     section_stage = _table_section_stage(table.headings)
     matched_rows = [
-        cells
-        for cells, _, _ in table.rows
+        (cells, start, end)
+        for cells, start, end in table.rows
         if cells and _model_label_matches(inputs, cells[0], section_stage=section_stage)
     ]
+    target_label = _normalized_header(
+        inputs.catalog.target.model_id.rsplit("/", 1)[-1]
+    )
+    exact_rows = [
+        row
+        for row in matched_rows
+        if _normalized_header(row[0][0]) == target_label
+    ]
+    if exact_rows:
+        matched_rows = exact_rows
     if len(matched_rows) != 1:
         return ()
-    cells = matched_rows[0]
+    cells, row_start, row_end = matched_rows[0]
     skip = {
         "model",
         "train flops",
@@ -2167,27 +3461,30 @@ def _row_oriented_scores(
     }
     scores = []
     for index in range(1, min(len(table.headers), len(cells))):
-        benchmark = _clean_readme_text(table.headers[index])
+        benchmark, metric, setting, split = _benchmark_qualifiers(
+            table.headers[index]
+        )
         if _normalized_header(benchmark) in skip:
             continue
         score = _score_value(cells[index])
         if score is None:
             continue
-        scores.append(
-            {
-                "benchmark": benchmark,
-                "metric": "README-reported score",
-                "score": score,
-                "setting": _setting_text(None, table.headings),
-            }
-        )
+        row = {
+            "benchmark": benchmark,
+            "metric": metric or "README-reported score",
+            "score": score,
+            "setting": setting or _setting_text(None, table.headings),
+        }
+        if split is not None:
+            row["split"] = split
+        scores.append(_ScoreCandidate(row, row_start, row_end))
     return tuple(scores)
 
 
 def _column_oriented_scores(
     inputs: _Inputs,
     table: _ReadmeTable,
-) -> tuple[dict[str, Any], ...]:
+) -> tuple[_ScoreCandidate, ...]:
     normalized = tuple(_normalized_header(item) for item in table.headers)
     benchmark_columns = [
         index for index, item in enumerate(normalized) if item in {"benchmark", "benchmark metric"}
@@ -2200,6 +3497,16 @@ def _column_oriented_scores(
         for index, item in enumerate(table.headers)
         if _model_label_matches(inputs, item, section_stage=section_stage)
     ]
+    target_label = _normalized_header(
+        inputs.catalog.target.model_id.rsplit("/", 1)[-1]
+    )
+    exact_model_columns = [
+        index
+        for index in model_columns
+        if _normalized_header(table.headers[index]) == target_label
+    ]
+    if exact_model_columns:
+        model_columns = exact_model_columns
     if len(model_columns) != 1:
         return ()
     benchmark_column = benchmark_columns[0]
@@ -2207,18 +3514,23 @@ def _column_oriented_scores(
     metric_column = next(
         (index for index, item in enumerate(normalized) if item == "metric"), None
     )
+    language_column = next(
+        (index for index, item in enumerate(normalized) if item == "language"), None
+    )
     shots_column = next(
         (index for index, item in enumerate(normalized) if item in {"shots", "shot"}), None
     )
+    split_column = next(
+        (index for index, item in enumerate(normalized) if item in {"split", "dataset split"}),
+        None,
+    )
     scores = []
-    for cells, _, _ in table.rows:
+    for cells, row_start, row_end in table.rows:
         if max(benchmark_column, model_column) >= len(cells):
             continue
-        if normalized[benchmark_column] == "benchmark metric":
-            benchmark, embedded_metric = _benchmark_metric(cells[benchmark_column])
-        else:
-            benchmark = _clean_readme_text(cells[benchmark_column])
-            embedded_metric = None
+        benchmark, embedded_metric, embedded_setting, embedded_split = (
+            _benchmark_qualifiers(cells[benchmark_column])
+        )
         if not benchmark or _normalized_header(benchmark) in {
             "architecture",
             "activated params",
@@ -2240,52 +3552,108 @@ def _column_oriented_scores(
             if "shot" in metric_cell.casefold():
                 shots = metric_cell
             elif metric_cell:
+                if metric is not None and metric.casefold() != metric_cell.casefold():
+                    continue
                 metric = metric_cell
-        scores.append(
-            {
-                "benchmark": benchmark,
-                "metric": metric or "README-reported score",
-                "score": score,
-                "setting": _setting_text(shots, table.headings),
-            }
-        )
+        explicit_setting = _setting_text(shots, ()) if shots else None
+        if (
+            embedded_setting is not None
+            and explicit_setting is not None
+            and embedded_setting.casefold() != explicit_setting.casefold()
+        ):
+            continue
+        setting = embedded_setting or explicit_setting or _setting_text(None, table.headings)
+        split = embedded_split
+        if split_column is not None and split_column < len(cells):
+            explicit_split = _clean_readme_text(cells[split_column])
+            if explicit_split:
+                if split is not None and split.casefold() != explicit_split.casefold():
+                    continue
+                split = explicit_split
+        if language_column is not None and language_column < len(cells):
+            language = _clean_readme_text(cells[language_column])
+            if language:
+                setting = f"{setting}; language: {language}"
+        row = {
+            "benchmark": benchmark,
+            "metric": metric or "README-reported score",
+            "score": score,
+            "setting": setting,
+        }
+        if split is not None:
+            row["split"] = split
+        scores.append(_ScoreCandidate(row, row_start, row_end))
     return tuple(scores)
 
 
 def _benchmark_scores(
     inputs: _Inputs,
-    *,
-    limit: int = 12,
-) -> tuple[tuple[dict[str, Any], ...], tuple[SourcePointer, ...]]:
+) -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[SourcePointer, ...],
+    tuple[PublicationConflictRecord, ...],
+]:
     if inputs.readme is None or inputs.readme_source_id is None:
-        return (), ()
-    scores: list[dict[str, Any]] = []
-    pointers: list[SourcePointer] = []
-    seen: set[tuple[str, str, str]] = set()
+        return (), (), ()
+    retained: dict[
+        tuple[str, str, str, str],
+        tuple[int, dict[str, Any], SourcePointer],
+    ] = {}
+    conflicted: dict[
+        tuple[str, str, str, str],
+        tuple[set[SourcePointer], set[str]],
+    ] = {}
+    ordinal = 0
+    # The frozen source bundle already bounds README size.  Preserve every
+    # qualifying exact-target relation instead of imposing a publication cap.
     tables = (*_markdown_tables(inputs.readme), *_html_tables(inputs.readme))
     for table in sorted(tables, key=lambda item: item.start):
         parsed = _row_oriented_scores(inputs, table) or _column_oriented_scores(inputs, table)
-        accepted = 0
-        for score in parsed:
+        for parsed_score in parsed:
+            score = parsed_score.value
+            pointer = SourcePointer(
+                inputs.readme_source_id,
+                f"text:{parsed_score.start}-{parsed_score.end}",
+            )
             key = (
                 score["benchmark"].casefold(),
                 score["metric"].casefold(),
                 str(score["setting"]).casefold(),
+                str(score.get("split", "")).casefold(),
             )
-            if key in seen:
+            if key in conflicted:
+                conflict_sources, conflict_hashes = conflicted[key]
+                conflict_sources.add(pointer)
+                conflict_hashes.add(_digest(score))
                 continue
-            seen.add(key)
-            scores.append(score)
-            accepted += 1
-            if len(scores) >= limit:
-                break
-        if accepted:
-            pointers.append(
-                SourcePointer(inputs.readme_source_id, f"text:{table.start}-{table.end}")
+            previous = retained.get(key)
+            if previous is None:
+                retained[key] = (ordinal, score, pointer)
+                ordinal += 1
+                continue
+            if previous[1]["score"] == score["score"]:
+                # An exact duplicate relation adds no information.
+                continue
+            # Two values for the same benchmark coordinates are ambiguous. Drop
+            # the relation entirely rather than selecting by README order.
+            del retained[key]
+            conflicted[key] = (
+                {previous[2], pointer},
+                {_digest(previous[1]), _digest(score)},
             )
-        if len(scores) >= limit:
-            break
-    return tuple(scores), tuple(pointers)
+    ordered = tuple(sorted(retained.values(), key=lambda item: item[0]))
+    scores = tuple(item[1] for item in ordered)
+    pointers = tuple(dict.fromkeys(item[2] for item in ordered))
+    conflicts = tuple(
+        PublicationConflictRecord(
+            field_path="evaluation.benchmark_scores",
+            reason="benchmark_coordinate_scores_disagree",
+            sources=tuple(sources),
+            value_sha256s=tuple(value_hashes),
+        )
+        for _, (sources, value_hashes) in sorted(conflicted.items())
+    )
+    return scores, pointers, conflicts
 
 
 def _safety_evaluation(
@@ -2304,33 +3672,131 @@ def _safety_evaluation(
                 "safety_evaluation_from_exact_target_score_row",
             )
 
-    outer = _section_span(inputs.readme, "ethics and safety")
-    if outer is None:
+    outer = (
+        _target_scoped_section_span(inputs, "ethics and safety")
+        if _is_exact_family_target(inputs, "gemma3")
+        else None
+    )
+    if outer is not None:
+        outer_body, outer_start, _ = outer
+        inner = _target_scoped_section_span(
+            inputs,
+            "evaluation results",
+            text=outer_body,
+            offset=outer_start,
+        )
+        if inner is not None:
+            body, inner_start, inner_end = inner
+            value = _clean_readme_text(body, limit=1_200)
+            required_markers = (
+                "child safety",
+                "content safety",
+                "representational harms",
+                "previous gemma",
+                "ungrounded inference",
+                "without safety filters",
+                "english language prompts",
+                "all model sizes",
+            )
+            absolute_inner_start = outer_start + inner_start
+            if (
+                value
+                and all(marker in value.casefold() for marker in required_markers)
+                and _markers_are_target_scoped(
+                    inputs,
+                    body,
+                    absolute_inner_start,
+                    required_markers,
+                )
+            ):
+                return (
+                    "The README reports Gemma-family, all-model-size improvements over "
+                    "earlier releases for child safety, content safety, representational "
+                    "harms, and ungrounded inference. The tests omitted safety filters "
+                    "and used English prompts; the source does not provide PT/IT- or "
+                    "checkpoint-specific results.",
+                    (
+                        SourcePointer(
+                            inputs.readme_source_id,
+                            f"text:{outer_start + inner_start}-{outer_start + inner_end}",
+                        ),
+                    ),
+                    "safety_evaluation_from_scoped_readme_results_section",
+                )
+
+    responsibility = (
+        _target_scoped_section_span(inputs, "responsibility & safety")
+        if _is_exact_family_target(inputs, "llama31")
+        else None
+    )
+    if responsibility is None:
         return None
-    outer_body, outer_start, _ = outer
-    inner = _section_span(outer_body, "evaluation results")
-    if inner is None:
+    responsibility_body, responsibility_start, _ = responsibility
+    evaluations = _target_scoped_section_span(
+        inputs,
+        "evaluations",
+        text=responsibility_body,
+        offset=responsibility_start,
+    )
+    critical = _target_scoped_section_span(
+        inputs,
+        "critical and other risks",
+        text=responsibility_body,
+        offset=responsibility_start,
+    )
+    if evaluations is None or critical is None:
         return None
-    body, inner_start, inner_end = inner
-    value = _clean_readme_text(body, limit=1_200)
-    if not value or not re.search(r"(?i)safety|policy violations|representational harms", value):
+    evaluation_body, evaluation_start, evaluation_end = evaluations
+    critical_body, critical_start, critical_end = critical
+    required_evaluation_markers = (
+        "adversarial evaluation",
+        "red teaming",
+    )
+    required_risk_markers = (
+        "cbrne",
+        "child safety",
+        "cyber",
+    )
+    combined_evaluation = evaluation_body.casefold()
+    combined_risks = critical_body.casefold()
+    if not all(item in combined_evaluation for item in required_evaluation_markers):
+        return None
+    if not all(item in combined_risks for item in required_risk_markers):
+        return None
+    if not _markers_are_target_scoped(
+        inputs,
+        evaluation_body,
+        responsibility_start + evaluation_start,
+        required_evaluation_markers,
+    ) or not _markers_are_target_scoped(
+        inputs,
+        critical_body,
+        responsibility_start + critical_start,
+        required_risk_markers,
+    ):
         return None
     return (
-        "The publisher reports improvement over prior Gemma releases for child "
-        "safety, content safety, representational harms, and ungrounded inference. "
-        "Testing omitted safety filters; the stated limitation is English-only prompts.",
+        "The publisher reports family/system-level adversarial safety evaluation and "
+        "recurring red teaming covering CBRNE, child-safety, and cyber risks; this "
+        "section does not state a checkpoint-specific numeric safety score.",
         (
             SourcePointer(
                 inputs.readme_source_id,
-                f"text:{outer_start + inner_start}-{outer_start + inner_end}",
+                f"text:{responsibility_start + evaluation_start}-"
+                f"{responsibility_start + evaluation_end}",
+            ),
+            SourcePointer(
+                inputs.readme_source_id,
+                f"text:{responsibility_start + critical_start}-"
+                f"{responsibility_start + critical_end}",
             ),
         ),
-        "safety_evaluation_from_scoped_readme_results_section",
+        "safety_evaluation_from_scoped_family_risk_sections",
     )
 
 
 def _evaluation_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
-    scores, score_sources = _benchmark_scores(inputs)
+    scores, score_sources, _conflicts = _benchmark_scores(inputs)
     if scores:
         sample = "; ".join(
             f"{item['benchmark']}: {item['score']}"
@@ -2338,7 +3804,8 @@ def _evaluation_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
         )
         yield _Candidate(
             "evaluation.results_summary",
-            f"The frozen README provides {len(scores)} exact-target benchmark scores in this capped publication set; examples: {sample}.",
+            f"The frozen README provides {len(scores)} exact-target benchmark scores; "
+            f"examples: {sample}.",
             "results_summary_from_exact_target_score_selection",
             score_sources,
         )
@@ -2355,7 +3822,8 @@ def _evaluation_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
         if not scores:
             yield _Candidate(
                 "evaluation.results_summary",
-                "The frozen README reports qualitative safety-evaluation results for the exact repository; see safety_evals.",
+                "The frozen README reports family-level qualitative safety-evaluation "
+                "results; see safety_evals.",
                 "results_summary_from_scoped_safety_evaluation",
                 sources,
             )
@@ -2461,6 +3929,69 @@ def _technical_report(inputs: _Inputs) -> tuple[str | None, tuple[SourcePointer,
     )
 
 
+def _explicit_technical_report(
+    inputs: _Inputs,
+) -> tuple[str, tuple[SourcePointer, ...]] | None:
+    """Resolve a uniquely labeled technical-report link in the exact README."""
+
+    if inputs.readme is None or inputs.readme_source_id is None:
+        return None
+    readme = inputs.readme
+    source_id = inputs.readme_source_id
+    candidates: dict[str, list[SourcePointer]] = {}
+
+    for match in _MARKDOWN_LINK_RE.finditer(readme):
+        if (
+            not _heading_matches(match.group(1), "technical report")
+            or not _link_label_matches_target(inputs, match.group(1))
+        ):
+            continue
+        url = _resolved_readme_link(inputs, match.group(2))
+        if url is not None:
+            candidates.setdefault(url, []).append(
+                SourcePointer(source_id, f"text:{match.start()}-{match.end()}")
+            )
+
+    definitions: dict[str, tuple[str, int, int]] = {}
+    for match in re.finditer(
+        r"(?im)^\s*\[(?P<key>[^]\n]+)\]\s*:\s*"
+        r"(?P<url>https://[^\s]+)\s*$",
+        readme,
+    ):
+        definitions[_normalized_header(match.group("key"))] = (
+            match.group("url").rstrip(".,;"),
+            match.start(),
+            match.end(),
+        )
+    for match in re.finditer(
+        r"\[(?P<label>[^]\n]*technical\s+report[^]\n]*)\]"
+        r"\[(?P<key>[^]\n]+)\]",
+        readme,
+        re.I,
+    ):
+        if not _link_label_matches_target(inputs, match.group("label")):
+            continue
+        definition = definitions.get(_normalized_header(match.group("key")))
+        if definition is None:
+            continue
+        url = _resolved_readme_link(inputs, definition[0])
+        if url is None:
+            continue
+        candidates.setdefault(url, []).extend(
+            (
+                SourcePointer(source_id, f"text:{match.start()}-{match.end()}"),
+                SourcePointer(
+                    source_id,
+                    f"text:{definition[1]}-{definition[2]}",
+                ),
+            )
+        )
+    if len(candidates) != 1:
+        return None
+    url, pointers = next(iter(candidates.items()))
+    return url, tuple(sorted(set(pointers)))
+
+
 def _repo_key(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.casefold())
 
@@ -2482,13 +4013,27 @@ def _github_repository(inputs: _Inputs) -> tuple[str | None, tuple[SourcePointer
         owner, repository = parts
         repository = repository[:-4] if repository.casefold().endswith(".git") else repository
         canonical = f"https://github.com/{owner}/{repository}"
-        score = 0
+        owner_score = 0
         if _repo_key(owner) == _repo_key(target_namespace):
-            score += 5
+            owner_score = 5
         target_key = _repo_key(target_name)
         repo_key = _repo_key(repository)
-        if repo_key and (target_key.startswith(repo_key) or repo_key.startswith(target_key)):
-            score += 5
+        relation_score = 0
+        # A family repository may be a strict prefix of a checkpoint name
+        # (Qwen3 for Qwen3-8B, for example).  The reverse direction denotes an
+        # ancillary repository such as ``<target>-evaluation`` and is not the
+        # target's code repository.
+        if repo_key and target_key.startswith(repo_key):
+            relation_score += 5
+        elif (
+            re.fullmatch(r"mistralai/Mistral-7B(?:-Instruct)?-v0\.3", inputs.catalog.target.model_id, re.I)
+            and _repo_key(owner) == "mistralai"
+            and repo_key == "mistralinference"
+        ):
+            relation_score += 4
+        if relation_score == 0:
+            return
+        score = relation_score + owner_score
         if _repo_key(label) in {"github", "code", "repository", "coderepository", "sourcecode"}:
             score += 6
         if score >= 5:
@@ -2515,8 +4060,19 @@ def _link_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
             (SourcePointer(inputs.readme_source_id, "source_uri"),),
         )
 
-    report, report_sources = _technical_report(inputs)
-    if report is not None:
+    explicit_report = _explicit_technical_report(inputs)
+    report: str | None = None
+    report_sources: tuple[SourcePointer, ...] = ()
+    if explicit_report is not None:
+        yield _Candidate(
+            "links.tech_report",
+            explicit_report[0],
+            "technical_report_from_explicit_readme_link",
+            explicit_report[1],
+        )
+    else:
+        report, report_sources = _technical_report(inputs)
+    if explicit_report is None and report is not None:
         yield _Candidate(
             "links.tech_report",
             report,
@@ -2557,6 +4113,38 @@ def _all_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
     yield from _link_candidates(inputs)
 
 
+def _publication_conflicts(
+    inputs: _Inputs,
+) -> tuple[PublicationConflictRecord, ...]:
+    conflicts: list[PublicationConflictRecord] = []
+    explicit_bases, tagged_bases = _base_model_surfaces(inputs.metadata)
+    if explicit_bases and tagged_bases and explicit_bases != tagged_bases:
+        if inputs.metadata_source_id is None:
+            raise PublicationSourceError(
+                "conflicting metadata has no frozen source identity"
+            )
+        conflicts.append(
+            PublicationConflictRecord(
+                field_path="lineage.base_models",
+                reason="metadata_base_model_declarations_disagree",
+                sources=(
+                    SourcePointer(
+                        inputs.metadata_source_id,
+                        "/cardData/base_model",
+                    ),
+                    SourcePointer(inputs.metadata_source_id, "/tags"),
+                ),
+                value_sha256s=(
+                    _digest(list(explicit_bases)),
+                    _digest(list(tagged_bases)),
+                ),
+            )
+        )
+    _scores, _score_sources, score_conflicts = _benchmark_scores(inputs)
+    conflicts.extend(score_conflicts)
+    return tuple(conflicts)
+
+
 def _validated_withheld_fields(withheld_fields: Iterable[str]) -> tuple[str, ...]:
     if isinstance(withheld_fields, (str, bytes)):
         raise PublicationSourceError(
@@ -2590,10 +4178,12 @@ def enrich_publication_card(
 ) -> PublicationEnrichmentResult:
     """Enrich a seven-section card from one verified, frozen source catalog.
 
-    Existing specified values win over derived candidates.  ``Not specified``
+    Existing specified values win over derived candidates, except that an exact
+    publisher ``Model developer`` label upgrades the matching Hugging Face
+    metadata author/namespace to the publisher's display name. ``Not specified``
     is treated as an invitation to enrich, while ``Not applicable`` remains an
-    explicit author decision.  Exact target identity conflicts are rejected.
-    The returned provenance is intentionally separate from the public card.
+    explicit author decision. Exact target identity conflicts are rejected. The
+    returned provenance is intentionally separate from the public card.
     """
 
     inputs = _catalog_inputs(catalog)
@@ -2614,12 +4204,32 @@ def enrich_publication_card(
                 f"{field_path} conflicts with the verified catalog target"
             )
 
+    conflicts = _publication_conflicts(inputs)
+    blocked_fields = {
+        conflict.field_path
+        for conflict in conflicts
+        if conflict.reason == "metadata_base_model_declarations_disagree"
+    }
+    # Conflicts override both derived candidates and caller-supplied draft
+    # values.  Otherwise a pre-populated card could preserve an unresolved
+    # relation even though this run correctly recorded the disagreement.
+    if "lineage.base_models" in blocked_fields:
+        output["lineage"].pop("base_models", None)
     provenance: list[PublicationFieldProvenance] = []
+    metadata_author = _string((inputs.metadata or {}).get("author"))
     for candidate in _all_candidates(inputs):
-        if candidate.field_path in withheld:
+        if candidate.field_path in withheld or candidate.field_path in blocked_fields:
             continue
         current = get_field(output, candidate.field_path, NOT_SPECIFIED)
-        if _specified(current) or current == NOT_APPLICABLE:
+        explicit_developer_upgrade = (
+            candidate.field_path == "identity.developed_by"
+            and candidate.rule == "developer_from_explicit_readme_label"
+            and metadata_author is not None
+            and current == metadata_author
+            and candidate.value != current
+        )
+        if (_specified(current) and not explicit_developer_upgrade) \
+                or current == NOT_APPLICABLE:
             continue
         set_field(output, candidate.field_path, candidate.value)
         provenance.append(
@@ -2631,7 +4241,7 @@ def enrich_publication_card(
         )
     assert_no_source_excerpt(output, catalog)
     validate_publication_card(output)
-    return PublicationEnrichmentResult(output, tuple(provenance))
+    return PublicationEnrichmentResult(output, tuple(provenance), conflicts)
 
 
 def replay_publication_enrichment(
@@ -2663,15 +4273,21 @@ def replay_publication_enrichment(
         raise PublicationSourceError(
             "publication enrichment replay provenance does not match the expected provenance"
         )
+    if expected is not None and replayed.conflicts != expected.conflicts:
+        raise PublicationSourceError(
+            "publication enrichment replay conflicts do not match the expected conflicts"
+        )
     return replayed
 
 
 __all__ = [
     "PUBLICATION_SOURCE_RULESET",
     "PUBLICATION_SOURCE_RULE_NAMES",
+    "PUBLICATION_CONFLICT_VERSION",
     "SOURCE_EXCERPT_MIN_COMPACT_CHARS",
     "SOURCE_EXCERPT_MIN_WORDS",
     "PublicationEnrichmentResult",
+    "PublicationConflictRecord",
     "PublicationFieldProvenance",
     "PublicationSourceError",
     "SourcePointer",

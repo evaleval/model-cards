@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evaleval.github.io/model-cards/evaluation/paired-audit-labels.schema.json",
+  "title": "Blinded paired Model Card audit labels",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "labels_version",
+    "study_status",
+    "blinded",
+    "items",
+    "annotator_confirmation"
+  ],
+  "properties": {
+    "labels_version": {
+      "const": "model-card-paired-audit-labels/v1"
+    },
+    "study_status": {
+      "enum": [
+        "design_only_no_human_results",
+        "annotation_in_progress",
+        "annotation_complete"
+      ]
+    },
+    "blinded": {
+      "type": "boolean"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "annotator_confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completed",
+        "used_only_displayed_evidence",
+        "uncertainty_notes"
+      ],
+      "properties": {
+        "completed": {
+          "type": "boolean"
+        },
+        "used_only_displayed_evidence": {
+          "type": "boolean"
+        },
+        "uncertainty_notes": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "study_status": {
+            "enum": [
+              "design_only_no_human_results",
+              "annotation_in_progress"
+            ]
+          }
+        },
+        "required": [
+          "study_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "items": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "study_status": {
+            "const": "annotation_complete"
+          }
+        },
+        "required": [
+          "study_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "blinded": {
+            "const": true
+          },
+          "items": {
+            "minItems": 1
+          },
+          "annotator_confirmation": {
+            "properties": {
+              "completed": {
+                "const": true
+              },
+              "used_only_displayed_evidence": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "target_blind_id",
+        "condition",
+        "support",
+        "source_binding",
+        "entity_checkpoint",
+        "relation",
+        "field_fit",
+        "score_row",
+        "omission",
+        "conflict_visibility",
+        "risk_grounding",
+        "risk_applicability",
+        "warning_present",
+        "actionable_error"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{7,127}$"
+        },
+        "target_blind_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{7,127}$"
+        },
+        "condition": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"
+        },
+        "support": {
+          "enum": [
+            "fully_supported",
+            "partially_supported",
+            "unsupported",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "source_binding": {
+          "enum": [
+            "correct",
+            "wrong",
+            "missing",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "entity_checkpoint": {
+          "enum": [
+            "correct",
+            "wrong_entity",
+            "wrong_checkpoint",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "relation": {
+          "enum": [
+            "correct",
+            "wrong",
+            "unresolved",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "field_fit": {
+          "enum": [
+            "correct",
+            "wrong",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "score_row": {
+          "enum": [
+            "correct",
+            "wrong",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "omission": {
+          "enum": [
+            "not_omitted",
+            "justified_abstention",
+            "source_present_omission",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "conflict_visibility": {
+          "enum": [
+            "visible",
+            "not_visible",
+            "no_conflict",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "risk_grounding": {
+          "enum": [
+            "adequate",
+            "inadequate",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "risk_applicability": {
+          "enum": [
+            "applies",
+            "does_not_apply",
+            "unclear",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "warning_present": {
+          "type": "boolean"
+        },
+        "actionable_error": {
+          "enum": [
+            "yes",
+            "no",
+            "unclear",
+            "unavailable"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -31,6 +31,15 @@ frozen-source enrichment stage rejects a candidate if any guarded prose field co
 only in the ignored local run artifacts; links, identifiers, citations, and structured
 score rows retain their publication-specific forms.
 
+The four claim gates apply to extracted candidates. A separate, closed and versioned
+publication ruleset computes additional fields from exact frozen metadata, structured
+pointers, and scoped README rows; every such field retains local rule-and-source
+provenance and must replay byte-for-byte. Those registered derivations are not
+semantic gate decisions. Their final narrative claims are checked by FactReasoner
+when that backend is available; an unavailable result remains `generated_unreviewed`
+and does not establish support. Comparative quality claims additionally require
+blinded human evaluation; a ruleset test alone is not a human correctness label.
+
 Evidence about a base model, sibling checkpoint, family, or comparison model cannot
 silently populate an exact-target field. Local automated lifecycle state uses only
 `generated_unreviewed` or `generated_validated`; neither means that a person reviewed,
@@ -59,6 +68,46 @@ python3 -m pip install -e '.[risk]'
 
 Without that exact dependency, the taxonomy stage reports itself as unavailable;
 the core package does not substitute another taxonomy release.
+
+The optional IBM FactReasoner integration requires Python 3.11 or newer and is
+pinned to the official IBM repository at commit
+`41eb0c21baa2a8bba4030cf0d619aa00fae2ed84`:
+
+```sh
+python3 -m pip install -e '.[factreasoner]'
+```
+
+The exact OpenRouter structured checker evaluates deterministic batches of at most
+64 FactReasoner requests. It runs a complete primary wave, sends only neutral
+outcomes through the bounded fallback wave, and caches exact request hashes across
+repeated pipeline passes. Each atom still retains its own categorical NLI relation
+and cited chunk IDs. Because that endpoint does not promise token log probabilities,
+the adapter declares a fixed `0.9` relation factor, runs upstream's FR1 Markov graph,
+and normalizes the atom marginal with pgmpy exact variable elimination. It does not
+require or execute Merlin. If the exact pinned upstream package or pgmpy cannot be
+verified and imported, FactReasoner is recorded as unavailable and no FactReasoner
+provider call is made.
+
+Nexus receives only evidence-bound Model Use Contexts. Each context must start
+from an accepted exact-target intended-use or out-of-scope-use claim. Accepted
+model properties, limitations, and known biases may qualify that core statement;
+their field paths, candidate IDs, and frozen source IDs remain attached to the
+context. Qualifiers alone never trigger risk inference, and an empty or withheld
+applicability decision is not replaced with generic top-ranked risks.
+
+Publisher context has two evidence paths. A conservative deterministic pass accepts
+only complete statements with an explicit model subject under closed use, limitation,
+bias, risk, or mitigation sections in the pinned root README. Pronouns cannot serve as
+the model subject because this local pass has no semantic coreference model. Verified
+official developer reports remain available to the provider-assisted path, where the
+normal semantic binding gates must establish checkpoint scope.
+A versioned stage-disambiguation rule may select one exact contiguous clause
+from a mixed base/Instruct sentence only when the pinned root Hugging Face README,
+official model family, and inline intended-use label all agree; the unsplit mixed
+sentence remains rejected. Provider-assisted mode adds a dedicated bounded recovery pass over source
+windows with use/risk signals. Both paths preserve exact quotes and coordinates and
+run the same four claim gates. Neither path adds risk fields to the public 33-field
+card.
 
 ## Generate one card
 
@@ -112,11 +161,29 @@ OPENROUTER_API_KEY=... modelcards generate MODEL[@REVISION] \
   --output RUN_DIR
 ```
 
+For several provider-assisted targets, reuse one aggregate budget journal. The batch
+command creates `BATCH/aggregate-budget.jsonl` by default; individual `generate`
+commands can share an explicit journal:
+
+```sh
+OPENROUTER_API_KEY=... modelcards batch targets.json \
+  --provider Together \
+  --output BATCH
+
+OPENROUTER_API_KEY=... modelcards generate MODEL[@REVISION] \
+  --provider Together \
+  --aggregate-budget-journal COHORT/aggregate-budget.jsonl \
+  --output RUN_DIR
+```
+
 This mode pins OpenRouter to exactly `deepseek/deepseek-v4-flash-0731` on
 `Together`. The CLI rejects every other provider, the runtime verifies the live
 endpoint identity and structured-output capabilities before each send, and automatic
-fallback is disabled. The runtime has a global run cap of 300 paid calls and USD 25,
-permits at most two
+fallback is disabled. Each target retains its USD 25 and 300-paid-call ledger cap;
+provider batches and explicitly shared journals additionally enforce USD 25 or 300
+paid calls, whichever comes first, across the cohort. Before each paid request, the
+shared journal reserves that send's exact route-bounded cost and one call slot, and
+records no prompt, source text, credential, or local path. The runtime permits at most two
 retries after an explicit HTTP 429 or 5xx response, and stops on an uncertain send
 instead of risking a duplicate. The API key, prompts, source text, and raw response
 envelopes are not written to public cards or audit summaries. Private normalized
@@ -127,8 +194,8 @@ A missing key, invalid route, spend cap, uncertain send, ledger conflict, extrac
 failure, or stale resume aborts the run. A safely recorded malformed, truncated, or
 retry-exhausted response during an individual claim or FactReasoner check becomes an
 explicit `unavailable` decision instead; it cannot count as validation and the card
-remains unreviewed. Provider mode is not exposed by `modelcards batch`; run
-provider-assisted targets individually so one run owns one global ledger.
+remains unreviewed. Provider-assisted batch runs use one shared aggregate journal so
+the cohort cannot silently multiply the paid-call ceiling across targets.
 
 ## Run artifacts
 
@@ -154,7 +221,10 @@ files are:
 Provider-assisted runs additionally retain `provider-orchestration.json`, a single
 `usage.jsonl` accounting ledger, normalized decision sidecars, and
 `provider-result.json` in the run directory. These are run records, not public-card
-content.
+content. A provider batch also retains its shared aggregate budget journal at the
+batch root and a body-free summary bound into batch reporting. Exact sidecar replay
+neither reserves nor records another paid call after any interrupted reservation has
+been reconciled.
 
 ## Inspect, validate, review, and repair records
 
@@ -209,20 +279,27 @@ modelcards report BATCH_A \
   --output quality-report.json
 ```
 
-Offline batch replay accepts repeatable target-specific mappings:
+Offline batch replay accepts repeatable target-specific mappings. The same mappings
+can be combined with `--provider Together` for one bounded provider-assisted cohort:
 
 ```sh
-modelcards batch targets.json --output BATCH_A \
+modelcards batch targets.json --provider Together --output BATCH_A \
   --offline-bundle 'MODEL@COMMIT=HF_BUNDLE' \
   --offline-official-bundle 'MODEL@COMMIT=OFFICIAL_BUNDLE'
 ```
 
-The quality report verifies each typed artifact before aggregating claim outcomes,
+The `model-card-quality-report/v3` report verifies each typed artifact before
+aggregating claim outcomes,
 withholding, omissions, risk-stage status, usage, cost/latency, and paired replay
-stability. It also replays the frozen-source publication enrichment and provenance,
+stability. Provider-assisted reports include validated usage ledgers retained by
+failed targets as well as successful ones, and bind admitted targets to the batch's
+shared-budget snapshot. The report also replays the frozen-source publication enrichment and provenance,
 replays deletion-only publication validation, and verifies that the final
-FactReasoner record accounts for all 33 public fields. It contains hashes and closed
-counters, not source bodies or provider payloads. These are engineering validation
+FactReasoner record accounts for all 33 public fields. Competing frozen-source values
+are withheld and retained only in `publication-conflicts.json` as field/reason codes,
+source pointers, and value hashes; the report exposes only body-free conflict counts
+and reason distributions. It contains hashes and closed counters, not source bodies
+or provider payloads. These are engineering validation
 measures, not human quality judgments or evidence that this generator is better than
 another system.
 
@@ -245,8 +322,8 @@ The checked-in cohort contains twelve source-backed cards:
 | Qwen 3 | [Qwen3-8B-Base](cards/qwen3-8b-base.md) | [Qwen3-8B](cards/qwen3-8b.md) |
 | Llama 3.1 | [Llama-3.1-8B](cards/llama-3.1-8b.md) | [Llama-3.1-8B-Instruct](cards/llama-3.1-8b-instruct.md) |
 
-The regenerated cohort populates 287 of 396 possible fields: 19–28 of 33 per card,
-23.92 on average, with 80 structured benchmark-score rows. The publishing command's
+The regenerated cohort populates 298 of 396 possible fields: 21–28 of 33 per card,
+24.83 on average, with 153 structured benchmark-score rows. The publishing command's
 default substantive-card floor is 15 populated fields; honest source-limited
 missingness is still omitted rather than filled with placeholders.
 
@@ -285,7 +362,6 @@ PYTHONPATH=src python3 scripts/regenerate_frozen_examples.py \
   does not independently search the literature.
 - Bounded official collection can freeze supported HTTPS responses, but the current
   official-document bridge does not extract text from PDFs.
-- Provider-assisted batch execution is intentionally unavailable.
 - Missing provider credentials or an unavailable FactReasoner backend are reported;
   they are not replaced with invented validation results.
 - The example cards are automated candidates. This repository reports no human study,
@@ -298,7 +374,10 @@ PYTHONPATH=src python3 scripts/regenerate_frozen_examples.py \
 
 The [JSON Schema](schema/model-card.schema.json) is the public contract. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for the typed stages, replay invariants, provider
-boundary, and publication boundary.
+boundary, and publication boundary. The offline
+[paired failure audit](evaluation/PAIRED_AUDIT.md) compares compatible engineering
+counts with the released Auto-BenchmarkCards failure categories while refusing to
+turn unmatched schemas or automated checks into a superiority claim.
 
 ## Test
 

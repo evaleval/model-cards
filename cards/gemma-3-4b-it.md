@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [gemma\-3\-4b\-it\.json](<./gemma-3-4b-it.json>)<br>
-SHA-256: `c517dc0a6081bbb74dd7c434426c4cc15aa2113902a4711e5c41c4e2b9653f9e`
+SHA-256: `d8b795479ec12990a532195e190e55c62fee70f2d5029e9f7f749208ae7bbece`
 
 ## Identity
 
@@ -11,10 +11,11 @@ SHA-256: `c517dc0a6081bbb74dd7c434426c4cc15aa2113902a4711e5c41c4e2b9653f9e`
 | --- | --- |
 | Model ID | google/gemma\-3\-4b\-it |
 | Name | gemma\-3\-4b\-it |
-| Developed by | google |
+| Developed by | Google DeepMind |
 | Model type | image\-text\-to\-text |
 | License | gemma |
 | Version | 093f9f388b31de276ce2de164bdc2081324b9767 |
+| Summary | The publisher describes gemma\-3\-4b\-it as a multimodal, open\-weight model with text\-and\-image input and text output\. |
 
 ## Lineage
 
@@ -38,8 +39,8 @@ SHA-256: `c517dc0a6081bbb74dd7c434426c4cc15aa2113902a4711e5c41c4e2b9653f9e`
 
 | Field | Value |
 | --- | --- |
-| Training data | Publisher\-listed source categories: web documents, code, mathematics, images\. Language coverage is reported above 140 languages\. |
-| Training data size | 4B model: 4 trillion tokens |
+| Training data | Publisher\-described family/base pretraining context: Publisher\-listed source categories: web documents, code, mathematics, images\. Language coverage is reported above 140 languages\. |
+| Training data size | Publisher\-described family/base pretraining scale: 4B model: 4 trillion tokens |
 | Adaptations | Instruction\-tuned variant \(the frozen README does not specify the tuning recipe\)\. |
 
 ## Access and Adoption
@@ -54,16 +55,17 @@ SHA-256: `c517dc0a6081bbb74dd7c434426c4cc15aa2113902a4711e5c41c4e2b9653f9e`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The frozen README reports qualitative safety\-evaluation results for the exact repository; see safety\_evals\. |
-| Safety evaluations | The publisher reports improvement over prior Gemma releases for child safety, content safety, representational harms, and ungrounded inference\. Testing omitted safety filters; the stated limitation is English\-only prompts\. |
+| Results summary | The frozen README reports family\-level qualitative safety\-evaluation results; see safety\_evals\. |
+| Safety evaluations | The README reports Gemma\-family, all\-model\-size improvements over earlier releases for child safety, content safety, representational harms, and ungrounded inference\. The tests omitted safety filters and used English prompts; the source does not provide PT/IT\- or checkpoint\-specific results\. |
 
 ## Links
 
 | Field | Value |
 | --- | --- |
 | Model card | [https://huggingface\.co/google/gemma\-3\-4b\-it/blob/093f9f388b31de276ce2de164bdc2081324b9767/README\.md](<https://huggingface.co/google/gemma-3-4b-it/blob/093f9f388b31de276ce2de164bdc2081324b9767/README.md>) |
+| Technical report | [https://goo\.gle/Gemma3Report](<https://goo.gle/Gemma3Report>) |
 | Citation | @article\{gemma\_2025,<br>    title=\{Gemma 3\},<br>    url=\{https://goo\.gle/Gemma3Report\},<br>    publisher=\{Kaggle\},<br>    author=\{Gemma Team\},<br>    year=\{2025\}<br>\} |
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `identity.summary`, `lineage.derivatives`, `training_context.data_cutoff`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `links.system_card`, `links.tech_report`, `links.code_repository`.
+Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `lineage.derivatives`, `training_context.data_cutoff`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `links.system_card`, `links.code_repository`.

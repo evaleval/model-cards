@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [mistral\-7b\-v0\.3\.json](<./mistral-7b-v0.3.json>)<br>
-SHA-256: `053b8c46509691bfebbbc6f98c36a2653861ebd960d5c63d82f93bff565b4745`
+SHA-256: `9927d75f63097c63ccdb47655dff496d1f645c973a589a6b0c4d869ac5325d09`
 
 ## Identity
 
@@ -12,15 +12,16 @@ SHA-256: `053b8c46509691bfebbbc6f98c36a2653861ebd960d5c63d82f93bff565b4745`
 | Model ID | mistralai/Mistral\-7B\-v0\.3 |
 | Name | Mistral\-7B\-v0\.3 |
 | Developed by | mistralai |
-| Model type | mistral config model type |
+| Model type | text\-generation |
 | License | apache\-2\.0 |
 | Version | caa1feb0e54d415e2df31207e5f4e273e33509b1 |
-| Summary | The publisher README identifies Mistral\-7B\-v0\.3 as a pretrained checkpoint for model inference\. |
+| Summary | Mistral\-7B\-v0\.3 is the publisher\-documented Mistral\-7B\-v0\.2 successor with an extended vocabulary\. |
 
 ## Lineage
 
 | Field | Value |
 | --- | --- |
+| Base models | mistralai/Mistral\-7B\-v0\.2 (base model) |
 | Model family | mistral |
 
 ## Specifications
@@ -36,7 +37,9 @@ SHA-256: `053b8c46509691bfebbbc6f98c36a2653861ebd960d5c63d82f93bff565b4745`
 
 ## Training Context
 
-_No specified fields are available in the publication data._
+| Field | Value |
+| --- | --- |
+| Adaptations | Derived from mistralai/Mistral\-7B\-v0\.2; vocabulary extended to 32,768 entries\. |
 
 ## Access and Adoption
 
@@ -59,4 +62,4 @@ _No specified fields are available in the publication data._
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `lineage.base_models`, `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.
+Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.

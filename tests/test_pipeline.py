@@ -79,7 +79,11 @@ The exact target is an instruction-following language model.
 
 ## Uses
 
-The publisher intends this model for personalized assistant responses.
+> The publisher intends this model for personalized assistant responses.
+
+## Limitations
+
+> The model can expose personal details from conversation history.
 
 ## Conflicting summaries
 
@@ -93,6 +97,63 @@ OFFICIAL_PASSAGE = (
     "This official developer document states the exact target supports careful "
     "multilingual instruction following for production assistants."
 )
+OFFICIAL_CONTEXT = """---
+license: custom
+recommended_temperature: 0.6
+---
+# Exact Target System Card
+
+## Intended Uses
+
+The exact target is intended for customer-support assistants that draft responses for human review.
+
+## Out-of-Scope Uses
+
+Do not use the exact target to make autonomous medical decisions.
+
+## Limitations
+
+The exact target may produce inaccurate statements about rapidly changing events.
+
+## Mitigations
+
+Operators should verify model outputs because they may contain inaccurate factual claims.
+
+## Generation Settings
+
+Do not use the temperature parameter without setting top-p first.
+
+## Recommendations
+
+We recommend exploring README_WEIGHTS for additional checkpoints.
+
+## License and Acceptable Use Policy
+
+This model must not be used outside the license terms.
+
+## Community
+
+We recommend joining the developer community for deployment guidance.
+
+## Limitations
+
+### Language Ambiguity and Nuance
+
+Language Ambiguity and Nuance.
+
+## Base Model
+
+### Intended Uses
+
+The base model is intended for unrestricted text completion.
+
+## Sibling Checkpoint
+
+### Out-of-Scope Uses
+
+Do not use acme/Instruct-Large for autonomous medical decisions.
+"""
+OFFICIAL_CONTEXT_URL = "https://github.com/acme/instruct/system-card"
 
 
 class Adapter:
@@ -140,6 +201,41 @@ class UnavailableAdapter(Adapter):
         return RemoteObject(FetchStatus.GATED, reason_code="auth_required")
 
 
+class PublicationConflictAdapter(Adapter):
+    def fetch_model_metadata(self, model_id, revision, *, max_bytes):
+        original = super().fetch_model_metadata(
+            model_id, revision, max_bytes=max_bytes
+        )
+        value = json.loads(original.content)
+        value["id"] = model_id
+        value["modelId"] = model_id
+        value["cardData"] = {"base_model": "acme/Legacy-Base"}
+        value["tags"] = ["base_model:acme/Canonical-Base"]
+        return RemoteObject(
+            FetchStatus.OK,
+            json.dumps(value, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            ),
+        )
+
+    def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
+        if repo_path == "README.md":
+            return RemoteObject(
+                FetchStatus.OK,
+                (
+                    README
+                    + "\n## Evaluation\n"
+                    + "| Benchmark | Metric | Shots | Fixture-Instruct |\n"
+                    + "| --- | --- | ---: | ---: |\n"
+                    + "| Conflict | accuracy | 5 | 71 |\n"
+                    + "| Conflict | accuracy | 5 | 72 |\n"
+                ).encode("utf-8"),
+            )
+        return super().fetch_file(
+            model_id, revision, repo_path, max_bytes=max_bytes
+        )
+
+
 class OfficialLinkedAdapter(Adapter):
     def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
         if repo_path == "README.md":
@@ -168,6 +264,46 @@ class OfficialFixtureAdapter:
             final_url=url,
             redirect_chain=(url,),
             media_type="text/plain",
+        )
+
+
+class OfficialContextLinkedAdapter(Adapter):
+    def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
+        if repo_path == "README.md":
+            return RemoteObject(
+                FetchStatus.OK,
+                (
+                    README
+                    + f"\n[Official system card]({OFFICIAL_CONTEXT_URL})\n"
+                ).encode("utf-8"),
+            )
+        return super().fetch_file(
+            model_id, revision, repo_path, max_bytes=max_bytes
+        )
+
+
+class PublisherContextReadmeAdapter(Adapter):
+    def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
+        if repo_path == "README.md":
+            return RemoteObject(FetchStatus.OK, OFFICIAL_CONTEXT.encode("utf-8"))
+        return super().fetch_file(
+            model_id, revision, repo_path, max_bytes=max_bytes
+        )
+
+
+class OfficialContextFixtureAdapter:
+    def fetch(self, url, *, max_bytes, max_redirects):
+        if url != OFFICIAL_CONTEXT_URL:
+            return OfficialRemoteObject(
+                OfficialFetchStatus.UNAVAILABLE,
+                reason_code="fixture_not_provided",
+            )
+        return OfficialRemoteObject(
+            OfficialFetchStatus.OK,
+            content=OFFICIAL_CONTEXT.encode("utf-8"),
+            final_url=url,
+            redirect_chain=(url,),
+            media_type="text/markdown",
         )
 
 class SupportingFactChecker:
@@ -524,6 +660,206 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result.to_dict(), replayed.to_dict())
         self.assertEqual(journal_before, (combined_run / "journal.jsonl").read_bytes())
 
+    def test_pinned_hub_readme_is_an_offline_publisher_context_source(self) -> None:
+        hf_bundle = self.root / "readme-context-bundle"
+        run = self.root / "readme-context-run"
+        collect_hf_source_bundle(
+            "acme/Instruct", hf_bundle, PublisherContextReadmeAdapter()
+        )
+        first = run_offline_pipeline(
+            hf_bundle,
+            run,
+            fact_checker=SupportingFactChecker(),
+            risk_catalog=RISK_CATALOG,
+        )
+        extraction = json.loads((run / "extraction.json").read_text())
+        ids = set(extraction["publisher_context"]["candidate_ids"])
+        candidates = [
+            item for item in extraction["candidates"] if item["candidate_id"] in ids
+        ]
+        self.assertEqual(4, len(candidates))
+        self.assertEqual(
+            {"hugging_face_snapshot"},
+            {
+                evidence["source_role"]
+                for candidate in candidates
+                for evidence in candidate["evidence"]
+            },
+        )
+        serialized_candidates = json.dumps(candidates)
+        for denied in (
+            "temperature parameter",
+            "README_WEIGHTS",
+            "license terms",
+            "developer community",
+            "Language Ambiguity and Nuance",
+            "unrestricted text completion",
+            "Instruct-Large",
+        ):
+            self.assertNotIn(denied, serialized_candidates)
+        self.assertEqual("risk_provider_unavailable", first.risk.reason)
+        self.assertEqual(b"", (run / "usage.jsonl").read_bytes())
+        journal_before = (run / "journal.jsonl").read_bytes()
+        second = run_offline_pipeline(
+            hf_bundle,
+            run,
+            fact_checker=SupportingFactChecker(),
+            risk_catalog=RISK_CATALOG,
+        )
+        self.assertEqual(first.to_dict(), second.to_dict())
+        self.assertEqual(journal_before, (run / "journal.jsonl").read_bytes())
+        self.assertEqual(b"", (run / "usage.jsonl").read_bytes())
+
+    def test_unaccepted_provider_context_cannot_shadow_deterministic_readme_context(
+        self,
+    ) -> None:
+        bundle = self.root / "provider-shadow-bundle"
+        run = self.root / "provider-shadow-run"
+        collect_hf_source_bundle(
+            "acme/Instruct", bundle, PublisherContextReadmeAdapter()
+        )
+        catalog = build_source_document_catalog(replay_source_bundle(bundle))
+        readme = next(
+            item
+            for item in catalog.documents
+            if item.source_uri.endswith("/README.md")
+        )
+        proposal = QuoteProposal(
+            source_id=readme.source_id,
+            field_path="use_and_risk.intended_uses[0]",
+            value="The exact target is intended for an unsupported invented use.",
+            quote="The exact target is intended for an unsupported invented use.",
+            claim_entity=f"acme/Instruct@{REVISION}",
+            relation=RelationToTarget.EXACT_TARGET,
+        )
+        batch = ExtractionBatch.build(
+            target=catalog.target,
+            source_catalog_sha256=catalog.catalog_sha256,
+            provider="Together",
+            inference_config_sha256="b" * 64,
+            proposals=(proposal,),
+        )
+
+        result = run_offline_pipeline(
+            bundle,
+            run,
+            quote_batches=(batch,),
+            fact_checker=SupportingFactChecker(),
+            risk_catalog=RISK_CATALOG,
+        )
+
+        extraction = json.loads((run / "extraction.json").read_text())
+        deterministic_ids = set(extraction["publisher_context"]["candidate_ids"])
+        deterministic_fields = {
+            item["field_path"]
+            for item in extraction["candidates"]
+            if item["candidate_id"] in deterministic_ids
+        }
+        self.assertIn("use_and_risk.intended_uses[0]", deterministic_fields)
+        provider_candidate = materialize_quote_batch(batch, catalog).candidates[0]
+        provider_ref = next(
+            item
+            for item in result.claims
+            if item.candidate_id == provider_candidate.candidate_id
+        )
+        self.assertFalse(provider_ref.projection_eligible)
+        self.assertFalse(provider_ref.included)
+
+    def test_official_context_requires_provider_assisted_semantic_binding(self) -> None:
+        hf_bundle = self.root / "context-hf-bundle"
+        official_bundle = self.root / "context-official-bundle"
+        combined_run = self.root / "context-run"
+        collect_hf_source_bundle(
+            "acme/Instruct", hf_bundle, OfficialContextLinkedAdapter()
+        )
+        discovery = discover_official_sources(replay_source_bundle(hf_bundle))
+        collect_official_sources(
+            discovery,
+            official_bundle,
+            OfficialContextFixtureAdapter(),
+        )
+
+        first = run_offline_pipeline(
+            hf_bundle,
+            combined_run,
+            official_bundle_directory=official_bundle,
+            fact_checker=SupportingFactChecker(),
+            risk_catalog=RISK_CATALOG,
+        )
+        extraction = json.loads((combined_run / "extraction.json").read_text())
+        context_summary = extraction["publisher_context"]
+        self.assertEqual([], context_summary["candidate_ids"])
+        deterministic_ids = set(context_summary["candidate_ids"])
+        deterministic_candidates = [
+            item
+            for item in extraction["candidates"]
+            if item["candidate_id"] in deterministic_ids
+        ]
+        self.assertEqual([], deterministic_candidates)
+        private_serialized = json.dumps(extraction, sort_keys=True)
+        for denied in (
+            "customer-support assistants",
+            "autonomous medical decisions",
+            "rapidly changing events",
+            "inaccurate factual claims",
+            "temperature parameter",
+            "README_WEIGHTS",
+            "license terms",
+            "developer community",
+            "Language Ambiguity and Nuance",
+            "unrestricted text completion",
+            "Instruct-Large",
+        ):
+            self.assertNotIn(denied, private_serialized)
+        self.assertNotIn("use_and_risk.identified_risks", {
+            item["field_path"] for item in deterministic_candidates
+        })
+
+        gates = json.loads((combined_run / "claim-gates.json").read_text())[
+            "records"
+        ]
+        deterministic_gates = [
+            item
+            for item in gates
+            if item["candidate"]["candidate_id"] in deterministic_ids
+        ]
+        self.assertEqual([], deterministic_gates)
+
+        audit_card = self.audit_card(combined_run)
+        audit_serialized = json.dumps(audit_card, sort_keys=True)
+        for description in (
+            "customer-support assistants",
+            "autonomous medical decisions",
+            "rapidly changing events",
+            "inaccurate factual claims",
+        ):
+            self.assertNotIn(description, audit_serialized)
+        self.assertEqual("no_grounded_use_context", first.risk.reason)
+        self.assertEqual(0, len(first.risk.publisher_context_candidate_ids))
+        self.assertEqual(0, first.risk.taxonomy_candidate_count)
+        self.assertEqual(b"", (combined_run / "usage.jsonl").read_bytes())
+
+        public_serialized = json.dumps(self.public_card(combined_run), sort_keys=True)
+        for description in (
+            "customer-support assistants",
+            "autonomous medical decisions",
+            "rapidly changing events",
+            "inaccurate factual claims",
+        ):
+            self.assertNotIn(description, public_serialized)
+
+        journal_before = (combined_run / "journal.jsonl").read_bytes()
+        second = run_offline_pipeline(
+            hf_bundle,
+            combined_run,
+            official_bundle_directory=official_bundle,
+            fact_checker=SupportingFactChecker(),
+            risk_catalog=RISK_CATALOG,
+        )
+        self.assertEqual(first.to_dict(), second.to_dict())
+        self.assertEqual(journal_before, (combined_run / "journal.jsonl").read_bytes())
+        self.assertEqual(b"", (combined_run / "usage.jsonl").read_bytes())
+
     def test_official_source_excerpt_cannot_cross_the_public_boundary(self) -> None:
         hf_bundle = self.root / "excerpt-hf-bundle"
         official_bundle = self.root / "excerpt-official-bundle"
@@ -661,6 +997,70 @@ class PipelineTests(unittest.TestCase):
         )
         self.assertEqual("conflicting", summary["reason"])
 
+    def test_publication_source_conflicts_are_persisted_replayed_and_withheld(
+        self,
+    ) -> None:
+        bundle = self.root / "publication-conflict-bundle"
+        run = self.root / "publication-conflict-run"
+        collect_hf_source_bundle(
+            "acme/Fixture-Instruct", bundle, PublicationConflictAdapter()
+        )
+
+        result = run_offline_pipeline(
+            bundle,
+            run,
+            fact_checker=SupportingFactChecker(),
+            risk_catalog=RISK_CATALOG,
+        )
+
+        self.assertEqual(0, result.conflict_count)
+        self.assertEqual(2, result.publication_conflict_count)
+        self.assertFalse(result.validation.conflicts_clear)
+        conflict_artifact = json.loads(
+            (run / "publication-conflicts.json").read_text()
+        )
+        self.assertEqual(2, conflict_artifact["conflict_count"])
+        self.assertEqual(
+            result.publication_conflicts_sha256,
+            conflict_artifact["conflicts_sha256"],
+        )
+        self.assertEqual(
+            {
+                "benchmark_coordinate_scores_disagree",
+                "metadata_base_model_declarations_disagree",
+            },
+            {item["reason"] for item in conflict_artifact["records"]},
+        )
+        public_card = json.loads((run / "public-card.json").read_text())
+        self.assertEqual(set(PUBLICATION_SECTIONS), set(public_card))
+        self.assertNotIn("base_models", public_card["lineage"])
+        self.assertNotIn("benchmark_scores", public_card["evaluation"])
+        self.assertNotIn("conflict", json.dumps(public_card).casefold())
+
+        replayed = verify_pipeline_result(
+            result,
+            bundle,
+            run,
+            fact_checker=SupportingFactChecker(),
+            risk_catalog=RISK_CATALOG,
+        )
+        self.assertEqual(result.to_dict(), replayed.to_dict())
+
+        tampered_result = deepcopy(result.to_dict())
+        tampered_result["publication_conflict_count"] = 1
+        with self.assertRaises(PipelineError):
+            PipelineResult.from_dict(tampered_result)
+
+        path = run / "publication-conflicts.json"
+        path.write_text(path.read_text() + " ", encoding="utf-8")
+        with self.assertRaises(RunStateError):
+            run_offline_pipeline(
+                bundle,
+                run,
+                fact_checker=SupportingFactChecker(),
+                risk_catalog=RISK_CATALOG,
+            )
+
     def test_accepted_taxonomy_mapping_projects_as_a_registered_derivation(self) -> None:
         description = (
             "The publisher intends this model for personalized assistant responses."
@@ -690,17 +1090,17 @@ class PipelineTests(unittest.TestCase):
         ][0]
         self.assertEqual("taxonomy-risk-derivation/v1", derivation["derivation_version"])
         self.assertEqual(result.risk.mapping_report_sha256, derivation["risk_report_sha256"])
-        self.assertEqual(
-            context_candidate.candidate_id,
-            derivation["input_claims"][0]["candidate_id"],
-        )
+        derivation_claims = {
+            item["candidate_id"]: item for item in derivation["input_claims"]
+        }
+        self.assertIn(context_candidate.candidate_id, derivation_claims)
         self.assertEqual(
             next(
                 item.gate_record_sha256
                 for item in result.claims
                 if item.candidate_id == context_candidate.candidate_id
             ),
-            derivation["input_claims"][0]["gate_record_sha256"],
+            derivation_claims[context_candidate.candidate_id]["gate_record_sha256"],
         )
         self.assertEqual(
             risks[0]["source_refs"], derivation["supporting_source_refs"]
@@ -750,6 +1150,84 @@ class PipelineTests(unittest.TestCase):
             risk_checker=FixtureRiskChecker(),
         )
         self.assertEqual(result.to_dict(), replayed.to_dict())
+
+    def test_model_use_context_keeps_core_qualifiers_and_evidence_identifiers(self) -> None:
+        intended = (
+            "The publisher intends this model for personalized assistant responses."
+        )
+        limitation = (
+            "The model can expose personal details from conversation history."
+        )
+        intended_input = self.quote_input(
+            field_path="use_and_risk.intended_uses[0]",
+            value=intended,
+            quote=intended,
+        )
+        limitation_input = self.quote_input(
+            field_path="use_and_risk.limitations[0]",
+            value=limitation,
+            quote=limitation,
+        )
+        result = self.run_pipeline(
+            quote_batches=(intended_input[0], limitation_input[0]),
+            prose_checker_decisions=(*intended_input[2], *limitation_input[2]),
+            fact_checker=SupportingFactChecker(),
+            risk_detector=FixtureRiskDetector(),
+            risk_checker=FixtureRiskChecker(),
+        )
+
+        payload = json.loads((self.run / "risk-mapping.json").read_text())
+        self.assertEqual(1, len(payload["use_contexts"]))
+        use_context = payload["use_contexts"][0]
+        self.assertIn(
+            "Publisher-reported intended use: " + intended,
+            use_context["description"],
+        )
+        self.assertIn(
+            "Publisher-reported limitation: " + limitation,
+            use_context["description"],
+        )
+        self.assertIn("Model type: text-generation", use_context["description"])
+        self.assertIn(
+            intended_input[1].candidate_id,
+            use_context["supporting_candidate_ids"],
+        )
+        self.assertIn(
+            limitation_input[1].candidate_id,
+            use_context["supporting_candidate_ids"],
+        )
+        self.assertIn(
+            "use_and_risk.intended_uses[0]", use_context["supporting_fields"]
+        )
+        self.assertIn(
+            "use_and_risk.limitations[0]", use_context["supporting_fields"]
+        )
+        self.assertGreaterEqual(len(use_context["source_refs"]), 2)
+        self.assertEqual(
+            (intended_input[1].candidate_id,),
+            result.risk.publisher_context_candidate_ids,
+        )
+
+    def test_qualifiers_without_an_accepted_core_never_invoke_risk_detection(self) -> None:
+        limitation = (
+            "The model can expose personal details from conversation history."
+        )
+        batch, _candidate, decisions = self.quote_input(
+            field_path="use_and_risk.limitations[0]",
+            value=limitation,
+            quote=limitation,
+        )
+        detector = CountingRiskDetector()
+        result = self.run_pipeline(
+            quote_batches=(batch,),
+            prose_checker_decisions=decisions,
+            fact_checker=SupportingFactChecker(),
+            risk_detector=detector,
+            risk_checker=FixtureRiskChecker(),
+        )
+        self.assertEqual(0, detector.calls)
+        self.assertEqual("no_grounded_use_context", result.risk.reason)
+        self.assertEqual(0, result.risk.taxonomy_candidate_count)
 
     def test_grounded_context_without_risk_provider_emits_no_taxonomy_risk(self) -> None:
         description = (

@@ -4,7 +4,9 @@ from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 import importlib.util
 import io
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from model_cards.risk_mapping import (
     ApplicabilityDecision,
@@ -12,6 +14,7 @@ from model_cards.risk_mapping import (
     INFERENCE_MODEL,
     MappingStatus,
     NEXUS_PACKAGE_VERSION,
+    NexusGenericRiskDetector,
     NexusSelection,
     RiskCatalog,
     RiskMappingError,
@@ -102,6 +105,75 @@ class RiskMappingTests(unittest.TestCase):
         self.assertEqual("", stdout.getvalue())
         self.assertEqual("", stderr.getvalue())
 
+    @unittest.skipUnless(
+        importlib.util.find_spec("ai_atlas_nexus") is not None,
+        "optional pinned Nexus dependency is not installed",
+    )
+    def test_real_nexus_generic_interface_accepts_offline_grounded_context(self) -> None:
+        from ai_atlas_nexus.blocks.inference import (
+            InferenceEngine,
+            TextGenerationInferenceOutput,
+        )
+
+        catalog = load_pinned_nexus_catalog()
+        selected = catalog.risks[0]
+
+        class OfflineInferenceEngine(InferenceEngine):
+            def __init__(self) -> None:
+                # Do not initialize a network client; the real Nexus generic
+                # detector only needs the typed engine and generate interface.
+                self.model_name_or_path = INFERENCE_MODEL
+                self.calls = 0
+
+            def prepare_credentials(self, credentials):
+                return {}
+
+            def create_client(self, credentials=None):
+                return object()
+
+            def generate(
+                self,
+                prompts,
+                response_format=None,
+                postprocessors=None,
+                verbose=True,
+            ):
+                self.calls += 1
+                self.assert_schema(response_format, postprocessors)
+                return [
+                    TextGenerationInferenceOutput(prediction=[selected.name])
+                    for _prompt in prompts
+                ]
+
+            def chat(
+                self,
+                messages,
+                tools=None,
+                response_format=None,
+                postprocessors=None,
+                verbose=True,
+            ):
+                raise AssertionError("generic batch risk detection must call generate")
+
+            @staticmethod
+            def assert_schema(response_format, postprocessors) -> None:
+                if not isinstance(response_format, dict):
+                    raise AssertionError("Nexus did not provide its list schema")
+                if selected.name not in response_format.get("items", {}).get("enum", []):
+                    raise AssertionError("Nexus schema omitted the selected taxonomy risk")
+                if postprocessors != ["list_of_str"]:
+                    raise AssertionError("Nexus did not request its list postprocessor")
+
+        engine = OfflineInferenceEngine()
+        detector = NexusGenericRiskDetector(engine, max_risks=1)
+        use_context = context()
+        selections = detector.detect((use_context,), catalog)
+        self.assertEqual(1, engine.calls)
+        self.assertEqual(
+            (NexusSelection(selected.risk_id, (use_context.context_id,)),),
+            selections,
+        )
+
     def setUp(self) -> None:
         self.catalog = RiskCatalog.build((RISK, OTHER_RISK))
 
@@ -115,6 +187,40 @@ class RiskMappingTests(unittest.TestCase):
         self.assertEqual((), report.included_risks)
         self.assertEqual(0, detector.calls)
         self.assertEqual(0, checker.calls)
+
+    def test_generic_adapter_uses_exact_interface_and_covers_every_context(self) -> None:
+        contexts = tuple(context(f"context:use_{index}") for index in range(5))
+
+        class FakeNexus:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def identify_risks_from_usecases(self, usecases, engine, **kwargs):
+                self.calls.append((tuple(usecases), engine, kwargs))
+                return [[SimpleNamespace(id=RISK.risk_id)] for _item in usecases]
+
+        nexus = FakeNexus()
+        engine = object()
+        detector = NexusGenericRiskDetector(engine, max_risks=2)
+        with patch("model_cards.risk_mapping._new_nexus_instance", return_value=nexus):
+            selections = detector.detect(contexts, self.catalog)
+
+        self.assertEqual([2, 2, 1], [len(item[0]) for item in nexus.calls])
+        for _usecases, actual_engine, kwargs in nexus.calls:
+            self.assertIs(engine, actual_engine)
+            self.assertEqual(
+                {
+                    "taxonomy": "ibm-risk-atlas",
+                    "max_risk": 2,
+                    "zero_shot_only": True,
+                    "batch_inference": True,
+                },
+                kwargs,
+            )
+        self.assertEqual(
+            (NexusSelection(RISK.risk_id, tuple(item.context_id for item in contexts)),),
+            selections,
+        )
 
     def test_specific_nexus_candidate_requires_applicability_and_is_schema_valid(self) -> None:
         use_context = context()

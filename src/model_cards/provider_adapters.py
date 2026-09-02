@@ -9,13 +9,17 @@ runtime in the caller's private run directory.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass, replace
+from decimal import Decimal, InvalidOperation
+import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
-from typing import Any, Callable, Mapping, Sequence
+import stat
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from jsonschema import Draft202012Validator
 
@@ -27,25 +31,36 @@ from .claim_gate import (
 )
 from .extraction import (
     ExtractionBatch,
+    MAX_EXTRACTION_BATCH_PROPOSALS,
     MAX_PROVIDER_PROPOSALS,
+    MAX_USE_RISK_PROVIDER_PROPOSALS,
     PUBLISHER_RISK_FIELD,
     PUBLISHER_RISK_PROPOSAL_FIELDS,
+    ProviderProposalRejection,
     SourceWindow,
     build_source_windows,
+    build_use_risk_windows,
     extraction_response_schema,
     normalize_provider_proposals,
     publisher_risk_proposal_schema,
+    proposals_from_provider_value,
+    use_risk_extraction_response_schema,
 )
 from .factreasoner import (
     CheckOutcome,
     CheckRequest,
     CheckerResponse,
+    MAX_FACT_CHECKS_PER_BATCH,
+    check_request_sha256,
 )
 from .models import SourceDocument, TargetIdentity
 from .provider import (
     MODEL_ID,
     PINNED_PROVIDER,
+    PROVIDER_RUNTIME_VERSION,
     REASONING_CONFIG,
+    ProviderResponseError,
+    ProviderTerminalAttemptError,
     ProviderTransport,
     StructuredCallSpec,
     structured_json_call,
@@ -56,17 +71,34 @@ from .risk_mapping import (
     RiskCandidate,
     UseContext,
 )
-from .run_ledger import json_sha256
-from .schema import CONTENT_FIELD_PATHS, CONTRACT_SCHEMA, LIST_FIELDS
+from .run_ledger import (
+    AttemptBinding,
+    BudgetCapError,
+    GLOBAL_PAID_CALL_CAP,
+    GLOBAL_USD_CAP,
+    MAX_RETRIES,
+    UsageLedger,
+    json_sha256,
+    path_sha256,
+)
+from .schema import (
+    CONTENT_FIELD_PATHS,
+    CONTRACT_SCHEMA,
+    LIST_FIELDS,
+)
 
 
-ADAPTER_VERSION = "model-card-openrouter-adapters/v14"
+ADAPTER_VERSION = "model-card-openrouter-adapters/v17"
 CLAIM_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 FACT_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 MAX_EXTRACTION_OUTPUT_TOKENS = 8192
 MAX_CLAIM_OUTPUT_TOKENS = 1024
 MAX_FACT_OUTPUT_TOKENS = 8192
 MAX_RISK_OUTPUT_TOKENS = 1536
+AGGREGATE_BUDGET_VERSION = "openrouter-aggregate-budget/v2"
+AGGREGATE_BUDGET_SUMMARY_VERSION = (
+    "openrouter-aggregate-budget-summary/v2"
+)
 
 _DESCRIPTION_ITEM_FIELDS = frozenset(
     {
@@ -168,6 +200,20 @@ def _extraction_value_contract() -> dict[str, Any]:
     }
 
 
+def _use_risk_value_contract() -> dict[str, Any]:
+    """Return the typed subset used by the publisher use/risk recovery pass."""
+
+    contract = _extraction_value_contract()
+    allowed = sorted(_DESCRIPTION_ITEM_FIELDS | {PUBLISHER_RISK_FIELD})
+    contract["field_value_schemas"] = {
+        field_path: contract["field_value_schemas"][field_path]
+        for field_path in allowed
+    }
+    contract["indexed_fields"] = allowed
+    contract["description_item_fields"] = sorted(_DESCRIPTION_ITEM_FIELDS)
+    return contract
+
+
 def _private_directory(path: str | os.PathLike[str]) -> Path:
     root = Path(path)
     if root.is_symlink():
@@ -178,6 +224,622 @@ def _private_directory(path: str | os.PathLike[str]) -> Path:
     return root
 
 
+def _validate_existing_pinned_ledger(path: Path, provider: str) -> None:
+    """Reject a reused ledger containing attempts for any other provider."""
+
+    if not path.exists():
+        return
+    if path.is_symlink() or not path.is_file():
+        raise ProviderAdapterError("usage ledger path is unsafe")
+    try:
+        providers = UsageLedger(path).audit_metrics()["providers"]
+    except Exception as exc:
+        raise ProviderAdapterError("existing usage ledger failed validation") from exc
+    if not isinstance(providers, list) or any(item != provider for item in providers):
+        raise ProviderAdapterError(
+            "existing usage ledger contains an unpinned provider"
+        )
+
+
+@contextmanager
+def _locked_aggregate_file(path: Path) -> Iterator[Any]:
+    if path.is_symlink() or path.parent.is_symlink():
+        raise ProviderAdapterError("aggregate budget path is unsafe")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_RDWR | os.O_CREAT
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as exc:
+        raise ProviderAdapterError("aggregate budget journal is unavailable") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ProviderAdapterError(
+                "aggregate budget journal is not a regular file"
+            )
+        os.fchmod(descriptor, 0o600)
+        handle = os.fdopen(descriptor, "r+b", buffering=0)
+        descriptor = -1
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield handle
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+_AGGREGATE_MONEY_RE = re.compile(r"^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$")
+
+
+def _aggregate_money(value: Any, label: str) -> Decimal:
+    if not isinstance(value, str) or not _AGGREGATE_MONEY_RE.fullmatch(value):
+        raise ProviderAdapterError(f"{label} is invalid")
+    try:
+        parsed = Decimal(value)
+    except InvalidOperation as exc:  # pragma: no cover - guarded by the regex
+        raise ProviderAdapterError(f"{label} is invalid") from exc
+    if not parsed.is_finite() or parsed < 0:
+        raise ProviderAdapterError(f"{label} is invalid")
+    return parsed
+
+
+def _aggregate_money_text(value: Decimal) -> str:
+    return format(value, "f")
+
+
+@dataclass(frozen=True)
+class _AggregateLedgerSnapshot:
+    paid_calls: int
+    committed_usd: Decimal
+    global_halt: bool
+
+
+@dataclass(frozen=True)
+class _AggregateReservation:
+    ledger_sha256: str
+    base_paid_calls: int
+    base_committed_usd: Decimal
+    reserved_usd: Decimal
+
+
+_EMPTY_AGGREGATE_SNAPSHOT = _AggregateLedgerSnapshot(0, Decimal("0"), False)
+
+
+class _AggregatePaidCallBudget:
+    """Serialize sends under one durable USD 25 / 300-paid-call cohort cap.
+
+    Target ledgers remain authoritative. The shared journal reserves one exact
+    route-bounded send before the target ledger does, then reconciles both the
+    paid-call count and committed USD while the aggregate lock is held. An open
+    reservation survives process interruption and is either reused for the same
+    send or reconciled from the target ledger before any later authorization.
+    """
+
+    _EVENT_KEYS = {
+        "aggregate_budget_version",
+        "event_type",
+        "ledger_sha256",
+        "operation_sha256",
+        "paid_calls",
+        "committed_usd",
+        "global_halt",
+        "base_paid_calls",
+        "base_committed_usd",
+        "slots",
+        "reserved_usd",
+    }
+
+    def __init__(
+        self,
+        path: str | os.PathLike[str],
+        *,
+        ledger_path: Path,
+    ) -> None:
+        self.path = Path(path)
+        self.ledger_path = ledger_path
+        if self.path.is_symlink() or self.path.parent.is_symlink():
+            raise ProviderAdapterError("aggregate budget path is unsafe")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path.resolve() == ledger_path.resolve():
+            raise ProviderAdapterError(
+                "aggregate budget journal must be distinct from the usage ledger"
+            )
+        if self.path.exists() and not self.path.is_file():
+            raise ProviderAdapterError("aggregate budget journal is not a regular file")
+        self.ledger_sha256 = path_sha256(ledger_path)
+
+    @contextmanager
+    def _locked(self) -> Iterator[Any]:
+        with _locked_aggregate_file(self.path) as handle:
+            yield handle
+
+    @staticmethod
+    def _consumed(
+        latest: Mapping[str, _AggregateLedgerSnapshot],
+        reservation: _AggregateReservation,
+    ) -> bool:
+        observed = latest.get(
+            reservation.ledger_sha256, _EMPTY_AGGREGATE_SNAPSHOT
+        )
+        delta = observed.paid_calls - reservation.base_paid_calls
+        if delta == 0 and observed.committed_usd == reservation.base_committed_usd:
+            return False
+        if (
+            delta == 1
+            and observed.committed_usd >= reservation.base_committed_usd
+        ):
+            return True
+        raise BudgetCapError(
+            "aggregate reservation and target ledger commitments diverged"
+        )
+
+    @classmethod
+    def _totals(
+        cls,
+        latest: Mapping[str, _AggregateLedgerSnapshot],
+        open_reservations: Mapping[str, _AggregateReservation],
+    ) -> tuple[int, Decimal, int, Decimal, bool]:
+        paid_calls = sum(item.paid_calls for item in latest.values())
+        committed_usd = sum(
+            (item.committed_usd for item in latest.values()), Decimal("0")
+        )
+        reserved_calls = 0
+        reserved_usd = Decimal("0")
+        for reservation in open_reservations.values():
+            if not cls._consumed(latest, reservation):
+                reserved_calls += 1
+                reserved_usd += reservation.reserved_usd
+        total_calls = paid_calls + reserved_calls
+        total_usd = committed_usd + reserved_usd
+        global_halt = (
+            any(item.global_halt for item in latest.values())
+            or total_calls > GLOBAL_PAID_CALL_CAP
+            or total_usd > GLOBAL_USD_CAP
+        )
+        return total_calls, total_usd, reserved_calls, reserved_usd, global_halt
+
+    @classmethod
+    def _state(
+        cls, handle: Any
+    ) -> tuple[
+        dict[str, _AggregateLedgerSnapshot],
+        dict[str, _AggregateReservation],
+        int,
+        Decimal,
+        bool,
+    ]:
+        handle.seek(0)
+        raw = handle.read()
+        if raw and not raw.endswith(b"\n"):
+            raise ProviderAdapterError("aggregate budget journal is truncated")
+        latest: dict[str, _AggregateLedgerSnapshot] = {}
+        open_reservations: dict[str, _AggregateReservation] = {}
+        for line in raw.splitlines():
+            try:
+                value = json.loads(
+                    line.decode("utf-8"),
+                    parse_constant=lambda _value: (_ for _ in ()).throw(
+                        ValueError("non-finite JSON")
+                    ),
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+                raise ProviderAdapterError(
+                    "aggregate budget journal is malformed"
+                ) from exc
+            item = _closed(value, cls._EVENT_KEYS, "aggregate budget event")
+            if (
+                item["aggregate_budget_version"] != AGGREGATE_BUDGET_VERSION
+                or item["event_type"] not in {"snapshot", "reserve", "settle"}
+                or not isinstance(item["ledger_sha256"], str)
+                or not _DIGEST_RE.fullmatch(item["ledger_sha256"])
+            ):
+                raise ProviderAdapterError("aggregate budget event is invalid")
+            if line != _canonical(dict(item)).encode("utf-8"):
+                raise ProviderAdapterError(
+                    "aggregate budget journal is not canonical JSONL"
+                )
+            event_type = item["event_type"]
+            ledger_sha256 = item["ledger_sha256"]
+            operation_sha256 = item["operation_sha256"]
+            if event_type == "snapshot":
+                if (
+                    operation_sha256 is not None
+                    or item["base_paid_calls"] is not None
+                    or item["base_committed_usd"] is not None
+                    or item["slots"] != 0
+                    or item["reserved_usd"] is not None
+                    or not isinstance(item["paid_calls"], int)
+                    or isinstance(item["paid_calls"], bool)
+                    or item["paid_calls"] < 0
+                    or not isinstance(item["global_halt"], bool)
+                ):
+                    raise ProviderAdapterError("aggregate budget snapshot is invalid")
+                current = _AggregateLedgerSnapshot(
+                    item["paid_calls"],
+                    _aggregate_money(
+                        item["committed_usd"], "aggregate committed USD"
+                    ),
+                    item["global_halt"],
+                )
+                previous = latest.get(ledger_sha256, _EMPTY_AGGREGATE_SNAPSHOT)
+                active = next(
+                    (
+                        reservation
+                        for reservation in open_reservations.values()
+                        if reservation.ledger_sha256 == ledger_sha256
+                    ),
+                    None,
+                )
+                if (
+                    current == previous
+                    or current.paid_calls < previous.paid_calls
+                    or (previous.global_halt and not current.global_halt)
+                    or (
+                        active is None
+                        and current.paid_calls == previous.paid_calls
+                        and current.committed_usd != previous.committed_usd
+                    )
+                    or (
+                        active is None
+                        and current.committed_usd < previous.committed_usd
+                    )
+                ):
+                    raise ProviderAdapterError("aggregate budget snapshot is invalid")
+                if active is not None:
+                    cls._consumed({ledger_sha256: current}, active)
+                latest[ledger_sha256] = current
+            elif event_type == "reserve":
+                previous = latest.get(ledger_sha256, _EMPTY_AGGREGATE_SNAPSHOT)
+                if (
+                    not isinstance(operation_sha256, str)
+                    or not _DIGEST_RE.fullmatch(operation_sha256)
+                    or item["paid_calls"] is not None
+                    or item["committed_usd"] is not None
+                    or item["global_halt"] is not None
+                    or not isinstance(item["base_paid_calls"], int)
+                    or isinstance(item["base_paid_calls"], bool)
+                    or item["base_paid_calls"] != previous.paid_calls
+                    or item["slots"] != 1
+                    or operation_sha256 in open_reservations
+                    or any(
+                        reservation.ledger_sha256 == ledger_sha256
+                        for reservation in open_reservations.values()
+                    )
+                ):
+                    raise ProviderAdapterError(
+                        "aggregate budget reservation is invalid"
+                    )
+                base_usd = _aggregate_money(
+                    item["base_committed_usd"], "aggregate base committed USD"
+                )
+                reserved_usd = _aggregate_money(
+                    item["reserved_usd"], "aggregate reserved USD"
+                )
+                if base_usd != previous.committed_usd:
+                    raise ProviderAdapterError(
+                        "aggregate budget reservation is invalid"
+                    )
+                open_reservations[operation_sha256] = _AggregateReservation(
+                    ledger_sha256,
+                    item["base_paid_calls"],
+                    base_usd,
+                    reserved_usd,
+                )
+            else:
+                active = open_reservations.get(operation_sha256)
+                if (
+                    not isinstance(operation_sha256, str)
+                    or not _DIGEST_RE.fullmatch(operation_sha256)
+                    or item["paid_calls"] is not None
+                    or item["committed_usd"] is not None
+                    or item["global_halt"] is not None
+                    or item["base_paid_calls"] is not None
+                    or item["base_committed_usd"] is not None
+                    or item["slots"] != 0
+                    or item["reserved_usd"] is not None
+                    or active is None
+                    or active.ledger_sha256 != ledger_sha256
+                ):
+                    raise ProviderAdapterError(
+                        "aggregate budget settlement is invalid"
+                    )
+                del open_reservations[operation_sha256]
+            cls._totals(latest, open_reservations)
+        total_calls, total_usd, _, _, global_halt = cls._totals(
+            latest, open_reservations
+        )
+        return latest, open_reservations, total_calls, total_usd, global_halt
+
+    @staticmethod
+    def _append(handle: Any, event: Mapping[str, Any]) -> None:
+        payload = _canonical(dict(event)).encode("utf-8") + b"\n"
+        handle.seek(0, os.SEEK_END)
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+    @staticmethod
+    def _snapshot_event(
+        ledger_sha256: str, snapshot: _AggregateLedgerSnapshot
+    ) -> dict[str, Any]:
+        return {
+            "aggregate_budget_version": AGGREGATE_BUDGET_VERSION,
+            "event_type": "snapshot",
+            "ledger_sha256": ledger_sha256,
+            "operation_sha256": None,
+            "paid_calls": snapshot.paid_calls,
+            "committed_usd": _aggregate_money_text(snapshot.committed_usd),
+            "global_halt": snapshot.global_halt,
+            "base_paid_calls": None,
+            "base_committed_usd": None,
+            "slots": 0,
+            "reserved_usd": None,
+        }
+
+    @staticmethod
+    def _settlement_event(
+        operation_sha256: str, reservation: _AggregateReservation
+    ) -> dict[str, Any]:
+        return {
+            "aggregate_budget_version": AGGREGATE_BUDGET_VERSION,
+            "event_type": "settle",
+            "ledger_sha256": reservation.ledger_sha256,
+            "operation_sha256": operation_sha256,
+            "paid_calls": None,
+            "committed_usd": None,
+            "global_halt": None,
+            "base_paid_calls": None,
+            "base_committed_usd": None,
+            "slots": 0,
+            "reserved_usd": None,
+        }
+
+    def _reconcile(
+        self,
+        handle: Any,
+        latest: dict[str, _AggregateLedgerSnapshot],
+        open_reservations: dict[str, _AggregateReservation],
+    ) -> None:
+        raw = UsageLedger(self.ledger_path).audit_state()
+        observed = _AggregateLedgerSnapshot(
+            raw["paid_calls"],
+            _aggregate_money(raw["committed_usd"], "target committed USD"),
+            raw["global_halt"],
+        )
+        previous = latest.get(self.ledger_sha256, _EMPTY_AGGREGATE_SNAPSHOT)
+        if (
+            not isinstance(observed.paid_calls, int)
+            or isinstance(observed.paid_calls, bool)
+            or observed.paid_calls < previous.paid_calls
+            or (previous.global_halt and not observed.global_halt)
+        ):
+            raise ProviderAdapterError("aggregate budget ledger state regressed")
+        active = next(
+            (
+                reservation
+                for reservation in open_reservations.values()
+                if reservation.ledger_sha256 == self.ledger_sha256
+            ),
+            None,
+        )
+        if active is None and observed.committed_usd < previous.committed_usd:
+            raise ProviderAdapterError("aggregate budget ledger commitment regressed")
+        if active is not None:
+            self._consumed({self.ledger_sha256: observed}, active)
+        if observed != previous:
+            self._append(
+                handle, self._snapshot_event(self.ledger_sha256, observed)
+            )
+            latest[self.ledger_sha256] = observed
+
+    def _settle_consumed(
+        self,
+        handle: Any,
+        latest: Mapping[str, _AggregateLedgerSnapshot],
+        open_reservations: dict[str, _AggregateReservation],
+    ) -> None:
+        for operation_sha256, reservation in tuple(open_reservations.items()):
+            if (
+                reservation.ledger_sha256 == self.ledger_sha256
+                and self._consumed(latest, reservation)
+            ):
+                self._append(
+                    handle,
+                    self._settlement_event(operation_sha256, reservation),
+                )
+                del open_reservations[operation_sha256]
+
+    @contextmanager
+    def guard(self, *, decision_path: Path) -> Iterator["_AggregateBudgetSession"]:
+        with self._locked() as handle:
+            latest, open_reservations, _, _, _ = self._state(handle)
+            self._reconcile(handle, latest, open_reservations)
+            self._settle_consumed(handle, latest, open_reservations)
+            session = _AggregateBudgetSession(
+                budget=self,
+                handle=handle,
+                latest=latest,
+                open_reservations=open_reservations,
+                decision_path=decision_path,
+            )
+            try:
+                yield session
+            finally:
+                self._reconcile(handle, latest, open_reservations)
+                for operation_sha256, reservation in tuple(
+                    open_reservations.items()
+                ):
+                    if reservation.ledger_sha256 == self.ledger_sha256:
+                        self._append(
+                            handle,
+                            self._settlement_event(operation_sha256, reservation),
+                        )
+                        del open_reservations[operation_sha256]
+                self._totals(latest, open_reservations)
+
+
+@dataclass
+class _AggregateBudgetSession:
+    budget: _AggregatePaidCallBudget
+    handle: Any
+    latest: dict[str, _AggregateLedgerSnapshot]
+    open_reservations: dict[str, _AggregateReservation]
+    decision_path: Path
+
+    def authorize_send(
+        self,
+        *,
+        binding: AttemptBinding,
+        retry_index: int,
+        route: Any,
+        input_token_ceiling: int,
+        output_token_ceiling: int,
+    ) -> None:
+        self.budget._reconcile(
+            self.handle, self.latest, self.open_reservations
+        )
+        self.budget._settle_consumed(
+            self.handle, self.latest, self.open_reservations
+        )
+        total_calls, total_usd, _, _, global_halt = self.budget._totals(
+            self.latest, self.open_reservations
+        )
+        if global_halt:
+            raise BudgetCapError("aggregate budget global halt is active")
+        if (
+            not isinstance(retry_index, int)
+            or isinstance(retry_index, bool)
+            or not 0 <= retry_index <= MAX_RETRIES
+            or not isinstance(input_token_ceiling, int)
+            or isinstance(input_token_ceiling, bool)
+            or input_token_ceiling <= 0
+            or not isinstance(output_token_ceiling, int)
+            or isinstance(output_token_ceiling, bool)
+            or output_token_ceiling <= 0
+        ):
+            raise ProviderAdapterError("aggregate send bounds are invalid")
+        reserved_usd = (
+            Decimal(input_token_ceiling)
+            * _aggregate_money(
+                route.prompt_price_per_token_usd, "route prompt price"
+            )
+            + Decimal(output_token_ceiling)
+            * _aggregate_money(
+                route.completion_price_per_token_usd, "route completion price"
+            )
+        )
+        operation_sha256 = _digest(
+            {
+                "decision_path_sha256": path_sha256(self.decision_path),
+                "logical_call_id": binding.logical_call_id,
+                "attempt_id": binding.attempt_id,
+                "request_sha256": binding.request_sha256,
+                "retry_index": retry_index,
+            }
+        )
+        active_entry = next(
+            (
+                (key, reservation)
+                for key, reservation in self.open_reservations.items()
+                if reservation.ledger_sha256 == self.budget.ledger_sha256
+            ),
+            None,
+        )
+        current = self.latest.get(
+            self.budget.ledger_sha256, _EMPTY_AGGREGATE_SNAPSHOT
+        )
+        if active_entry is not None:
+            active_operation, active = active_entry
+            if (
+                active_operation != operation_sha256
+                or active.base_paid_calls != current.paid_calls
+                or active.base_committed_usd != current.committed_usd
+                or active.reserved_usd != reserved_usd
+                or self.budget._consumed(self.latest, active)
+            ):
+                raise ProviderAdapterError(
+                    "open aggregate reservation differs from the exact paid send"
+                )
+            return
+        if total_calls + 1 > GLOBAL_PAID_CALL_CAP:
+            raise BudgetCapError("aggregate paid-call cap would be exceeded")
+        if total_usd + reserved_usd > GLOBAL_USD_CAP:
+            raise BudgetCapError("aggregate USD cap would be exceeded")
+        reservation = _AggregateReservation(
+            self.budget.ledger_sha256,
+            current.paid_calls,
+            current.committed_usd,
+            reserved_usd,
+        )
+        self.budget._append(
+            self.handle,
+            {
+                "aggregate_budget_version": AGGREGATE_BUDGET_VERSION,
+                "event_type": "reserve",
+                "ledger_sha256": reservation.ledger_sha256,
+                "operation_sha256": operation_sha256,
+                "paid_calls": None,
+                "committed_usd": None,
+                "global_halt": None,
+                "base_paid_calls": reservation.base_paid_calls,
+                "base_committed_usd": _aggregate_money_text(
+                    reservation.base_committed_usd
+                ),
+                "slots": 1,
+                "reserved_usd": _aggregate_money_text(
+                    reservation.reserved_usd
+                ),
+            },
+        )
+        self.open_reservations[operation_sha256] = reservation
+
+
+def summarize_aggregate_budget(
+    path: str | os.PathLike[str],
+) -> dict[str, Any]:
+    """Return a body-free, locked snapshot of one aggregate budget journal."""
+
+    journal = Path(path)
+    with _locked_aggregate_file(journal) as handle:
+        latest, open_reservations, total_calls, total_usd, global_halt = (
+            _AggregatePaidCallBudget._state(handle)
+        )
+        handle.seek(0)
+        raw = handle.read()
+    paid_calls = sum(item.paid_calls for item in latest.values())
+    committed_usd = sum(
+        (item.committed_usd for item in latest.values()), Decimal("0")
+    )
+    _, _, reserved_calls, reserved_usd, _ = _AggregatePaidCallBudget._totals(
+        latest, open_reservations
+    )
+    ledgers = set(latest)
+    ledgers.update(item.ledger_sha256 for item in open_reservations.values())
+    return {
+        "aggregate_budget_summary_version": AGGREGATE_BUDGET_SUMMARY_VERSION,
+        "aggregate_budget_version": AGGREGATE_BUDGET_VERSION,
+        "journal_path_sha256": path_sha256(journal),
+        "journal_sha256": hashlib.sha256(raw).hexdigest(),
+        "journal_event_count": len(raw.splitlines()),
+        "ledger_count": len(ledgers),
+        "paid_calls": paid_calls,
+        "committed_usd": _aggregate_money_text(committed_usd),
+        "open_reservation_count": len(open_reservations),
+        "reserved_call_capacity": reserved_calls,
+        "reserved_usd_capacity": _aggregate_money_text(reserved_usd),
+        "total_budget_commitment": total_calls,
+        "total_usd_commitment": _aggregate_money_text(total_usd),
+        "paid_call_cap": GLOBAL_PAID_CALL_CAP,
+        "usd_cap": _aggregate_money_text(GLOBAL_USD_CAP),
+        "global_halt": global_halt,
+    }
+
+
 @dataclass(frozen=True)
 class _Runtime:
     provider: str
@@ -186,6 +848,7 @@ class _Runtime:
     environment: Mapping[str, str] | None
     transport: ProviderTransport | None
     call: CallFunction
+    aggregate_budget: _AggregatePaidCallBudget | None
 
     @classmethod
     def build(
@@ -197,6 +860,7 @@ class _Runtime:
         environment: Mapping[str, str] | None,
         transport: ProviderTransport | None,
         call: CallFunction,
+        aggregate_budget_path: str | os.PathLike[str] | None = None,
     ) -> "_Runtime":
         if provider != PINNED_PROVIDER:
             raise ProviderAdapterError("the pinned OpenRouter provider is required")
@@ -204,6 +868,15 @@ class _Runtime:
         if ledger.is_symlink() or ledger.parent.is_symlink():
             raise ProviderAdapterError("usage ledger path is unsafe")
         ledger.parent.mkdir(parents=True, exist_ok=True)
+        _validate_existing_pinned_ledger(ledger, provider)
+        aggregate = (
+            None
+            if aggregate_budget_path is None
+            else _AggregatePaidCallBudget(
+                aggregate_budget_path,
+                ledger_path=ledger,
+            )
+        )
         return cls(
             provider=provider,
             ledger_path=ledger,
@@ -211,6 +884,7 @@ class _Runtime:
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget=aggregate,
         )
 
     def invoke(
@@ -219,21 +893,74 @@ class _Runtime:
         *,
         decision_name: str,
         validator: Callable[[Mapping[str, Any]], None],
+        semantic_retries: int = 0,
     ) -> Any:
         if not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{2,191}\.json", decision_name):
             raise ProviderAdapterError("decision sidecar name is invalid")
-        return self.call(
-            spec,
-            ledger_path=self.ledger_path,
-            decision_path=self.decision_dir / decision_name,
-            validator=validator,
-            environment=self.environment,
-            transport=self.transport,
-        )
+        if semantic_retries not in {0, 1}:
+            raise ProviderAdapterError("semantic retry bound is invalid")
+        if not spec.attempt_id.endswith(".attempt1"):
+            raise ProviderAdapterError("initial provider attempt must end in .attempt1")
+        for semantic_attempt in range(semantic_retries + 1):
+            attempt_number = semantic_attempt + 1
+            active_spec = (
+                spec
+                if semantic_attempt == 0
+                else replace(
+                    spec,
+                    attempt_id=spec.attempt_id[: -len("attempt1")] + "attempt2",
+                )
+            )
+            # Semantic attempts need distinct durable sidecars.  Otherwise a
+            # successful attempt2 sidecar sits beside attempt1's failed ledger
+            # record, and a fresh process mistakes that sidecar for corrupt
+            # attempt1 state before it can resume attempt2.
+            active_decision_name = (
+                decision_name
+                if semantic_retries == 0
+                else (
+                    decision_name[: -len(".json")]
+                    + f".attempt{attempt_number}.json"
+                )
+            )
+            if not re.fullmatch(
+                r"[a-z0-9][a-z0-9_.-]{2,191}\.json", active_decision_name
+            ):
+                raise ProviderAdapterError("attempt decision sidecar name is invalid")
+            decision_path = self.decision_dir / active_decision_name
+            budget_guard = (
+                nullcontext(None)
+                if self.aggregate_budget is None
+                else self.aggregate_budget.guard(
+                    decision_path=decision_path,
+                )
+            )
+            try:
+                with budget_guard as paid_send_budget:
+                    call_kwargs = {
+                        "ledger_path": self.ledger_path,
+                        "decision_path": decision_path,
+                        "validator": validator,
+                        "environment": self.environment,
+                        "transport": self.transport,
+                    }
+                    if paid_send_budget is not None:
+                        call_kwargs["paid_send_budget"] = paid_send_budget
+                    return self.call(
+                        active_spec,
+                        **call_kwargs,
+                    )
+            except (ProviderResponseError, ProviderTerminalAttemptError) as exc:
+                if (
+                    exc.reason_code != "structured_decision_invalid"
+                    or semantic_attempt >= semantic_retries
+                ):
+                    raise
+        raise AssertionError("unreachable semantic retry state")
 
 
 class OpenRouterQuoteExtractor:
-    """One structured call per bounded text source, followed by local replay."""
+    """Bounded general extraction plus conditional publisher-use/risk recovery."""
 
     def __init__(
         self,
@@ -241,6 +968,7 @@ class OpenRouterQuoteExtractor:
         provider: str,
         ledger_path: str | os.PathLike[str],
         decision_dir: str | os.PathLike[str],
+        aggregate_budget_path: str | os.PathLike[str] | None = None,
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
@@ -252,6 +980,7 @@ class OpenRouterQuoteExtractor:
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget_path=aggregate_budget_path,
         )
 
     def extract_source(
@@ -266,8 +995,11 @@ class OpenRouterQuoteExtractor:
         if not _DIGEST_RE.fullmatch(source_catalog_sha256):
             raise ProviderAdapterError("source catalog digest is invalid")
         windows = build_source_windows(source)
+        use_risk_windows = build_use_risk_windows(source, windows=windows)
         response = extraction_response_schema()
+        use_risk_response = use_risk_extraction_response_schema()
         value_contract = _extraction_value_contract()
+        use_risk_value_contract = _use_risk_value_contract()
         configuration = {
             "adapter_version": ADAPTER_VERSION,
             "model": MODEL_ID,
@@ -279,7 +1011,12 @@ class OpenRouterQuoteExtractor:
             "window_ids": [item.window_id for item in windows],
             "content_fields": list(CONTENT_FIELD_PATHS),
             "field_value_contract_sha256": _digest(value_contract),
+            "use_risk_schema": use_risk_response["name"],
+            "use_risk_window_ids": [item.window_id for item in use_risk_windows],
+            "use_risk_value_contract_sha256": _digest(use_risk_value_contract),
             "max_proposals": MAX_PROVIDER_PROPOSALS,
+            "max_use_risk_proposals": MAX_USE_RISK_PROVIDER_PROPOSALS,
+            "max_batch_proposals": MAX_EXTRACTION_BATCH_PROPOSALS,
             "proposal_rejection_policy": "hash_only_per_item_fail_closed",
         }
         config_sha = json_sha256(configuration)
@@ -365,7 +1102,9 @@ class OpenRouterQuoteExtractor:
 
         result = self.runtime.invoke(
             spec,
-            decision_name=f"extract-{source.source_id}-{source_catalog_sha256[:16]}.json",
+            decision_name=(
+                f"extract-v2-{source.source_id}-{source_catalog_sha256[:16]}.json"
+            ),
             validator=validate,
         )
         validate(result.decision)
@@ -373,6 +1112,130 @@ class OpenRouterQuoteExtractor:
             result.decision,
             expected_source_id=source.source_id,
         )
+        # This pass is category-complete rather than a fallback. A general
+        # response that happens to contain one intended use can still omit the
+        # source's limitations, publisher-reported risks, or mitigations. Run
+        # the bounded dedicated pass whenever the frozen source has relevant
+        # signals, then deduplicate exact proposals locally.
+        if use_risk_windows:
+            recovery_payload = {
+                "target": target.to_dict(),
+                "source": payload["source"],
+                "allowed_fields": sorted(
+                    _DESCRIPTION_ITEM_FIELDS | {PUBLISHER_RISK_FIELD}
+                ),
+                "field_value_contract": use_risk_value_contract,
+                "rules": {
+                    "quote_must_be_verbatim": True,
+                    "value_must_be_fully_supported_by_quote": True,
+                    "maximum_proposals": MAX_USE_RISK_PROVIDER_PROPOSALS,
+                    "description_items": (
+                        "For intended uses, out-of-scope uses, limitations, known "
+                        "biases, and mitigations, value_json may contain either a "
+                        "JSON string or the exact nonempty source prose. Do not "
+                        "invent wrapper metadata."
+                    ),
+                    "publisher_reported_risk": {
+                        "field_path": PUBLISHER_RISK_FIELD + "[INDEX]",
+                        "origin": "source_stated",
+                        "value_fields": list(PUBLISHER_RISK_PROPOSAL_FIELDS),
+                    },
+                    "source_id_must_equal": source.source_id,
+                    "unknown_or_ambiguous_claims": "omit",
+                    "absence_markers_are_omitted_not_proposed": [
+                        "Not specified",
+                        "Not applicable",
+                    ],
+                },
+                "windows": [
+                    {
+                        "window_id": item.window_id,
+                        "normalized_start": item.normalized_start,
+                        "normalized_end": item.normalized_end,
+                        "excerpt": item.excerpt,
+                    }
+                    for item in use_risk_windows
+                ],
+            }
+            recovery_logical = (
+                f"extract-use-risk.{source.source_id}."
+                f"{source_catalog_sha256[:16]}"
+            )
+            recovery_spec = StructuredCallSpec(
+                logical_call_id=recovery_logical,
+                attempt_id=recovery_logical + ".attempt1",
+                provider=self.runtime.provider,
+                schema_name=use_risk_response["name"],
+                json_schema=use_risk_response["schema"],
+                system_prompt=(
+                    "Extract only publisher-stated intended uses, out-of-scope uses, "
+                    "limitations, known biases, risks, and mitigations from the "
+                    "bounded exact-target windows. Return exact quotes and never "
+                    "invent a use or risk to fill the response."
+                ),
+                user_prompt=_canonical(recovery_payload),
+                max_output_tokens=MAX_EXTRACTION_OUTPUT_TOKENS,
+                context_metadata={
+                    "stage": "quote_extraction_use_risk",
+                    "source_id": source.source_id,
+                    "catalog_sha256": source_catalog_sha256,
+                },
+            )
+
+            def validate_use_risk(value: Mapping[str, Any]) -> None:
+                Draft202012Validator(use_risk_response["schema"]).validate(value)
+
+            recovered = self.runtime.invoke(
+                recovery_spec,
+                decision_name=(
+                    f"extract-use-risk-v1-{source.source_id}-"
+                    f"{source_catalog_sha256[:16]}.json"
+                ),
+                validator=validate_use_risk,
+            )
+            validate_use_risk(recovered.decision)
+            recovered_proposals, recovered_rejections = normalize_provider_proposals(
+                recovered.decision,
+                expected_source_id=source.source_id,
+            )
+            offset = len(result.decision["proposals"])
+            combined = {item.proposal_id: item for item in proposals}
+            combined_rejections = list(rejections)
+            combined_rejections.extend(
+                ProviderProposalRejection(
+                    proposal_index=offset + item.proposal_index,
+                    proposal_sha256=item.proposal_sha256,
+                    reason=item.reason,
+                )
+                for item in recovered_rejections
+            )
+            raw_by_id: dict[str, tuple[int, Mapping[str, Any]]] = {}
+            for index, raw in enumerate(recovered.decision["proposals"]):
+                try:
+                    normalized = proposals_from_provider_value(
+                        {"proposals": [raw]}
+                    )[0]
+                except (TypeError, ValueError):
+                    continue
+                raw_by_id.setdefault(normalized.proposal_id, (index, raw))
+            for item in recovered_proposals:
+                if item.proposal_id not in combined:
+                    combined[item.proposal_id] = item
+                    continue
+                raw_index, raw = raw_by_id[item.proposal_id]
+                combined_rejections.append(
+                    ProviderProposalRejection(
+                        proposal_index=offset + raw_index,
+                        proposal_sha256=_digest(raw),
+                        reason="duplicate_proposal",
+                    )
+                )
+            proposals = tuple(
+                sorted(combined.values(), key=lambda item: item.proposal_id)
+            )
+            rejections = tuple(
+                sorted(combined_rejections, key=lambda item: item.proposal_index)
+            )
         return ExtractionBatch.build(
             target=target,
             source_catalog_sha256=source_catalog_sha256,
@@ -406,6 +1269,7 @@ class OpenRouterClaimChecker:
         provider: str,
         ledger_path: str | os.PathLike[str],
         decision_dir: str | os.PathLike[str],
+        aggregate_budget_path: str | os.PathLike[str] | None = None,
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
@@ -417,6 +1281,7 @@ class OpenRouterClaimChecker:
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget_path=aggregate_budget_path,
         )
 
     def decide(self, candidate: ClaimCandidate, gate: GateName) -> ProseCheckerDecision:
@@ -519,6 +1384,7 @@ class OpenRouterFactChecker:
         provider: str,
         ledger_path: str | os.PathLike[str],
         decision_dir: str | os.PathLike[str],
+        aggregate_budget_path: str | os.PathLike[str] | None = None,
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
@@ -530,108 +1396,200 @@ class OpenRouterFactChecker:
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget_path=aggregate_budget_path,
         )
+        self._response_cache: dict[str, CheckerResponse] = {}
 
-    def check(self, request: CheckRequest) -> CheckerResponse:
-        if not isinstance(request, CheckRequest):
-            raise ProviderAdapterError("FactReasoner checker requires a CheckRequest")
-        chunk_ids = [item.chunk.chunk_id for item in request.contexts]
+    def check_many(
+        self, requests: Sequence[CheckRequest]
+    ) -> tuple[CheckerResponse, ...]:
+        ordered = tuple(requests)
+        if (
+            not ordered
+            or len(ordered) > MAX_FACT_CHECKS_PER_BATCH
+            or not all(isinstance(item, CheckRequest) for item in ordered)
+        ):
+            raise ProviderAdapterError(
+                "FactReasoner batch requires between 1 and 64 CheckRequests"
+            )
+        request_hashes = tuple(check_request_sha256(item) for item in ordered)
+        request_by_hash: dict[str, CheckRequest] = {}
+        missing_hashes: list[str] = []
+        for request_hash, request in zip(request_hashes, ordered):
+            request_by_hash.setdefault(request_hash, request)
+            if (
+                request_hash not in self._response_cache
+                and request_hash not in missing_hashes
+            ):
+                missing_hashes.append(request_hash)
+        if not missing_hashes:
+            return tuple(self._response_cache[item] for item in request_hashes)
+
+        chunk_by_id: dict[str, Mapping[str, Any]] = {}
+        context_ids_by_request: dict[str, tuple[str, ...]] = {}
+        checks = []
+        for request_hash in missing_hashes:
+            request = request_by_hash[request_hash]
+            context_ids = tuple(item.chunk.chunk_id for item in request.contexts)
+            context_ids_by_request[request_hash] = context_ids
+            checks.append(
+                {
+                    "request_sha256": request_hash,
+                    "hypothesis": request.hypothesis,
+                    "stage": request.stage.value,
+                    "fallback_complete": request.fallback_complete,
+                    "context_ids": list(context_ids),
+                }
+            )
+            for context in request.contexts:
+                existing = chunk_by_id.setdefault(
+                    context.chunk.chunk_id,
+                    {
+                        "chunk_id": context.chunk.chunk_id,
+                        "chunk_sha256": context.chunk.content_sha256,
+                        "text": context.text,
+                    },
+                )
+                if (
+                    existing["chunk_sha256"] != context.chunk.content_sha256
+                    or existing["text"] != context.text
+                ):
+                    raise ProviderAdapterError(
+                        "FactReasoner chunk identifier collision"
+                    )
+        chunk_ids = sorted(chunk_by_id)
         schema = {
             "type": "object",
-            "required": ["outcome", "reason_code", "cited_chunk_ids"],
+            "required": ["decisions"],
             "properties": {
-                "outcome": {"enum": ["support", "contradiction", "neutral"]},
-                "reason_code": {
-                    "enum": [
-                        "support_in_context",
-                        "contradiction_in_context",
-                        "no_complete_support",
-                    ]
-                },
-                "cited_chunk_ids": {
+                "decisions": {
                     "type": "array",
-                    "items": {"enum": chunk_ids},
-                    "uniqueItems": True,
-                    "maxItems": len(chunk_ids),
-                },
+                    "minItems": len(missing_hashes),
+                    "maxItems": len(missing_hashes),
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "request_sha256",
+                            "outcome",
+                            "cited_chunk_ids",
+                        ],
+                        "properties": {
+                            "request_sha256": {"enum": missing_hashes},
+                            "outcome": {
+                                "enum": ["support", "contradiction", "neutral"]
+                            },
+                            "cited_chunk_ids": {
+                                "type": "array",
+                                "items": {"enum": chunk_ids},
+                                "uniqueItems": True,
+                                "minItems": 1,
+                                "maxItems": len(chunk_ids),
+                            },
+                        },
+                        "additionalProperties": False,
+                    },
+                }
             },
             "additionalProperties": False,
         }
         payload = {
-            "hypothesis": request.hypothesis,
-            "stage": request.stage.value,
-            "fallback_complete": request.fallback_complete,
-            "contexts": [
-                {"chunk_id": item.chunk.chunk_id, "text": item.text}
-                for item in request.contexts
-            ],
+            "checks": checks,
+            "contexts": [chunk_by_id[item] for item in chunk_ids],
             "rules": {
+                "one_decision_per_request_in_supplied_order": True,
                 "support_requires_complete_entailment": True,
                 "contradiction_requires_explicit_conflict": True,
                 "otherwise": "neutral",
+                "citations_must_belong_to_that_request": True,
             },
         }
-        suffix = _digest(
+        batch_sha256 = _digest(
             {
-                "atom": request.atom.content_sha256,
-                "stage": request.stage.value,
-                "chunks": chunk_ids,
+                "adapter_version": ADAPTER_VERSION,
+                "request_sha256s": missing_hashes,
             }
-        )[:16]
-        logical = f"fact.{request.atom.atom_id}.{request.stage.value}.{suffix}"
+        )
+        logical = f"fact.batch.{batch_sha256[:24]}"
         spec = StructuredCallSpec(
             logical_call_id=logical,
             attempt_id=logical + ".attempt1",
             provider=self.runtime.provider,
-            schema_name="model_card_factreasoner_v1",
+            schema_name="model_card_factreasoner_batch_v1",
             json_schema=schema,
             system_prompt=(
-                "Assess the explicit hypothesis only against the supplied frozen-source "
-                "contexts. Return support, contradiction, or neutral with cited chunk IDs."
+                "Assess each explicit hypothesis only against its named frozen-source "
+                "contexts. Return one ordered structured decision per request."
             ),
             user_prompt=_canonical(payload),
             max_output_tokens=MAX_FACT_OUTPUT_TOKENS,
             context_metadata={
-                "stage": "factreasoner",
-                "atom_id": request.atom.atom_id,
-                "check_stage": request.stage.value,
+                "stage": "factreasoner_batch",
+                "batch_sha256": batch_sha256,
+                "request_count": len(missing_hashes),
             },
         )
 
         def validate(value: Mapping[str, Any]) -> None:
-            item = _closed(
-                value,
-                {"outcome", "reason_code", "cited_chunk_ids"},
-                "FactReasoner decision",
-            )
-            expected_reason = {
-                "support": "support_in_context",
-                "contradiction": "contradiction_in_context",
-                "neutral": "no_complete_support",
-            }
-            if item["outcome"] not in expected_reason:
-                raise ProviderAdapterError("FactReasoner outcome is invalid")
-            if item["reason_code"] != expected_reason[item["outcome"]]:
-                raise ProviderAdapterError("FactReasoner outcome/reason pair is invalid")
-            cited = item["cited_chunk_ids"]
-            if not isinstance(cited, list) or len(cited) != len(set(cited)):
-                raise ProviderAdapterError("FactReasoner citations are invalid")
-            if not set(cited).issubset(chunk_ids):
-                raise ProviderAdapterError("FactReasoner cited an unavailable chunk")
-            if item["outcome"] in {"support", "contradiction"} and not cited:
-                raise ProviderAdapterError("FactReasoner decisive outcome requires evidence")
+            item = _closed(value, {"decisions"}, "FactReasoner batch decision")
+            values = item["decisions"]
+            if not isinstance(values, list) or len(values) != len(missing_hashes):
+                raise ProviderAdapterError("FactReasoner batch coverage is invalid")
+            actual_hashes = []
+            for value_item in values:
+                decision = _closed(
+                    value_item,
+                    {"request_sha256", "outcome", "cited_chunk_ids"},
+                    "FactReasoner decision",
+                )
+                request_hash = decision["request_sha256"]
+                actual_hashes.append(request_hash)
+                if request_hash not in context_ids_by_request:
+                    raise ProviderAdapterError("FactReasoner request digest is invalid")
+                if decision["outcome"] not in {
+                    "support",
+                    "contradiction",
+                    "neutral",
+                }:
+                    raise ProviderAdapterError("FactReasoner outcome is invalid")
+                cited = decision["cited_chunk_ids"]
+                if (
+                    not isinstance(cited, list)
+                    or not cited
+                    or len(cited) != len(set(cited))
+                    or not set(cited).issubset(context_ids_by_request[request_hash])
+                ):
+                    raise ProviderAdapterError("FactReasoner citations are invalid")
+            if actual_hashes != missing_hashes:
+                raise ProviderAdapterError(
+                    "FactReasoner decisions are missing, duplicated, or reordered"
+                )
 
         result = self.runtime.invoke(
             spec,
-            decision_name=f"{request.atom.atom_id}-{request.stage.value}-{suffix}.json",
+            decision_name=f"fact-batch-{batch_sha256[:24]}.json",
             validator=validate,
+            semantic_retries=1,
         )
         validate(result.decision)
-        return CheckerResponse(
-            outcome=CheckOutcome(result.decision["outcome"]),
-            reason_code=result.decision["reason_code"],
-            cited_chunk_ids=tuple(result.decision["cited_chunk_ids"]),
-        )
+        pending: dict[str, CheckerResponse] = {}
+        for decision in result.decision["decisions"]:
+            outcome = CheckOutcome(decision["outcome"])
+            pending[decision["request_sha256"]] = CheckerResponse(
+                outcome=outcome,
+                reason_code={
+                    CheckOutcome.SUPPORT: "support_in_context",
+                    CheckOutcome.CONTRADICTION: "contradiction_in_context",
+                    CheckOutcome.NEUTRAL: "no_complete_support",
+                }[outcome],
+                cited_chunk_ids=tuple(decision["cited_chunk_ids"]),
+            )
+        self._response_cache.update(pending)
+        return tuple(self._response_cache[item] for item in request_hashes)
+
+    def check(self, request: CheckRequest) -> CheckerResponse:
+        if not isinstance(request, CheckRequest):
+            raise ProviderAdapterError("FactReasoner checker requires a CheckRequest")
+        return self.check_many((request,))[0]
 
 
 class OpenRouterApplicabilityChecker:
@@ -643,6 +1601,7 @@ class OpenRouterApplicabilityChecker:
         provider: str,
         ledger_path: str | os.PathLike[str],
         decision_dir: str | os.PathLike[str],
+        aggregate_budget_path: str | os.PathLike[str] | None = None,
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
@@ -654,6 +1613,7 @@ class OpenRouterApplicabilityChecker:
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget_path=aggregate_budget_path,
         )
 
     def assess(
@@ -746,6 +1706,7 @@ def build_nexus_openrouter_inference_engine(
     provider: str,
     ledger_path: str | os.PathLike[str],
     decision_dir: str | os.PathLike[str],
+    aggregate_budget_path: str | os.PathLike[str] | None = None,
     environment: Mapping[str, str] | None = None,
     transport: ProviderTransport | None = None,
     call: CallFunction = structured_json_call,
@@ -773,6 +1734,7 @@ def build_nexus_openrouter_inference_engine(
         environment=environment,
         transport=transport,
         call=call,
+        aggregate_budget_path=aggregate_budget_path,
     )
 
     class _OpenRouterNexusEngine(InferenceEngine):
@@ -898,6 +1860,8 @@ def build_nexus_openrouter_inference_engine(
 
 __all__ = [
     "ADAPTER_VERSION",
+    "AGGREGATE_BUDGET_SUMMARY_VERSION",
+    "AGGREGATE_BUDGET_VERSION",
     "CLAIM_CHECKER_ID",
     "FACT_CHECKER_ID",
     "MAX_CLAIM_OUTPUT_TOKENS",
@@ -910,4 +1874,5 @@ __all__ = [
     "OpenRouterQuoteExtractor",
     "ProviderAdapterError",
     "build_nexus_openrouter_inference_engine",
+    "summarize_aggregate_budget",
 ]

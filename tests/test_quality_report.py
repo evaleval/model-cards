@@ -28,6 +28,7 @@ from model_cards.official_sources import (
     collect_official_sources,
 )
 from model_cards.quality_report import (
+    QUALITY_REPORT_VERSION,
     QualityReportError,
     _assert_body_free,
     _explicit_findings,
@@ -63,8 +64,9 @@ def _canonical(value: object) -> bytes:
 
 
 class _HubAdapter:
-    def __init__(self, *, precision: str) -> None:
+    def __init__(self, *, precision: str, publication_conflict: bool = False) -> None:
         self.precision = precision
+        self.publication_conflict = publication_conflict
 
     def resolve_revision(self, model_id, requested_revision):
         if model_id != "acme/Quality" or requested_revision != REVISION:
@@ -72,20 +74,22 @@ class _HubAdapter:
         return REVISION
 
     def fetch_model_metadata(self, model_id, revision, *, max_bytes):
+        value = {
+            "id": model_id,
+            "sha": revision,
+            "pipeline_tag": "text-generation",
+            "siblings": [
+                {"rfilename": "README.md"},
+                {"rfilename": "config.json"},
+                {"rfilename": "TRAINING.md"},
+            ],
+        }
+        if self.publication_conflict:
+            value["cardData"] = {"base_model": "acme/Legacy-Base"}
+            value["tags"] = ["base_model:acme/Canonical-Base"]
         return RemoteObject(
             FetchStatus.OK,
-            _canonical(
-                {
-                    "id": model_id,
-                    "sha": revision,
-                    "pipeline_tag": "text-generation",
-                    "siblings": [
-                        {"rfilename": "README.md"},
-                        {"rfilename": "config.json"},
-                        {"rfilename": "TRAINING.md"},
-                    ],
-                }
-            ).rstrip(b"\n"),
+            _canonical(value).rstrip(b"\n"),
         )
 
     def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
@@ -158,10 +162,19 @@ class QualityReportTests(unittest.TestCase):
         cls.replay = cls.root / "batch-replay"
         cls.changed = cls.root / "batch-changed"
         cls.official = cls.root / "batch-official"
+        cls.conflict_bundle = cls.root / "conflict-bundle"
+        cls.conflict = cls.root / "batch-conflict"
+        collect_hf_source_bundle(
+            "acme/Quality",
+            cls.conflict_bundle,
+            _HubAdapter(precision="float16", publication_conflict=True),
+            revision=REVISION,
+        )
         cls._make_batch(cls.primary, cls.bundle)
         cls._make_batch(cls.replay, cls.bundle)
         cls._make_batch(cls.changed, cls.changed_bundle)
         cls._make_batch(cls.official, cls.bundle, cls.official_bundle)
+        cls._make_batch(cls.conflict, cls.conflict_bundle)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -314,6 +327,51 @@ class QualityReportTests(unittest.TestCase):
         batch_result_path.write_bytes(_canonical(batch_result))
         with self.assertRaises(QualityReportError):
             build_quality_report(stale)
+
+    def test_publication_conflicts_are_replayed_and_aggregated_without_values(
+        self,
+    ) -> None:
+        report = build_quality_report(self.conflict)
+        value = report.to_dict()
+        self.assertEqual("model-card-quality-report/v3", QUALITY_REPORT_VERSION)
+        omissions = value["targets"][0]["metrics"]["omissions"]
+        self.assertEqual(1, omissions["publication_conflict_count"])
+        self.assertEqual(1, omissions["publication_conflict_field_count"])
+        self.assertEqual(
+            {
+                "entries": [
+                    {
+                        "count": 1,
+                        "key": "metadata_base_model_declarations_disagree",
+                    }
+                ],
+                "total": 1,
+            },
+            omissions["publication_conflict_reasons"],
+        )
+        aggregate = value["aggregate"]["omissions"]
+        self.assertEqual(1, aggregate["publication_conflict_count"])
+        self.assertEqual(
+            omissions["publication_conflict_reasons"],
+            aggregate["publication_conflict_reasons"],
+        )
+        encoded = serialize_quality_report(report)
+        for private_key in (
+            b'"source_id"',
+            b'"pointer"',
+            b'"value_sha256s"',
+            b'"conflict_sha256"',
+        ):
+            self.assertNotIn(private_key, encoded)
+
+        tampered = self.root / "batch-conflict-tampered"
+        shutil.copytree(self.conflict, tampered)
+        conflict_path = next(
+            tampered.glob("targets/*/publication-conflicts.json")
+        )
+        conflict_path.write_text(conflict_path.read_text() + " ", encoding="utf-8")
+        with self.assertRaises(QualityReportError):
+            build_quality_report(tampered)
 
     def test_privacy_boundary_rejects_arbitrary_absolute_paths(self) -> None:
         for unsafe in (

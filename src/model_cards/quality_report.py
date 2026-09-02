@@ -40,7 +40,15 @@ from .extraction import (
     ExtractionResult,
     ProposalOutcome,
 )
-from .factreasoner import FactReasonerRecord, FieldAction
+from .factreasoner import (
+    FACTREASONER_KERNEL_VERSION,
+    IBM_FACTREASONER_ADAPTER_VERSION,
+    IBM_FACTREASONER_INFERENCE_METHOD,
+    IBM_FACTREASONER_RELATION_PROBABILITY,
+    IBM_FACTREASONER_UPSTREAM_REVISION,
+    FactReasonerRecord,
+    FieldAction,
+)
 from .findings import FieldAuditStatus, OmissionAudit, OmissionReason
 from .models import (
     EvidenceKind,
@@ -50,7 +58,14 @@ from .models import (
 )
 from .official_discovery import OfficialDiscoveryManifest
 from .official_sources import replay_official_sources
+from .orchestration import (
+    ORCHESTRATION_MANIFEST_FILENAME,
+    ORCHESTRATION_SCOPE,
+    ORCHESTRATION_VERSION,
+    ProviderOrchestrationResult,
+)
 from .pipeline import (
+    PIPELINE_VERSION,
     CompositionStatus,
     PipelineRepairReport,
     PipelineResult,
@@ -62,6 +77,9 @@ from .publication import project_publication_card
 from .publication_contract import FIELD_PATHS as PUBLICATION_FIELD_PATHS
 from .publication_schema import PUBLICATION_SCHEMA, validate_publication_card
 from .publication_sources import (
+    PUBLICATION_CONFLICT_VERSION,
+    PUBLICATION_SOURCE_RULESET,
+    PublicationConflictRecord,
     assert_no_source_excerpt,
     replay_publication_enrichment,
 )
@@ -70,14 +88,21 @@ from .publication_validation import (
     remove_publication_fields,
     replay_publication_validation,
 )
+from .provider import MODEL_ID, PINNED_PROVIDER, PROVIDER_RUNTIME_VERSION
+from .provider_adapters import (
+    ADAPTER_VERSION,
+    AGGREGATE_BUDGET_SUMMARY_VERSION,
+    AGGREGATE_BUDGET_VERSION,
+    summarize_aggregate_budget,
+)
 from .risk_mapping import RISK_MAPPING_VERSION, UseContext
-from .run_ledger import UsageLedger
+from .run_ledger import GLOBAL_PAID_CALL_CAP, GLOBAL_USD_CAP, UsageLedger
 from .run_summary import (
     AUDIT_VIEW_FILENAME,
     USAGE_SUMMARY_FILENAME,
     write_run_summaries,
 )
-from .run_state import RunStore
+from .run_state import USAGE_LEDGER_FILENAME, RunStore
 from .schema import (
     CONTRACT_VERSION,
     CONTENT_FIELD_PATHS,
@@ -90,11 +115,17 @@ from .source_documents import SourceDocumentCatalog
 from .source_state import SourceStateMode, load_source_state
 
 
-QUALITY_REPORT_VERSION = "model-card-quality-report/v1"
+QUALITY_REPORT_VERSION = "model-card-quality-report/v3"
+
+_AGGREGATE_BUDGET_FILENAME = "aggregate-budget.jsonl"
+_AGGREGATE_BUDGET_SUMMARY_FILENAME = "aggregate-budget-summary.json"
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 _CODE_RE = re.compile(r"^[a-z][a-z0-9._:-]{0,127}$")
 _CLAIM_RE = re.compile(r"^claim-[0-9a-f]{24}$")
+_HF_BUNDLE_ID_RE = re.compile(r"^hf_bundle_[0-9a-f]{32}$")
+_OFFICIAL_BUNDLE_ID_RE = re.compile(r"^official_bundle_[0-9a-f]{32}$")
+_COMBINED_BUNDLE_ID_RE = re.compile(r"^combined_bundle_[0-9a-f]{32}$")
 _FIELD_RE = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)(?:\[[0-9]+\])?$")
 _LOCAL_PATH_RE = re.compile(
     r"(?i)(?:file://|(?:^|\s)~[/\\]|[A-Z]:[\\/]Users[\\/]"
@@ -160,6 +191,7 @@ _PIPELINE_ARTIFACT_FILENAMES = frozenset(
         "factreasoner-content.json",
         "factreasoner-publication-original.json",
         "publication-validation.json",
+        "publication-conflicts.json",
         "factreasoner.json",
         "omissions.json",
         "privacy.json",
@@ -264,6 +296,7 @@ class QualityReport:
 class _LoadedTarget:
     record: dict[str, Any]
     provider: dict[str, Any] | None
+    aggregate_budget_path_sha256: str | None
 
 
 @dataclass(frozen=True)
@@ -271,6 +304,7 @@ class _LoadedBatch:
     status: str
     requests: tuple[str, ...]
     targets: tuple[_LoadedTarget, ...]
+    aggregate_budget: dict[str, Any] | None
     batch_sha256: str
 
 
@@ -377,6 +411,361 @@ def write_quality_report(
     return path
 
 
+_PROVIDER_ADMISSION_KEYS = {
+    "orchestration_version",
+    "adapter_version",
+    "extraction_version",
+    "factreasoner_kernel_version",
+    "pipeline_version",
+    "provider_runtime_version",
+    "scope",
+    "model",
+    "target",
+    "source_bundle_id",
+    "source_manifest_sha256",
+    "source_catalog_sha256",
+    "source_state_mode",
+    "source_state_sha256",
+    "hf_bundle_id",
+    "official_bundle_id",
+    "provider",
+    "eligible_source_set_sha256",
+    "ledger_slot_sha256",
+    "decision_namespace_sha256",
+    "aggregate_budget_path_sha256",
+    "risk_catalog_sha256",
+    "risk_catalog_status",
+    "risk_interface_status",
+    "factreasoner_interface_status",
+    "factreasoner_checker_id",
+    "factreasoner_checker_revision",
+    "factreasoner_adapter_version",
+    "factreasoner_upstream_revision",
+    "factreasoner_configuration",
+    "factreasoner_inference_method",
+    "factreasoner_relation_probability",
+    "max_risks",
+}
+
+_PROVIDER_RESULT_KEYS = {
+    "orchestration_version",
+    "scope",
+    "model",
+    "target",
+    "source_bundle_id",
+    "source_manifest_sha256",
+    "source_catalog_sha256",
+    "provider",
+    "eligible_text_source_ids",
+    "extraction_batch_sha256s",
+    "quote_candidate_ids",
+    "prose_decision_sha256s",
+    "risk_catalog_sha256",
+    "risk_interface_status",
+    "factreasoner_interface_status",
+    "pipeline_result_sha256",
+    "result_sha256",
+}
+
+_AGGREGATE_SUMMARY_KEYS = {
+    "aggregate_budget_summary_version",
+    "aggregate_budget_version",
+    "journal_path_sha256",
+    "journal_sha256",
+    "journal_event_count",
+    "ledger_count",
+    "paid_calls",
+    "committed_usd",
+    "open_reservation_count",
+    "reserved_call_capacity",
+    "reserved_usd_capacity",
+    "total_budget_commitment",
+    "total_usd_commitment",
+    "paid_call_cap",
+    "usd_cap",
+    "global_halt",
+    "journal_scope",
+}
+
+_AGGREGATE_REPORT_KEYS = _AGGREGATE_SUMMARY_KEYS - {"journal_path_sha256"}
+
+_PROVIDER_DECISION_DIRECTORY = "provider-decisions"
+_RISK_CATALOG_STATUSES = frozenset(
+    {
+        "explicit_pinned_catalog",
+        "installed_pinned_catalog",
+        "nexus_dependency_unavailable",
+    }
+)
+_RISK_INTERFACE_STATUSES = frozenset(
+    {
+        "nexus_dependency_unavailable",
+        "nexus_provider_enabled",
+        "risk_catalog_unavailable",
+    }
+)
+_FACTREASONER_UNAVAILABLE_STATUSES = frozenset(
+    {
+        "ibm_factreasoner_api_invalid",
+        "ibm_factreasoner_dependency_unavailable",
+        "ibm_factreasoner_import_unavailable",
+        "ibm_factreasoner_pgmpy_unavailable",
+        "ibm_factreasoner_revision_unverified",
+    }
+)
+
+
+def _load_provider_admission(
+    path: Path,
+    request: str,
+    result: PipelineResult | None = None,
+) -> tuple[dict[str, Any], str | None]:
+    value = _read_canonical_object(path, "provider orchestration admission")
+    item = _strict_object(value, _PROVIDER_ADMISSION_KEYS, "provider admission")
+    if (
+        item["orchestration_version"] != ORCHESTRATION_VERSION
+        or item["adapter_version"] != ADAPTER_VERSION
+        or item["extraction_version"] != EXTRACTION_VERSION
+        or item["factreasoner_kernel_version"] != FACTREASONER_KERNEL_VERSION
+        or item["pipeline_version"] != PIPELINE_VERSION
+        or item["provider_runtime_version"] != PROVIDER_RUNTIME_VERSION
+        or item["scope"] != ORCHESTRATION_SCOPE
+        or item["model"] != MODEL_ID
+        or item["provider"] != PINNED_PROVIDER
+    ):
+        raise QualityReportError("provider admission identity is not pinned")
+    try:
+        target = TargetIdentity.from_dict(
+            _strict_object(item["target"], {"model_id", "revision"}, "provider target")
+        )
+    except Exception as exc:
+        raise QualityReportError("provider admission target is invalid") from exc
+    model_id, requested_revision = parse_target_request(request, None)
+    if target.model_id != model_id or (
+        requested_revision is not None and target.revision != requested_revision
+    ):
+        raise QualityReportError("provider admission target differs from the batch")
+    source_state_mode = item["source_state_mode"]
+    if (
+        not isinstance(item["hf_bundle_id"], str)
+        or not _HF_BUNDLE_ID_RE.fullmatch(item["hf_bundle_id"])
+    ):
+        raise QualityReportError("provider admission Hub bundle identity is invalid")
+    if source_state_mode == SourceStateMode.HF_ONLY.value:
+        if (
+            item["source_bundle_id"] != item["hf_bundle_id"]
+            or item["official_bundle_id"] is not None
+        ):
+            raise QualityReportError("provider admission source-state identity is invalid")
+    elif source_state_mode == SourceStateMode.HF_AND_OFFICIAL.value:
+        if (
+            not isinstance(item["source_bundle_id"], str)
+            or not _COMBINED_BUNDLE_ID_RE.fullmatch(item["source_bundle_id"])
+            or not isinstance(item["official_bundle_id"], str)
+            or not _OFFICIAL_BUNDLE_ID_RE.fullmatch(item["official_bundle_id"])
+        ):
+            raise QualityReportError("provider admission source-state identity is invalid")
+    else:
+        raise QualityReportError("provider admission source-state mode is invalid")
+    for name in (
+        "source_manifest_sha256",
+        "source_catalog_sha256",
+        "source_state_sha256",
+        "eligible_source_set_sha256",
+        "ledger_slot_sha256",
+        "decision_namespace_sha256",
+    ):
+        _require_digest(item[name], f"provider admission {name}")
+    for name in ("aggregate_budget_path_sha256", "risk_catalog_sha256"):
+        if item[name] is not None:
+            _require_digest(item[name], f"provider admission {name}")
+    for name in (
+        "risk_catalog_status",
+        "risk_interface_status",
+        "factreasoner_interface_status",
+    ):
+        _require_code(item[name], f"provider admission {name}")
+    if (
+        item["ledger_slot_sha256"] != _digest(USAGE_LEDGER_FILENAME)
+        or item["decision_namespace_sha256"]
+        != _digest(_PROVIDER_DECISION_DIRECTORY)
+    ):
+        raise QualityReportError("provider admission local state slots are invalid")
+    if (
+        item["risk_catalog_status"] not in _RISK_CATALOG_STATUSES
+        or item["risk_interface_status"] not in _RISK_INTERFACE_STATUSES
+        or (
+            item["risk_catalog_sha256"] is None
+            and (
+                item["risk_catalog_status"] != "nexus_dependency_unavailable"
+                or item["risk_interface_status"] != "risk_catalog_unavailable"
+            )
+        )
+        or (
+            item["risk_catalog_sha256"] is not None
+            and item["risk_catalog_status"] == "nexus_dependency_unavailable"
+        )
+        or (
+            item["risk_interface_status"] == "nexus_provider_enabled"
+            and item["risk_catalog_sha256"] is None
+        )
+        or (
+            item["risk_interface_status"] == "risk_catalog_unavailable"
+            and item["risk_catalog_sha256"] is not None
+        )
+    ):
+        raise QualityReportError("provider admission risk interface is invalid")
+    factreasoner_status = item["factreasoner_interface_status"]
+    expected_factreasoner_checker = (
+        "ibm/factreasoner-fr1"
+        if factreasoner_status == "ibm_factreasoner_fr1_enabled"
+        else "ibm/factreasoner-fr1-unavailable"
+    )
+    if (
+        factreasoner_status
+        not in _FACTREASONER_UNAVAILABLE_STATUSES
+        | {"ibm_factreasoner_fr1_enabled"}
+        or item["factreasoner_checker_id"] != expected_factreasoner_checker
+        or item["factreasoner_checker_revision"]
+        != IBM_FACTREASONER_UPSTREAM_REVISION
+        or item["factreasoner_adapter_version"]
+        != IBM_FACTREASONER_ADAPTER_VERSION
+        or item["factreasoner_upstream_revision"]
+        != IBM_FACTREASONER_UPSTREAM_REVISION
+        or item["factreasoner_configuration"] != "FR1"
+        or item["factreasoner_inference_method"]
+        != IBM_FACTREASONER_INFERENCE_METHOD
+        or item["factreasoner_relation_probability"]
+        != IBM_FACTREASONER_RELATION_PROBABILITY
+    ):
+        raise QualityReportError("provider admission FactReasoner interface is invalid")
+    if (
+        not isinstance(item["max_risks"], int)
+        or isinstance(item["max_risks"], bool)
+        or not 1 <= item["max_risks"] <= 10
+    ):
+        raise QualityReportError("provider admission max_risks is invalid")
+    if result is not None and (
+        target != result.target
+        or item["source_bundle_id"] != result.source_bundle_id
+        or item["source_manifest_sha256"] != result.source_manifest_sha256
+        or item["source_catalog_sha256"] != result.source_catalog_sha256
+    ):
+        raise QualityReportError("provider admission differs from the pipeline result")
+    return item, item["aggregate_budget_path_sha256"]
+
+
+def _load_provider_run_artifacts(
+    run_root: Path,
+    request: str,
+    result: PipelineResult,
+) -> tuple[
+    tuple[str, ...],
+    str | None,
+    dict[str, Any] | None,
+    dict[str, Any] | None,
+]:
+    admission_path = run_root / ORCHESTRATION_MANIFEST_FILENAME
+    provider_result_path = run_root / "provider-result.json"
+    presence = tuple(
+        path.exists() or path.is_symlink()
+        for path in (admission_path, provider_result_path)
+    )
+    if presence == (False, False):
+        return (), None, None, None
+    if presence != (True, True):
+        raise QualityReportError("provider run artifact pair is incomplete")
+    admission, budget_path_sha256 = _load_provider_admission(
+        admission_path, request, result
+    )
+    value = _read_canonical_object(provider_result_path, "provider result")
+    item = _strict_object(value, _PROVIDER_RESULT_KEYS, "provider result")
+    try:
+        typed = ProviderOrchestrationResult(
+            target=result.target,
+            source_bundle_id=item["source_bundle_id"],
+            source_manifest_sha256=item["source_manifest_sha256"],
+            source_catalog_sha256=item["source_catalog_sha256"],
+            provider=item["provider"],
+            eligible_text_source_ids=tuple(item["eligible_text_source_ids"]),
+            extraction_batch_sha256s=tuple(item["extraction_batch_sha256s"]),
+            quote_candidate_ids=tuple(item["quote_candidate_ids"]),
+            prose_decision_sha256s=tuple(item["prose_decision_sha256s"]),
+            risk_catalog_sha256=item["risk_catalog_sha256"],
+            risk_interface_status=item["risk_interface_status"],
+            factreasoner_interface_status=item["factreasoner_interface_status"],
+            pipeline_result=result,
+            orchestration_version=item["orchestration_version"],
+        )
+    except Exception as exc:
+        raise QualityReportError("provider result failed typed validation") from exc
+    if typed.to_dict() != item:
+        raise QualityReportError("provider result differs from its typed reconstruction")
+    if (
+        item["risk_catalog_sha256"] != admission["risk_catalog_sha256"]
+        or item["risk_interface_status"] != admission["risk_interface_status"]
+        or item["factreasoner_interface_status"]
+        != admission["factreasoner_interface_status"]
+        or admission["eligible_source_set_sha256"]
+        != _digest(item["eligible_text_source_ids"])
+    ):
+        raise QualityReportError("provider result differs from its admission")
+    return (
+        (ORCHESTRATION_MANIFEST_FILENAME, "provider-result.json"),
+        budget_path_sha256,
+        admission,
+        item,
+    )
+
+
+def _validate_aggregate_summary(value: Any) -> dict[str, Any]:
+    item = _strict_object(value, _AGGREGATE_SUMMARY_KEYS, "aggregate budget summary")
+    if (
+        item["aggregate_budget_summary_version"]
+        != AGGREGATE_BUDGET_SUMMARY_VERSION
+        or item["aggregate_budget_version"] != AGGREGATE_BUDGET_VERSION
+        or item["journal_scope"] not in {"batch_root", "external_shared"}
+        or item["paid_call_cap"] != GLOBAL_PAID_CALL_CAP
+        or _money(item["usd_cap"]) != GLOBAL_USD_CAP
+    ):
+        raise QualityReportError("aggregate budget summary identity is invalid")
+    for name in ("journal_path_sha256", "journal_sha256"):
+        _require_digest(item[name], f"aggregate budget {name}")
+    for name in (
+        "journal_event_count",
+        "ledger_count",
+        "paid_calls",
+        "open_reservation_count",
+        "reserved_call_capacity",
+        "total_budget_commitment",
+        "paid_call_cap",
+    ):
+        _nonnegative(item[name], f"aggregate budget {name}")
+    committed_usd = _money(item["committed_usd"])
+    reserved_usd = _money(item["reserved_usd_capacity"])
+    total_usd = _money(item["total_usd_commitment"])
+    if not isinstance(item["global_halt"], bool):
+        raise QualityReportError("aggregate budget halt flag is invalid")
+    if (
+        item["paid_calls"] + item["reserved_call_capacity"]
+        != item["total_budget_commitment"]
+        or committed_usd + reserved_usd != total_usd
+        or (
+            not item["global_halt"]
+            and (
+                item["total_budget_commitment"] > item["paid_call_cap"]
+                or total_usd > _money(item["usd_cap"])
+            )
+        )
+    ):
+        raise QualityReportError("aggregate budget summary counts are inconsistent")
+    return item
+
+
+def _aggregate_report_metrics(summary: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: summary[key] for key in sorted(_AGGREGATE_REPORT_KEYS)}
+
+
 def _load_batch(root: Path) -> _LoadedBatch:
     if root.is_symlink() or not root.is_dir():
         raise QualityReportError("batch directory is missing or unsafe")
@@ -403,7 +792,48 @@ def _load_batch(root: Path) -> _LoadedBatch:
     )
     if result_value["status"] not in _BATCH_STATUSES:
         raise QualityReportError("batch result is not complete")
-    if result_value["artifacts"] != ["batch-request.json", "batch-result.json"]:
+    control_artifacts = result_value["artifacts"]
+    if (
+        not isinstance(control_artifacts, list)
+        or control_artifacts != sorted(set(control_artifacts))
+    ):
+        raise QualityReportError("batch result control artifacts are invalid")
+    aggregate_summary: dict[str, Any] | None = None
+    if _AGGREGATE_BUDGET_SUMMARY_FILENAME in control_artifacts:
+        aggregate_summary = _validate_aggregate_summary(
+            _read_canonical_object(
+                _safe_child(
+                    root,
+                    PurePosixPath(_AGGREGATE_BUDGET_SUMMARY_FILENAME),
+                    require_file=True,
+                ),
+                "aggregate budget summary",
+            )
+        )
+        expected_controls = {
+            "batch-request.json",
+            "batch-result.json",
+            _AGGREGATE_BUDGET_SUMMARY_FILENAME,
+        }
+        if aggregate_summary["journal_scope"] == "batch_root":
+            expected_controls.add(_AGGREGATE_BUDGET_FILENAME)
+            journal_path = _safe_child(
+                root,
+                PurePosixPath(_AGGREGATE_BUDGET_FILENAME),
+                require_file=True,
+            )
+            observed = {
+                **summarize_aggregate_budget(journal_path),
+                "journal_scope": "batch_root",
+            }
+            for key in _AGGREGATE_SUMMARY_KEYS - {"journal_path_sha256"}:
+                if aggregate_summary[key] != observed[key]:
+                    raise QualityReportError(
+                        "aggregate budget journal differs from its summary"
+                    )
+        if set(control_artifacts) != expected_controls:
+            raise QualityReportError("batch result control artifacts are invalid")
+    elif control_artifacts != ["batch-request.json", "batch-result.json"]:
         raise QualityReportError("batch result control artifacts are invalid")
     rows = result_value["targets"]
     if not isinstance(rows, list) or len(rows) != len(requests):
@@ -424,8 +854,49 @@ def _load_batch(root: Path) -> _LoadedBatch:
                 row, {"request", "status", "reason", "artifacts"}, "failed target"
             )
             _require_code(item["reason"], "failed target reason")
-            if item["artifacts"] != []:
-                raise QualityReportError("failed target cannot claim artifacts")
+            artifacts = item["artifacts"]
+            if (
+                not isinstance(artifacts, list)
+                or artifacts != sorted(set(artifacts))
+            ):
+                raise QualityReportError("failed target artifacts are invalid")
+            run_relative = PurePosixPath("targets") / (
+                "target-" + hashlib.sha256(request.encode("utf-8")).hexdigest()[:20]
+            )
+            allowed = {
+                run_relative / ORCHESTRATION_MANIFEST_FILENAME,
+                run_relative / "usage.jsonl",
+            }
+            artifact_paths = tuple(_safe_relative(entry) for entry in artifacts)
+            if not set(artifact_paths).issubset(allowed):
+                raise QualityReportError("failed target artifact inventory is invalid")
+            for relative in artifact_paths:
+                _safe_child(root, relative, require_file=True)
+            admission_relative = run_relative / ORCHESTRATION_MANIFEST_FILENAME
+            usage_relative = run_relative / "usage.jsonl"
+            budget_path_sha256 = None
+            if admission_relative in artifact_paths:
+                _, budget_path_sha256 = _load_provider_admission(
+                    _safe_child(root, admission_relative, require_file=True), request
+                )
+                if aggregate_summary is not None and budget_path_sha256 is None:
+                    raise QualityReportError(
+                        "failed provider admission is not bound to the batch budget"
+                    )
+            if (
+                usage_relative in artifact_paths
+                and admission_relative not in artifact_paths
+            ):
+                raise QualityReportError(
+                    "failed target usage ledger lacks provider admission"
+                )
+            provider = (
+                _provider_metrics(
+                    _safe_child(root, usage_relative, require_file=True)
+                )
+                if usage_relative in artifact_paths
+                else None
+            )
             record = {
                 "request": request,
                 "status": "failed",
@@ -434,11 +905,25 @@ def _load_batch(root: Path) -> _LoadedBatch:
                 "run_sha256": None,
                 "metrics": None,
                 "surfaces": None,
+                "provider": provider,
             }
-            targets.append(_LoadedTarget(record=record, provider=None))
+            targets.append(
+                _LoadedTarget(
+                    record=record,
+                    provider=provider,
+                    aggregate_budget_path_sha256=budget_path_sha256,
+                )
+            )
             failures += 1
             batch_components.append(
-                {"request": request, "status": "failed", "reason": item["reason"]}
+                {
+                    "request": request,
+                    "status": "failed",
+                    "reason": item["reason"],
+                    "cost_latency_sha256": (
+                        None if provider is None else _provider_surface(provider)
+                    ),
+                }
             )
             continue
         item = _strict_object(
@@ -446,8 +931,16 @@ def _load_batch(root: Path) -> _LoadedBatch:
         )
         if item["status"] not in _SUCCESS_STATUSES:
             raise QualityReportError("successful target lifecycle is invalid")
-        target, provider = _load_successful_target(root, request, item)
-        targets.append(_LoadedTarget(record=target, provider=provider))
+        target, provider, budget_path_sha256 = _load_successful_target(
+            root, request, item
+        )
+        targets.append(
+            _LoadedTarget(
+                record=target,
+                provider=provider,
+                aggregate_budget_path_sha256=budget_path_sha256,
+            )
+        )
         batch_components.append(
             {
                 "request": request,
@@ -459,17 +952,44 @@ def _load_batch(root: Path) -> _LoadedBatch:
     expected_status = "completed_with_failures" if failures else "completed"
     if result_value["status"] != expected_status:
         raise QualityReportError("batch result failure summary is inconsistent")
+    budget_hashes = {
+        item.aggregate_budget_path_sha256
+        for item in targets
+        if item.aggregate_budget_path_sha256 is not None
+    }
+    if aggregate_summary is None:
+        if budget_hashes:
+            raise QualityReportError("provider targets lack an aggregate budget summary")
+        aggregate_report = None
+    else:
+        if budget_hashes and budget_hashes != {
+            aggregate_summary["journal_path_sha256"]
+        }:
+            raise QualityReportError(
+                "provider targets do not share the summarized aggregate budget"
+            )
+        if any(
+            item.record["status"] != "failed"
+            and item.aggregate_budget_path_sha256 is None
+            for item in targets
+        ):
+            raise QualityReportError(
+                "provider batch contains a successful unbudgeted target"
+            )
+        aggregate_report = _aggregate_report_metrics(aggregate_summary)
     batch_sha256 = _digest(
         {
             "batch_request": request_value,
             "batch_status": result_value["status"],
             "targets": batch_components,
+            "aggregate_budget": aggregate_report,
         }
     )
     return _LoadedBatch(
         status=result_value["status"],
         requests=requests,
         targets=tuple(targets),
+        aggregate_budget=aggregate_report,
         batch_sha256=batch_sha256,
     )
 
@@ -478,7 +998,7 @@ def _load_successful_target(
     batch_root: Path,
     request: str,
     batch_record: Mapping[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any], str | None]:
     target_value = _strict_object(
         batch_record["target"], {"model_id", "revision"}, "batch target identity"
     )
@@ -533,11 +1053,19 @@ def _load_successful_target(
     ):
         raise QualityReportError("run manifest differs from pipeline result")
 
+    (
+        provider_artifacts,
+        aggregate_budget_path_sha256,
+        provider_admission,
+        provider_result,
+    ) = _load_provider_run_artifacts(run_root, request, result)
+
     expected_batch_artifacts = {
         run_relative / "source-bundle" / "manifest.json",
         run_relative / "pipeline-result.json",
         run_relative / AUDIT_VIEW_FILENAME,
         run_relative / USAGE_SUMMARY_FILENAME,
+        *(run_relative / name for name in provider_artifacts),
     }
     artifact_by_name = {item.filename: item for item in result.artifacts}
     if (
@@ -644,6 +1172,27 @@ def _load_successful_target(
         or result.source_catalog_sha256 != source_state.active_catalog_sha256
     ):
         raise QualityReportError("source state differs from pipeline result")
+    if provider_admission is not None:
+        eligible_source_ids = sorted(
+            item.source_id
+            for item in source_state.documents
+            if item.target == source_state.target and item.text is not None
+        )
+        if (
+            provider_result is None
+            or provider_admission["source_state_mode"] != source_state.mode.value
+            or provider_admission["source_state_sha256"]
+            != _digest(source_state.to_dict())
+            or provider_admission["hf_bundle_id"] != source_state.hf_bundle_id
+            or provider_admission["official_bundle_id"]
+            != source_state.official_bundle_id
+            or provider_admission["eligible_source_set_sha256"]
+            != _digest(eligible_source_ids)
+            or provider_result["eligible_text_source_ids"] != eligible_source_ids
+        ):
+            raise QualityReportError(
+                "provider source admission differs from the replayed source state"
+            )
     if discovery is not None and (
         discovery.target != source_state.target
         or discovery.source_bundle_id != source_state.hf_bundle_id
@@ -693,7 +1242,13 @@ def _load_successful_target(
     repair = _load_repair_chain(run_root, result)
     artifact, public_card = _load_exports(run_root, result)
     privacy = _load_privacy(run_root, result)
-    content_fact, original_publication_fact, publication_validation, fact = (
+    (
+        content_fact,
+        original_publication_fact,
+        publication_validation,
+        fact,
+        publication_conflicts,
+    ) = (
         _load_publication_validation_chain(
             run_root,
             result,
@@ -734,6 +1289,7 @@ def _load_successful_target(
             omission,
             publication_validation,
             result.conflict_count,
+            publication_conflicts,
         ),
         "risk": risk_metrics,
         "privacy": _privacy_metrics(privacy, result),
@@ -761,12 +1317,13 @@ def _load_successful_target(
         "run_sha256": result.result_sha256,
         "metrics": metrics,
         "surfaces": surfaces,
+        "provider": provider,
     }
     # These values are deliberately read to ensure strict artifact parsing is
     # not optimized away while no body-bearing value crosses into ``record``.
     if not gate_value or not risk_value:
         raise QualityReportError("pipeline quality artifacts are incomplete")
-    return record, provider
+    return record, provider, aggregate_budget_path_sha256
 
 
 def _load_extraction(run_root: Path, result: PipelineResult) -> tuple[ClaimCandidate, ...]:
@@ -778,6 +1335,7 @@ def _load_extraction(run_root: Path, result: PipelineResult) -> tuple[ClaimCandi
             "target",
             "catalog_sha256",
             "structured",
+            "publisher_context",
             "quote_batches",
             "quote_results",
             "candidates",
@@ -816,14 +1374,17 @@ def _load_extraction(run_root: Path, result: PipelineResult) -> tuple[ClaimCandi
         _typed_extraction_summary(
             item["structured"], result.target, candidate_by_id
         ),
+        _typed_extraction_summary(
+            item["publisher_context"], result.target, candidate_by_id
+        ),
         *(
             _typed_extraction_summary(summary, result.target, candidate_by_id)
             for summary in item["quote_results"]
         ),
     )
-    if len(summaries) != len(batches) + 1 or any(
+    if len(summaries) != len(batches) + 2 or any(
         summary.input_sha256 != batch.batch_sha256
-        for summary, batch in zip(summaries[1:], batches)
+        for summary, batch in zip(summaries[2:], batches)
     ):
         raise QualityReportError("quote extraction results differ from their batches")
     summarized_ids = {
@@ -1124,6 +1685,7 @@ def _load_publication_validation_chain(
     FactReasonerRecord,
     PublicationValidationReport,
     FactReasonerRecord,
+    tuple[PublicationConflictRecord, ...],
 ]:
     """Replay the deterministic bridge around the final public FactReasoner."""
 
@@ -1189,6 +1751,48 @@ def _load_publication_validation_chain(
         raise QualityReportError(
             "publication enrichment or validation replay failed"
         ) from exc
+    conflict_value = _read_canonical_object(
+        run_root / "publication-conflicts.json",
+        "publication conflict artifact",
+    )
+    conflict_item = _strict_object(
+        conflict_value,
+        {
+            "conflict_version",
+            "ruleset",
+            "records",
+            "conflict_count",
+            "conflicts_sha256",
+        },
+        "publication conflict artifact",
+    )
+    if (
+        conflict_item["conflict_version"] != PUBLICATION_CONFLICT_VERSION
+        or conflict_item["ruleset"] != PUBLICATION_SOURCE_RULESET
+        or not isinstance(conflict_item["records"], list)
+    ):
+        raise QualityReportError(
+            "publication conflict artifact version or records are invalid"
+        )
+    try:
+        publication_conflicts = tuple(
+            PublicationConflictRecord.from_dict(item)
+            for item in conflict_item["records"]
+        )
+    except Exception as exc:
+        raise QualityReportError(
+            "publication conflict records failed typed validation"
+        ) from exc
+    if (
+        conflict_value != initial.conflicts_dict()
+        or publication_conflicts != initial.conflicts
+        or conflict_item["conflict_count"] != result.publication_conflict_count
+        or conflict_item["conflicts_sha256"]
+        != result.publication_conflicts_sha256
+    ):
+        raise QualityReportError(
+            "publication conflict artifact differs from deterministic replay"
+        )
 
     initial_paths = {item.field_path for item in initial.provenance}
     withheld_paths = set(validation.withheld_field_paths)
@@ -1234,7 +1838,13 @@ def _load_publication_validation_chain(
         raise QualityReportError(
             "final FactReasoner is not bound to the complete publication card"
         )
-    return content_fact, original_publication_fact, validation, final_fact
+    return (
+        content_fact,
+        original_publication_fact,
+        validation,
+        final_fact,
+        publication_conflicts,
+    )
 
 
 def _load_omissions(
@@ -1657,6 +2267,7 @@ def _omission_metrics(
     audit: OmissionAudit,
     publication: PublicationValidationReport,
     conflict_count: int,
+    publication_conflicts: Sequence[PublicationConflictRecord],
 ) -> dict[str, Any]:
     conflict_fields = [
         item for item in audit.records if item.reason is OmissionReason.CONFLICTING
@@ -1669,6 +2280,13 @@ def _omission_metrics(
         "conflict_field_count": len(conflict_fields),
         "conflict_record_count": sum(len(item.conflict_sha256s) for item in conflict_fields),
         "composition_conflict_count": conflict_count,
+        "publication_conflict_count": len(publication_conflicts),
+        "publication_conflict_field_count": len(
+            {item.field_path for item in publication_conflicts}
+        ),
+        "publication_conflict_reasons": _distribution(
+            Counter(item.reason for item in publication_conflicts)
+        ),
         "reasons": _distribution(
             Counter(
                 [
@@ -1725,7 +2343,11 @@ def _provider_metrics(path: Path) -> dict[str, Any]:
     if set(raw) != expected:
         raise QualityReportError("usage ledger aggregate shape is invalid")
     _money(raw["committed_usd"])
-    if not isinstance(raw["providers"], list) or raw["providers"] != sorted(set(raw["providers"])):
+    if (
+        not isinstance(raw["providers"], list)
+        or raw["providers"] != sorted(set(raw["providers"]))
+        or any(item != PINNED_PROVIDER for item in raw["providers"])
+    ):
         raise QualityReportError("usage ledger provider summary is invalid")
     if not isinstance(raw["attempt_statuses"], dict) or not isinstance(raw["terminal_outcomes"], dict):
         raise QualityReportError("usage ledger outcome summaries are invalid")
@@ -1796,6 +2418,7 @@ def _surface_digests(
             {
                 "audit": result.omission_audit_sha256,
                 "publication": publication_validation.content_sha256,
+                "publication_conflicts": result.publication_conflicts_sha256,
             }
         ),
         "privacy": result.privacy.report_sha256,
@@ -1895,6 +2518,18 @@ def _aggregate(batch: _LoadedBatch) -> dict[str, Any]:
             "composition_conflict_count": sum(
                 item["omissions"]["composition_conflict_count"] for item in successful
             ),
+            "publication_conflict_count": sum(
+                item["omissions"]["publication_conflict_count"]
+                for item in successful
+            ),
+            "publication_conflict_field_count": sum(
+                item["omissions"]["publication_conflict_field_count"]
+                for item in successful
+            ),
+            "publication_conflict_reasons": _merge_distributions(
+                item["omissions"]["publication_conflict_reasons"]
+                for item in successful
+            ),
             "reasons": _merge_distributions(item["omissions"]["reasons"] for item in successful),
         },
         "risk": _aggregate_risk(successful),
@@ -1911,6 +2546,7 @@ def _aggregate(batch: _LoadedBatch) -> dict[str, Any]:
             "reasons": _distribution(Counter(item["privacy"]["reason"] for item in successful)),
         },
         "provider": _aggregate_provider(providers),
+        "aggregate_budget": batch.aggregate_budget,
     }
 
 
@@ -2039,11 +2675,21 @@ def _replay_stability(
             target_stable = all(surfaces.values()) and left_record["status"] == right_record["status"]
             comparison_status = "stable" if target_stable else "changed"
         elif not left_success and not right_success:
+            if left.provider is None and right.provider is None:
+                cost_latency_stable = None
+            elif left.provider is not None and right.provider is not None:
+                cost_latency_stable = _provider_surface(
+                    left.provider
+                ) == _provider_surface(right.provider)
+            else:
+                cost_latency_stable = False
             target_stable = (
                 left_record["status"] == right_record["status"]
                 and left_record["failure_reason"] == right_record["failure_reason"]
+                and cost_latency_stable is not False
             )
             surfaces = {key: None for key in _SURFACE_KEYS}
+            surfaces["cost_latency"] = cost_latency_stable
             comparison_status = "stable_failure" if target_stable else "changed_failure"
         else:
             target_stable = False
@@ -2143,11 +2789,8 @@ def _validate_report_payload(value: Any) -> None:
     loaded_targets = tuple(
         _LoadedTarget(
             record=dict(target),
-            provider=(
-                None
-                if target["metrics"] is None
-                else target["metrics"]["provider"]
-            ),
+            provider=target["provider"],
+            aggregate_budget_path_sha256=None,
         )
         for target in item["targets"]
     )
@@ -2155,6 +2798,7 @@ def _validate_report_payload(value: Any) -> None:
         status=item["primary_batch_status"],
         requests=tuple(requests),
         targets=loaded_targets,
+        aggregate_budget=item["aggregate"]["aggregate_budget"],
         batch_sha256=item["primary_batch_sha256"],
     )
     _validate_aggregate(item["aggregate"], len(item["targets"]))
@@ -2168,6 +2812,11 @@ def _validate_report_payload(value: Any) -> None:
                     "request": target["request"],
                     "status": "failed",
                     "reason": target["failure_reason"],
+                    "cost_latency_sha256": (
+                        None
+                        if target["provider"] is None
+                        else _provider_surface(target["provider"])
+                    ),
                 }
             )
         else:
@@ -2184,6 +2833,7 @@ def _validate_report_payload(value: Any) -> None:
             "batch_request": {"targets": requests},
             "batch_status": item["primary_batch_status"],
             "targets": batch_components,
+            "aggregate_budget": item["aggregate"]["aggregate_budget"],
         }
     ):
         raise QualityReportError("primary batch digest differs from target records")
@@ -2218,6 +2868,7 @@ def _validate_target_record(value: Any) -> None:
             "run_sha256",
             "metrics",
             "surfaces",
+            "provider",
         },
         "target quality record",
     )
@@ -2229,6 +2880,8 @@ def _validate_target_record(value: Any) -> None:
         _require_code(item["failure_reason"], "target failure reason")
         if any(item[name] is not None for name in ("target", "run_sha256", "metrics", "surfaces")):
             raise QualityReportError("failed target quality record claims run output")
+        if item["provider"] is not None:
+            _validate_provider(item["provider"])
         return
     if item["status"] not in _SUCCESS_STATUSES or item["failure_reason"] is not None:
         raise QualityReportError("successful target quality status is invalid")
@@ -2241,6 +2894,9 @@ def _validate_target_record(value: Any) -> None:
         raise QualityReportError("quality target model differs from request")
     _require_digest(item["run_sha256"], "target run digest")
     _validate_target_metrics(item["metrics"])
+    _validate_provider(item["provider"])
+    if item["provider"] != item["metrics"]["provider"]:
+        raise QualityReportError("target provider metrics are inconsistent")
     if item["metrics"]["schema_export"]["lifecycle_status"] != item["status"]:
         raise QualityReportError("target lifecycle differs from schema/export metrics")
     surfaces = _strict_object(item["surfaces"], set(_SURFACE_KEYS), "target surfaces")
@@ -2427,11 +3083,32 @@ def _validate_omissions(value: Any) -> None:
             "conflict_field_count",
             "conflict_record_count",
             "composition_conflict_count",
+            "publication_conflict_count",
+            "publication_conflict_field_count",
+            "publication_conflict_reasons",
             "reasons",
         },
         "omission metrics",
     )
-    _nonnegative_many(item, ("source_present_count", "conflict_field_count", "conflict_record_count", "composition_conflict_count"))
+    _nonnegative_many(
+        item,
+        (
+            "source_present_count",
+            "conflict_field_count",
+            "conflict_record_count",
+            "composition_conflict_count",
+            "publication_conflict_count",
+            "publication_conflict_field_count",
+        ),
+    )
+    if item["publication_conflict_field_count"] > item["publication_conflict_count"]:
+        raise QualityReportError(
+            "publication conflict fields exceed publication conflict records"
+        )
+    _validate_distribution(
+        item["publication_conflict_reasons"],
+        expected_total=item["publication_conflict_count"],
+    )
     _validate_distribution(item["reasons"])
 
 
@@ -2543,6 +3220,7 @@ def _validate_provider(value: Any) -> None:
         not isinstance(item["providers"], list)
         or item["providers"] != sorted(set(item["providers"]))
         or any(not isinstance(entry, str) or not entry or len(entry) > 128 for entry in item["providers"])
+        or any(entry != PINNED_PROVIDER for entry in item["providers"])
     ):
         raise QualityReportError("provider list is invalid")
     _validate_distribution(item["attempt_statuses"], expected_total=item["attempt_count"])
@@ -2567,6 +3245,7 @@ def _validate_aggregate(value: Any, request_count: int) -> None:
             "risk",
             "privacy",
             "provider",
+            "aggregate_budget",
         },
         "aggregate metrics",
     )
@@ -2609,6 +3288,27 @@ def _validate_aggregate(value: Any, request_count: int) -> None:
     _validate_distribution(privacy["statuses"], expected_total=item["succeeded"])
     _validate_distribution(privacy["reasons"], expected_total=item["succeeded"])
     _validate_provider(item["provider"])
+    if item["aggregate_budget"] is not None:
+        budget = _strict_object(
+            item["aggregate_budget"],
+            _AGGREGATE_REPORT_KEYS,
+            "aggregate budget report metrics",
+        )
+        _validate_aggregate_summary(
+            {**budget, "journal_path_sha256": "0" * 64}
+        )
+        if (
+            budget["journal_scope"] == "batch_root"
+            and (
+                budget["paid_calls"] != item["provider"]["paid_calls"]
+                or _money(budget["committed_usd"])
+                != _money(item["provider"]["committed_usd"])
+                or budget["global_halt"] != item["provider"]["global_halt"]
+            )
+        ):
+            raise QualityReportError(
+                "batch-root aggregate budget differs from target ledgers"
+            )
 
 
 def _validate_replay(value: Any, targets: Sequence[Mapping[str, Any]]) -> None:
@@ -2667,7 +3367,16 @@ def _validate_replay(value: Any, targets: Sequence[Mapping[str, Any]]) -> None:
         for key in _SURFACE_KEYS:
             if comparable and not isinstance(entry[key], bool):
                 raise QualityReportError("comparable replay surface must be boolean")
-            if not comparable and entry[key] is not None:
+            if (
+                not comparable
+                and key == "cost_latency"
+                and entry[key] is not None
+                and not isinstance(entry[key], bool)
+            ):
+                raise QualityReportError(
+                    "failed replay cost/latency surface is invalid"
+                )
+            if not comparable and key != "cost_latency" and entry[key] is not None:
                 raise QualityReportError("failed replay surface must be unavailable")
         if comparable:
             expected_stable = (
@@ -2679,6 +3388,7 @@ def _validate_replay(value: Any, targets: Sequence[Mapping[str, Any]]) -> None:
             expected_stable = (
                 entry["primary_failure_reason"]
                 == entry["replay_failure_reason"]
+                and entry["cost_latency"] is not False
             )
             expected_comparison = (
                 "stable_failure" if expected_stable else "changed_failure"

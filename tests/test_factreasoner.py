@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from contextlib import redirect_stderr, redirect_stdout
 from copy import deepcopy
+import io
 import json
+from types import SimpleNamespace
 from unittest import mock
 import unittest
 
 from model_cards.factreasoner import (
     IBM_FACTREASONER_UPSTREAM_REVISION,
     CheckOutcome,
+    CheckRequest,
     CheckerResponse,
     CheckStage,
     FactReasonerError,
@@ -16,6 +20,7 @@ from model_cards.factreasoner import (
     FieldAction,
     FieldCoverageStatus,
     IBMFactReasonerAdapter,
+    MAX_FACT_CHECKS_PER_BATCH,
     ReferentHypothesis,
     RetrievalConfig,
     SourceAvailability,
@@ -139,6 +144,34 @@ class FactReasonerKernelTests(unittest.TestCase):
         self.assertIn(RelationToTarget.EXACT_TARGET, relations)
         self.assertIn(RelationToTarget.BASE_MODEL, relations)
         self.assertIn(RelationToTarget.COMPARISON_MODEL, relations)
+        score_atoms = [
+            item
+            for item in result.atoms
+            if item.field_path == "evaluation.benchmark_scores"
+        ]
+        self.assertEqual(1, len(score_atoms))
+        self.assertEqual("evaluation.benchmark_scores[0]", score_atoms[0].value_path)
+        self.assertIn('"benchmark":"Toy Reasoning"', score_atoms[0].statement)
+        self.assertIn('"metric":"accuracy"', score_atoms[0].statement)
+        self.assertIn('"score":73.5', score_atoms[0].statement)
+
+    def test_bibtex_citation_is_one_metadata_unit_not_fragment_atoms(self) -> None:
+        schema = contract({"citation": {"type": "string"}})
+        citation = (
+            "```bibtex\n"
+            "@misc{gemma3,\n"
+            "  title={Gemma 3},\n"
+            "  author={Example Lab}\n"
+            "}\n"
+            "```"
+        )
+
+        result = atomize_card(card(citation=citation), schema, TARGET)
+
+        atoms = [item for item in result.atoms if item.field_path == "details.citation"]
+        self.assertEqual(1, len(atoms))
+        self.assertIn("@misc{gemma3", atoms[0].statement)
+        self.assertNotEqual("}", atoms[0].statement.strip())
 
     def test_schema_parametric_atomization_covers_every_final_field(self) -> None:
         schema = contract(
@@ -398,6 +431,89 @@ class FactReasonerKernelTests(unittest.TestCase):
         self.assertTrue(decision.attempts[-1].fallback_complete)
         self.assertTrue(decision.attempts[-1].evidence)
 
+    def test_batch_checker_runs_complete_primary_then_neutral_fallback_waves(self) -> None:
+        fields = {
+            f"claim_{index:02d}": {"type": "string"}
+            for index in range(70)
+        }
+        schema = contract(fields)
+        value = card(
+            **{
+                name: f"The exact model has documented property {index}."
+                for index, name in enumerate(fields)
+            }
+        )
+
+        class BatchChecker:
+            checker_id = "fixture/batch-checker"
+            checker_revision = "fixture-batch-v1"
+
+            def __init__(self):
+                self.batches = []
+
+            def check(self, _request):
+                raise AssertionError("single-check path must not be used")
+
+            def check_many(self, requests):
+                stage = requests[0].stage
+                self.assert_single_stage(requests, stage)
+                self.batches.append((stage, len(requests)))
+                if stage is CheckStage.RETRIEVAL:
+                    return tuple(
+                        CheckerResponse(CheckOutcome.NEUTRAL, "no_relation")
+                        for _ in requests
+                    )
+                return tuple(
+                    CheckerResponse(
+                        CheckOutcome.SUPPORT,
+                        "fixture_support",
+                        (request.contexts[0].chunk.chunk_id,),
+                    )
+                    for request in requests
+                )
+
+            @staticmethod
+            def assert_single_stage(requests, stage):
+                if any(item.stage is not stage for item in requests):
+                    raise AssertionError("mixed FactReasoner stages")
+
+        checker = BatchChecker()
+        record = run_factreasoner(
+            value,
+            schema,
+            TARGET,
+            (
+                identity_source(
+                    "\n".join(
+                        f"The exact model has documented property {index}."
+                        for index in range(70)
+                    )
+                ),
+            ),
+            checker,
+        )
+
+        atom_count = len(record.atoms)
+        remainder = atom_count - MAX_FACT_CHECKS_PER_BATCH
+        self.assertGreater(remainder, 0)
+        self.assertLessEqual(remainder, MAX_FACT_CHECKS_PER_BATCH)
+        self.assertEqual(
+            [
+                (CheckStage.RETRIEVAL, MAX_FACT_CHECKS_PER_BATCH),
+                (CheckStage.RETRIEVAL, remainder),
+                (CheckStage.FULL_SOURCE_FALLBACK, MAX_FACT_CHECKS_PER_BATCH),
+                (CheckStage.FULL_SOURCE_FALLBACK, remainder),
+            ],
+            checker.batches,
+        )
+        self.assertTrue(
+            all(
+                decision.outcome is CheckOutcome.SUPPORT
+                and len(decision.attempts) == 2
+                for decision in record.decisions
+            )
+        )
+
     def test_missing_and_thin_sources_are_visible_without_checker_calls(self) -> None:
         schema = contract({"claim": {"type": "string"}})
         value = card(claim="A claim needing evidence.")
@@ -628,6 +744,141 @@ class FactReasonerKernelTests(unittest.TestCase):
             adapter = IBMFactReasonerAdapter()
             imported.assert_not_called()
         self.assertEqual(adapter.checker_revision, IBM_FACTREASONER_UPSTREAM_REVISION)
+
+    def test_ibm_adapter_runs_fr1_graph_and_normalizes_pgmpy_marginal(self) -> None:
+        schema = contract({"claim": {"type": "string"}})
+        atom = next(
+            item
+            for item in atomize_card(
+                card(claim="Acme Instruct supports exact source grounding."),
+                schema,
+                TARGET,
+            ).atoms
+            if item.field_path == "details.claim"
+        )
+        corpus = build_source_chunks(
+            (identity_source("Acme Instruct supports exact source grounding."),)
+        )
+        contexts = retrieve_chunks(atom, corpus.chunks, top_k=2)
+        request = CheckRequest(
+            atom=atom,
+            stage=CheckStage.RETRIEVAL,
+            contexts=contexts,
+            fallback_complete=len(contexts) == len(corpus.chunks),
+        )
+        graphs = []
+
+        class FakeNode:
+            def __init__(self, identifier, node_type, probability):
+                self.id = identifier
+                self.type = node_type
+                self.probability = probability
+
+        class FakeEdge:
+            def __init__(self, source_id, target_id, relation, probability, link):
+                self.source = source_id
+                self.target = target_id
+                self.type = relation
+                self.probability = probability
+                self.link = link
+
+        class FakeGraph:
+            def __init__(self):
+                self.nodes = []
+                self.edges = []
+                graphs.append(self)
+
+            def add_node(self, node):
+                self.nodes.append(node)
+
+            def add_edge(self, edge):
+                self.edges.append(edge)
+
+        class FakeReasoner:
+            def __init__(self, *, nli_extractor, merlin_path, use_priors):
+                self.markov_network = None
+                self.merlin_path = merlin_path
+                self.use_priors = use_priors
+
+            def from_fact_graph(self, graph):
+                self.markov_network = graph
+
+        class FakeVariableElimination:
+            def __init__(self, network):
+                self.network = network
+
+            def query(self, *, variables, show_progress):
+                self.variables = variables
+                self.show_progress = show_progress
+                return SimpleNamespace(values=[0.07, 0.43])
+
+        adapter = IBMFactReasonerAdapter(FixtureChecker())
+        runtime = SimpleNamespace(
+            fact_reasoner=FakeReasoner,
+            fact_graph=FakeGraph,
+            node=FakeNode,
+            edge=FakeEdge,
+            variable_elimination=FakeVariableElimination,
+            prior_prob_atom=0.5,
+            prior_prob_context=0.9,
+        )
+        with mock.patch.object(adapter, "_load_upstream", return_value=runtime):
+            response = adapter.check(request)
+
+        self.assertEqual(CheckOutcome.SUPPORT, response.outcome)
+        self.assertEqual(
+            (contexts[0].chunk.chunk_id,), response.cited_chunk_ids
+        )
+        self.assertEqual(1, len(graphs))
+        self.assertEqual(1, len(graphs[0].edges))
+        self.assertEqual("entailment", graphs[0].edges[0].type)
+        self.assertEqual(0.9, graphs[0].edges[0].probability)
+        inference = adapter.inference_for(request)
+        self.assertIsNotNone(inference)
+        self.assertAlmostEqual(0.14, inference.atom_false_probability)
+        self.assertAlmostEqual(0.86, inference.atom_true_probability)
+        self.assertEqual(
+            (contexts[0].chunk.chunk_id,), inference.cited_chunk_ids
+        )
+
+    @unittest.skipUnless(
+        IBMFactReasonerAdapter.is_installed(),
+        "exact pinned IBM FactReasoner extra is not installed",
+    )
+    def test_installed_ibm_adapter_runs_without_merlin_or_live_calls(self) -> None:
+        schema = contract({"claim": {"type": "string"}})
+        atom = next(
+            item
+            for item in atomize_card(
+                card(claim="Acme Instruct supports exact source grounding."),
+                schema,
+                TARGET,
+            ).atoms
+            if item.field_path == "details.claim"
+        )
+        corpus = build_source_chunks(
+            (identity_source("Acme Instruct supports exact source grounding."),)
+        )
+        contexts = retrieve_chunks(atom, corpus.chunks, top_k=2)
+        request = CheckRequest(
+            atom=atom,
+            stage=CheckStage.RETRIEVAL,
+            contexts=contexts,
+            fallback_complete=len(contexts) == len(corpus.chunks),
+        )
+        adapter = IBMFactReasonerAdapter(FixtureChecker())
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with redirect_stdout(stdout), redirect_stderr(stderr):
+            response = adapter.check(request)
+
+        self.assertEqual(CheckOutcome.SUPPORT, response.outcome)
+        self.assertEqual("", stdout.getvalue())
+        self.assertEqual("", stderr.getvalue())
+        inference = adapter.inference_for(request)
+        self.assertIsNotNone(inference)
+        self.assertGreater(inference.atom_true_probability, 0.5)
 
 
 if __name__ == "__main__":

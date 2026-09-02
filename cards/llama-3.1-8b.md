@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [llama\-3\.1\-8b\.json](<./llama-3.1-8b.json>)<br>
-SHA-256: `0ba7baa8351a41b05985aa6acf73db2e7967394bf8b7c2a4355fc9a0d29508e5`
+SHA-256: `6fe99e1e2978ab7c25c2372440e66d42cb99d54f5fffd2f51ff9b7f124736b3b`
 
 ## Identity
 
@@ -11,11 +11,12 @@ SHA-256: `0ba7baa8351a41b05985aa6acf73db2e7967394bf8b7c2a4355fc9a0d29508e5`
 | --- | --- |
 | Model ID | meta\-llama/Llama\-3\.1\-8B |
 | Name | Llama\-3\.1\-8B |
-| Developed by | meta\-llama |
+| Developed by | Meta |
 | Model type | text\-generation |
-| License | llama3\.1 |
+| License | A custom commercial license, the Llama 3\.1 Community License, is available at: https://github\.com/meta\-llama/llama\-models/blob/main/models/llama3\_1/LICENSE |
 | Release date | July 23, 2024 |
 | Version | d04e592bb4f6aa9cfee91e2e20afa771667e1d4b |
+| Summary | The publisher describes Llama\-3\.1\-8B as a multilingual model with text input and output\. |
 
 ## Lineage
 
@@ -32,7 +33,7 @@ SHA-256: `0ba7baa8351a41b05985aa6acf73db2e7967394bf8b7c2a4355fc9a0d29508e5`
 | Context length | 128K tokens \(README\-declared context length\) |
 | Precision | bfloat16 stored tensor weights \(safetensors parameter\-count metadata\) |
 | Model size | 14\.96 GiB estimated tensor payload \(16,060,522,496 bytes; from safetensors dtype counts\) |
-| Input / output | input: text<br>output: text |
+| Input / output | input: Multilingual Text<br>output: Multilingual Text and code<br>supported languages: English, German, French, Italian, Portuguese, Hindi, Spanish, and Thai |
 
 ## Training Context
 
@@ -54,7 +55,8 @@ SHA-256: `0ba7baa8351a41b05985aa6acf73db2e7967394bf8b7c2a4355fc9a0d29508e5`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The frozen README provides 12 exact\-target benchmark scores in this capped publication set; examples: MMLU: 66\.7; MMLU\-Pro \(CoT\): 37\.1; AGIEval English: 47\.8\. |
+| Results summary | The frozen README provides 19 exact\-target benchmark scores; examples: MMLU: 66\.7; MMLU\-Pro \(CoT\): 37\.1; AGIEval English: 47\.8\. |
+| Safety evaluations | The publisher reports family/system\-level adversarial safety evaluation and recurring red teaming covering CBRNE, child\-safety, and cyber risks; this section does not state a checkpoint\-specific numeric safety score\. |
 
 ### Benchmark Scores
 
@@ -69,9 +71,16 @@ SHA-256: `0ba7baa8351a41b05985aa6acf73db2e7967394bf8b7c2a4355fc9a0d29508e5`
 | ARC\-Challenge | acc\_char | 79\.7 | 25 shots | Not reported |
 | TriviaQA\-Wiki | em | 77\.6 | 5 shots | Not reported |
 | SQuAD | em | 77\.0 | 1 shots | Not reported |
-| QuAC \(F1\) | f1 | 44\.9 | 1 shots | Not reported |
+| QuAC | f1 | 44\.9 | 1 shots | Not reported |
 | BoolQ | acc\_char | 75\.0 | 0 shots | Not reported |
-| DROP \(F1\) | f1 | 59\.5 | 3 shots | Not reported |
+| DROP | f1 | 59\.5 | 3 shots | Not reported |
+| MMLU | macro\_avg/acc | 62\.12 | 5 shots; language: Portuguese | Not reported |
+| MMLU | macro\_avg/acc | 62\.45 | 5 shots; language: Spanish | Not reported |
+| MMLU | macro\_avg/acc | 61\.63 | 5 shots; language: Italian | Not reported |
+| MMLU | macro\_avg/acc | 60\.59 | 5 shots; language: German | Not reported |
+| MMLU | macro\_avg/acc | 62\.34 | 5 shots; language: French | Not reported |
+| MMLU | macro\_avg/acc | 50\.88 | 5 shots; language: Hindi | Not reported |
+| MMLU | macro\_avg/acc | 50\.32 | 5 shots; language: Thai | Not reported |
 
 ## Links
 
@@ -82,4 +91,4 @@ SHA-256: `0ba7baa8351a41b05985aa6acf73db2e7967394bf8b7c2a4355fc9a0d29508e5`
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.summary`, `lineage.base_models`, `lineage.derivatives`, `training_context.adaptations`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.
+Unavailable agreed fields (not specified in the publication data): `lineage.base_models`, `lineage.derivatives`, `training_context.adaptations`, `evaluation.human_evals`, `links.system_card`, `links.tech_report`, `links.citation`.

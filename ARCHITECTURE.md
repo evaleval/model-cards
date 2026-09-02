@@ -71,8 +71,9 @@ exact Hugging Face bundle ---- declared official links
 - Claims must pass coordinate integrity, entity scope, field fit, and value support
   before they can enter composition.
 - Composition receives accepted candidates, not an unrestricted source corpus.
-- Conflicting accepted values do not use last-write-wins behavior; the affected field
-  is withheld.
+- Conflicting accepted values and conflicting publication-source values do not use
+  last-write-wins behavior; the affected field is withheld and the conflict remains
+  visible in a local, content-addressed record.
 - The local audit projection uses explicit absence values. The generated public
   projection instead omits an agreed field when the retained sources do not support
   a value; `Not applicable` is reserved for a field shown not to apply.
@@ -151,6 +152,19 @@ public artifacts. The private normalized decision sidecar still contains the
 schema-shaped response and is never exported. Wire-schema failures abort the
 extraction stage.
 
+A deterministic publisher-context pass separately scans only the pinned root model
+README. It admits complete statements with an explicit model subject under closed
+use, limitation, bias, risk, or mitigation structure. Pronouns cannot serve as the
+model subject. It rejects legal, configuration, fragment, unrecognized nested-heading,
+and related-model text because deterministic coreference would be unsafe, and records
+exact quote coordinates. Verified official developer reports are handled only by the
+provider-assisted path and its semantic binding gates.
+One versioned stage-disambiguation rule selects an exact clause from a mixed
+base/Instruct intended-use sentence only when the exact Hugging Face root README,
+publisher family, target stage, and inline intended-use label agree. The generic
+mixed-variant guard remains fail-closed. These private candidates can form Nexus use
+contexts but do not add fields to the seven-section public card.
+
 `claim_gate.py` applies the same ordered interface to every candidate:
 
 1. `coordinate_integrity` replays the pointer or quote.
@@ -225,6 +239,15 @@ be withheld. It then recomputes registered derivations with the blocked fields a
 requires that replay to equal the deletion result exactly. The final public card is
 checked again in `factreasoner.json`; no actionable result may survive that pass.
 
+Publication enrichment also treats Hugging Face's base-model declarations as a
+consensus relation. When `/cardData/base_model` and `base_model:` tags are both
+present, their normalized identifier sets must agree; otherwise
+`lineage.base_models` is omitted instead of choosing one metadata surface. Likewise,
+two different scores at the same benchmark/metric/setting/split coordinates cause
+that benchmark relation to be omitted. Both cases are recorded in the local
+`publication-conflicts.json` artifact using source pointers and value hashes; neither
+the competing values nor conflict metadata enter the agreed public schema.
+
 `public_export.py` validates the resulting seven-section object against the packaged
 Draft 2020-12 publication schema. `public_markdown.py` renders a human-readable
 companion only from a validated public JSON object and the SHA-256 of the exact sibling
@@ -235,16 +258,22 @@ publisher preflights and audits the JSON/Markdown pair before writing either fil
 
 ## 7. Provider-assisted orchestration
 
-`orchestration.py` is invoked only by `generate --provider Together`. The CLI,
-adapters, and orchestration admission reject every other provider; every assisted call uses exactly
+`orchestration.py` is invoked by `generate --provider Together`, including each
+target of a provider-assisted `batch` run. The CLI, adapters, and orchestration
+admission reject every other provider; every assisted call uses exactly
 `deepseek/deepseek-v4-flash-0731` through OpenRouter. It extracts bounded quote
-candidates from each eligible text document once, obtains normalized field-fit and
-value-support decisions, supplies a FactReasoner checker, and, when the pinned risk
-dependency is available, supplies the Nexus risk interfaces.
+candidates in one per-document extraction stage, using one general request and at
+most one dedicated use/risk request, obtains normalized field-fit and value-support
+decisions, supplies a FactReasoner checker, and, when the pinned risk dependency is
+available, supplies the Nexus risk interfaces.
 
-`provider.py` and `run_ledger.py` enforce a single append-only `usage.jsonl` ledger,
-the USD 25 and 300-call run caps, route freshness, structured JSON output, and at most
-two retries after explicit 429/5xx responses. A transport outcome that may have sent a
+`provider.py` and `run_ledger.py` enforce an append-only per-target `usage.jsonl`
+ledger, the USD 25 and 300-call target caps, route freshness, structured JSON output,
+and at most two retries after explicit 429/5xx responses. Provider-assisted batches
+also share an append-only aggregate journal capped at USD 25 or 300 paid calls,
+whichever comes first, for the entire cohort. It reserves one route-bounded cost and
+call slot before each fresh send and reconciles both commitments against the per-target
+ledgers after a crash. A transport outcome that may have sent a
 paid request becomes `uncertain` and cannot be sent again. There is no model or route
 fallback. Prompts and raw responses are not ledger fields; normalized decisions are
 stored separately in the private run directory and addressed by digest. The provider
@@ -257,20 +286,25 @@ check become explicit unavailable outcomes, so the run can retain its audit trai
 cannot claim full validation. Extraction and risk-interface response failures remain
 fatal because there is no safe local decision to substitute.
 
-Provider mode is intentionally absent from the batch command. This prevents separate
-targets from fragmenting the one-run global accounting boundary.
+Exact request-hash sidecars are reused across pipeline passes, and FactReasoner atoms
+are sent in deterministic batches of at most 64. Once any interrupted aggregate
+reservation has been reconciled, an ordinary replay reuses those sidecars before
+making a new reservation, so it adds neither a paid call nor a new aggregate-journal
+event.
 
 ## 8. Run state and replay
 
 `run_state.py` owns the immutable run manifest and append-only stage journal. Every
 stage records its input digests, output digest, status, reason code, and closed
-metrics. `pipeline-result.json` references the canonical stage artifacts and is
-verified against the journal and filesystem before reuse.
+metrics. `pipeline-result.json` references the canonical stage artifacts, including
+the publication-conflict count and digest, and is verified against the journal and
+filesystem before reuse.
 
 `run_summary.py` produces `audit-view.json` and `usage-summary.json`. They expose stage
 counts, repair counts, validation status, and cost/latency totals without source text,
 prompts, or raw ledger rows. `quality_report.py` re-verifies complete batch artifact
-chains, replays publication enrichment/provenance and deletion-only validation, and
+chains, replays publication enrichment/provenance/conflicts and deletion-only
+validation, and
 requires final FactReasoner coverage of the 33-field publication contract. With a
 paired replay it also compares value, artifact, decision, validation, risk, omission,
 privacy, and cost/latency surfaces.
@@ -284,13 +318,14 @@ privacy, and cost/latency surfaces.
 | `extraction.json`, `claim-gates.json` | Candidates and support decisions | No |
 | `composition*.json`, `factreasoner-original.json`, `factreasoner-content.json`, `omissions*.json` | Before/after audit-content repair projections and checks | No |
 | `repairs.json`, `risk-mapping.json` | Local field repair and taxonomy audit | No |
-| `factreasoner-publication-original.json`, `publication-validation.json` | Enriched pre-withhold public check and deletion-only decisions | No |
+| `factreasoner-publication-original.json`, `publication-validation.json`, `publication-conflicts.json` | Enriched pre-withhold public check, deletion-only decisions, and hashed source conflicts | No |
 | `factreasoner.json`, `privacy.json` | Final public-card factuality and privacy checks | No |
 | `card-artifact.json` | Bindings, reviews, validation, and derived card | No |
 | `public-card.json` | Exact 33-field-allowlisted seven-section JSON projection | Yes |
 | `cards/NAME.json`, `cards/NAME.md` | Published canonical JSON and its deterministic human-readable companion | Yes |
 | `run-manifest.json`, `journal.jsonl`, `pipeline-result.json` | Run and artifact integrity chain | No |
 | `audit-view.json`, `usage-summary.json` | Body-free operational summaries | No |
+| `aggregate-budget.jsonl`, `aggregate-budget-summary.json` | Shared provider-batch cap and its batch-bound snapshot | No |
 | `quality-report.json` | Body-free batch or paired-replay aggregate | Separate publishable report |
 
 ## Package map

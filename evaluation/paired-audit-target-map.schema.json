@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evaleval.github.io/model-cards/evaluation/paired-audit-target-map.schema.json",
+  "title": "Private paired Model Card audit target map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "mapping_version",
+    "targets"
+  ],
+  "properties": {
+    "mapping_version": {
+      "const": "model-card-paired-audit-target-map/v1"
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target_blind_id",
+          "target_request"
+        ],
+        "properties": {
+          "target_blind_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{7,127}$"
+          },
+          "target_request": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 512
+          }
+        }
+      }
+    }
+  }
+}

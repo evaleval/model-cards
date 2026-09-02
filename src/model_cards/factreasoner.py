@@ -15,15 +15,19 @@ an accusation about how the card text was produced.
 from __future__ import annotations
 
 from collections import Counter
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from copy import deepcopy
 from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
 import hashlib
 import importlib
+import importlib.metadata as importlib_metadata
 import importlib.util
 import json
 import math
+import os
 import re
+import threading
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -40,13 +44,36 @@ from .provider import (
 from .run_ledger import LedgerError
 
 
-FACTREASONER_KERNEL_VERSION = "model-card-factreasoner/v2"
+FACTREASONER_KERNEL_VERSION = "model-card-factreasoner/v4"
 ATOM_VERSION = "model-card-fact-atom/v1"
 CHUNK_VERSION = "model-card-source-chunk/v1"
 DECISION_VERSION = "model-card-fact-decision/v1"
 RECORD_VERSION = "model-card-factreasoner-record/v1"
 RETRIEVAL_VERSION = "hybrid-bm25-token-vector/v1"
 IBM_FACTREASONER_UPSTREAM_REVISION = "41eb0c21baa2a8bba4030cf0d619aa00fae2ed84"
+IBM_FACTREASONER_UPSTREAM_URL = "https://github.com/IBM/FactReasoner.git"
+IBM_FACTREASONER_ADAPTER_VERSION = "model-card-ibm-factreasoner-fr1/v2"
+IBM_FACTREASONER_INFERENCE_METHOD = "pgmpy-variable-elimination"
+CHECK_REQUEST_VERSION = "model-card-fact-check-request/v1"
+MAX_FACT_CHECKS_PER_BATCH = 64
+# OpenRouter's exact structured decision is categorical and does not promise
+# token log probabilities.  This fixed, declared factor strength replaces no
+# hidden confidence estimate; it is simply the deterministic FR1 edge weight.
+IBM_FACTREASONER_RELATION_PROBABILITY = 0.9
+
+# Upstream writes graph diagnostics directly to process-global stdout/stderr.
+# A provider-assisted CLI must keep stdout as one machine-readable JSON object,
+# so serialize the short local graph/inference section while both streams point
+# at the null device.  No model or network call occurs inside this section.
+_IBM_FACTREASONER_STDIO_LOCK = threading.Lock()
+
+
+@contextmanager
+def _suppress_upstream_factreasoner_output() -> Iterable[None]:
+    with _IBM_FACTREASONER_STDIO_LOCK:
+        with open(os.devnull, "w", encoding="utf-8") as sink:
+            with redirect_stdout(sink), redirect_stderr(sink):
+                yield
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 _ID_RE = re.compile(r"^[a-z][a-z0-9._:/-]{1,127}$")
@@ -65,6 +92,12 @@ _TABLE_SEPARATOR_RE = re.compile(
     r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$"
 )
 _ABSENCE_VALUES = frozenset({"not specified", "not applicable"})
+_ROW_ATOM_FIELDS = frozenset(
+    {
+        "evaluation.benchmark_scores",
+        "evaluation.related_model_scores",
+    }
+)
 
 
 class FactReasonerError(ValueError):
@@ -77,6 +110,11 @@ class FactReasonerReplayError(FactReasonerError):
 
 class UpstreamFactReasonerUnavailable(FactReasonerError):
     """The optional pinned IBM FactReasoner integration is not available."""
+
+    def __init__(self, message: str, *, reason_code: str) -> None:
+        super().__init__(message)
+        _require_code(reason_code, "upstream FactReasoner reason_code")
+        self.reason_code = reason_code
 
 
 class CheckOutcome(str, Enum):
@@ -858,8 +896,24 @@ def _sentence_atoms(text: str) -> tuple[str, ...]:
     normalized = text.strip()
     if not normalized:
         return ("The field is an empty string.",)
-    parts = re.split(r"(?:\r?\n\s*(?:[-*]\s+)?)|(?<=[.!?])\s+", normalized)
-    atoms = tuple(item.strip() for item in parts if item.strip())
+
+    # A citation is a metadata unit, not a sequence of prose claims.  Splitting
+    # fenced BibTeX at line boundaries used to create hypotheses such as ``}``
+    # and ``title={...},``.  Keep the complete unit together so the checker can
+    # compare it to an exact source citation without manufacturing fragments.
+    lowered = normalized.casefold()
+    if "```bibtex" in lowered or normalized.startswith("@"):
+        return (normalized,)
+
+    parts = re.split(
+        r"(?:\r?\n\s*(?:[-*]\s+)?)|(?<=[.!?])\s+|;\s+(?=[A-Z])",
+        normalized,
+    )
+    atoms = tuple(
+        item.strip()
+        for item in parts
+        if item.strip() and re.search(r"[A-Za-z0-9]", item)
+    )
     return atoms or (normalized,)
 
 
@@ -888,10 +942,25 @@ def _atomic_values(
     context: tuple[str, ...] = (),
 ) -> tuple[tuple[str, str], ...]:
     if isinstance(value, str):
+        if value_path.rsplit(".", 1)[-1] == "citation":
+            return ((value_path, _scalar_text(value_path, value, context)),)
         return tuple((value_path, item) for item in _sentence_atoms(value))
     if isinstance(value, Mapping):
         if not value:
             return ((value_path, f'Field "{value_path}" is an empty object.'),)
+        if any(
+            value_path == field or value_path.startswith(field + "[")
+            for field in _ROW_ATOM_FIELDS
+        ):
+            # Benchmark results are factual tuples.  Checking each scalar in
+            # isolation loses the benchmark/model/metric/value association and
+            # recreates the wrong-row leakage observed in the AAAI audit.
+            return (
+                (
+                    value_path,
+                    f'Complete score row for "{value_path}" is {_canonical(value)}.',
+                ),
+            )
         local_context = context + _context_for_mapping(value)
         atoms: list[tuple[str, str]] = []
         for key in sorted(value):
@@ -1606,6 +1675,42 @@ class FactChecker(Protocol):
         ...
 
 
+class BatchFactChecker(FactChecker, Protocol):
+    """Optional bounded batch extension for exact per-request decisions."""
+
+    def check_many(
+        self, requests: Sequence[CheckRequest]
+    ) -> tuple[CheckerResponse, ...]:
+        ...
+
+
+def check_request_sha256(request: CheckRequest) -> str:
+    """Hash every semantic input visible at the injected checker boundary."""
+
+    if not isinstance(request, CheckRequest):
+        raise FactReasonerError("checker request digest requires a CheckRequest")
+    request.atom.validate_integrity()
+    for context in request.contexts:
+        context.chunk.validate_integrity()
+    return _digest(
+        {
+            "request_version": CHECK_REQUEST_VERSION,
+            "atom_sha256": request.atom.content_sha256,
+            "hypothesis": request.hypothesis,
+            "stage": request.stage.value,
+            "contexts": [
+                {
+                    "chunk_id": item.chunk.chunk_id,
+                    "chunk_sha256": item.chunk.content_sha256,
+                    "retrieval_score": item.retrieval_score,
+                }
+                for item in request.contexts
+            ],
+            "fallback_complete": request.fallback_complete,
+        }
+    )
+
+
 @dataclass(frozen=True)
 class EvidenceCoordinate:
     chunk_id: str
@@ -2273,6 +2378,11 @@ def _invoke_checker(
 ) -> CheckerAttempt:
     try:
         response = checker.check(request)
+    except UpstreamFactReasonerUnavailable as exc:
+        response = CheckerResponse(
+            outcome=CheckOutcome.UNAVAILABLE,
+            reason_code=exc.reason_code,
+        )
     except (ProviderResponseError, ProviderTerminalAttemptError) as exc:
         if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
             raise
@@ -2304,6 +2414,91 @@ def _invoke_checker(
     )
 
 
+def _unavailable_response(reason_code: str) -> CheckerResponse:
+    return CheckerResponse(
+        outcome=CheckOutcome.UNAVAILABLE,
+        reason_code=reason_code,
+    )
+
+
+def _response_attempt(
+    response: CheckerResponse,
+    request: CheckRequest,
+    checker_id: str,
+    checker_revision: str,
+) -> CheckerAttempt:
+    if not isinstance(response, CheckerResponse):
+        raise FactReasonerError("checker must return typed CheckerResponse records")
+    available = {item.chunk.chunk_id for item in request.contexts}
+    if not set(response.cited_chunk_ids).issubset(available):
+        raise FactReasonerError("checker cited a chunk outside its request")
+    cited = set(response.cited_chunk_ids)
+    return CheckerAttempt(
+        checker_id=checker_id,
+        checker_revision=checker_revision,
+        stage=request.stage,
+        outcome=response.outcome,
+        reason_code=response.reason_code,
+        fallback_complete=request.fallback_complete,
+        evidence=tuple(_coordinate(item, cited) for item in request.contexts),
+    )
+
+
+def _invoke_checker_many(
+    checker: FactChecker,
+    checker_id: str,
+    checker_revision: str,
+    requests: Sequence[CheckRequest],
+) -> tuple[CheckerAttempt, ...]:
+    """Invoke a checker in deterministic groups of at most 64 requests."""
+
+    ordered = tuple(requests)
+    if not all(isinstance(item, CheckRequest) for item in ordered):
+        raise FactReasonerError("checker batch requires typed CheckRequest records")
+    if not ordered:
+        return ()
+    batch_method = getattr(checker, "check_many", None)
+    if not callable(batch_method):
+        return tuple(
+            _invoke_checker(
+                checker,
+                checker_id,
+                checker_revision,
+                request,
+            )
+            for request in ordered
+        )
+
+    attempts: list[CheckerAttempt] = []
+    for start in range(0, len(ordered), MAX_FACT_CHECKS_PER_BATCH):
+        batch = ordered[start : start + MAX_FACT_CHECKS_PER_BATCH]
+        try:
+            responses = batch_method(batch)
+        except UpstreamFactReasonerUnavailable as exc:
+            responses = tuple(_unavailable_response(exc.reason_code) for _ in batch)
+        except (ProviderResponseError, ProviderTerminalAttemptError) as exc:
+            if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
+                raise
+            responses = tuple(_unavailable_response("checker_unavailable") for _ in batch)
+        except (ProviderError, LedgerError, TransportUncertainError):
+            raise
+        except Exception:
+            responses = tuple(_unavailable_response("checker_unavailable") for _ in batch)
+        if (
+            not isinstance(responses, Sequence)
+            or isinstance(responses, (str, bytes, bytearray))
+            or len(responses) != len(batch)
+        ):
+            raise FactReasonerError(
+                "batch checker must return one typed response per request"
+            )
+        attempts.extend(
+            _response_attempt(response, request, checker_id, checker_revision)
+            for request, response in zip(batch, responses)
+        )
+    return tuple(attempts)
+
+
 def _unavailable_decision(
     atom: FactAtom,
     reason_code: str,
@@ -2321,55 +2516,16 @@ def _unavailable_decision(
     )
 
 
-def _decision_for_atom(
+def _decision_from_attempts(
     atom: FactAtom,
-    corpus: ChunkCorpus,
-    checker: FactChecker,
-    checker_id: str,
-    checker_revision: str,
-    config: RetrievalConfig,
+    attempts: Sequence[CheckerAttempt],
+    *,
+    globally_limited: bool,
 ) -> AtomDecision:
-    scoped = _scope_chunks(atom, corpus.chunks)
-    globally_limited = corpus.truncated or any(
-        item.status != "loaded" for item in corpus.sources
-    )
-    if not scoped:
-        return _unavailable_decision(atom, "no_in_scope_frozen_source")
-    if sum(len(item.text.strip()) for item in scoped) < config.min_source_chars:
-        return _unavailable_decision(atom, "thin_frozen_source")
-
-    primary_contexts = retrieve_chunks(atom, scoped, top_k=config.top_k)
-    primary = _invoke_checker(
-        checker,
-        checker_id,
-        checker_revision,
-        CheckRequest(
-            atom=atom,
-            stage=CheckStage.RETRIEVAL,
-            contexts=primary_contexts,
-            fallback_complete=len(primary_contexts) == len(scoped),
-        ),
-    )
-    attempts = [primary]
-    final = primary
-    fallback_complete = primary.fallback_complete
-    if primary.outcome is CheckOutcome.NEUTRAL:
-        fallback_contexts, fallback_complete = _fallback_contexts(scoped, config)
-        if not fallback_contexts:
-            return _unavailable_decision(atom, "fallback_source_unavailable")
-        final = _invoke_checker(
-            checker,
-            checker_id,
-            checker_revision,
-            CheckRequest(
-                atom=atom,
-                stage=CheckStage.FULL_SOURCE_FALLBACK,
-                contexts=fallback_contexts,
-                fallback_complete=fallback_complete,
-            ),
-        )
-        attempts.append(final)
-
+    values = tuple(attempts)
+    if not values:
+        raise FactReasonerError("checked atom requires at least one checker attempt")
+    final = values[-1]
     action = {
         CheckOutcome.SUPPORT: FieldAction.NONE,
         CheckOutcome.CONTRADICTION: FieldAction.REPAIR_OR_WITHHOLD,
@@ -2385,9 +2541,102 @@ def _decision_for_atom(
         outcome=final.outcome,
         field_action=action,
         reason_code=reason,
-        source_limited=globally_limited or not fallback_complete,
-        attempts=tuple(attempts),
+        source_limited=globally_limited or not final.fallback_complete,
+        attempts=values,
     )
+
+
+def _batched_atom_decisions(
+    atoms: Sequence[FactAtom],
+    corpus: ChunkCorpus,
+    checker: FactChecker,
+    checker_id: str,
+    checker_revision: str,
+    config: RetrievalConfig,
+) -> tuple[AtomDecision, ...]:
+    """Run one complete primary wave, then a neutral-only fallback wave."""
+
+    globally_limited = corpus.truncated or any(
+        item.status != "loaded" for item in corpus.sources
+    )
+    decisions: list[AtomDecision | None] = [None] * len(atoms)
+    scoped_by_index: dict[int, tuple[SourceChunk, ...]] = {}
+    primary_indices: list[int] = []
+    primary_requests: list[CheckRequest] = []
+    for index, atom in enumerate(atoms):
+        scoped = _scope_chunks(atom, corpus.chunks)
+        if not scoped:
+            decisions[index] = _unavailable_decision(
+                atom, "no_in_scope_frozen_source"
+            )
+            continue
+        if sum(len(item.text.strip()) for item in scoped) < config.min_source_chars:
+            decisions[index] = _unavailable_decision(atom, "thin_frozen_source")
+            continue
+        scoped_by_index[index] = scoped
+        primary_contexts = retrieve_chunks(atom, scoped, top_k=config.top_k)
+        primary_indices.append(index)
+        primary_requests.append(
+            CheckRequest(
+                atom=atom,
+                stage=CheckStage.RETRIEVAL,
+                contexts=primary_contexts,
+                fallback_complete=len(primary_contexts) == len(scoped),
+            )
+        )
+
+    primary_attempts = _invoke_checker_many(
+        checker,
+        checker_id,
+        checker_revision,
+        primary_requests,
+    )
+    attempts_by_index: dict[int, list[CheckerAttempt]] = {}
+    fallback_indices: list[int] = []
+    fallback_requests: list[CheckRequest] = []
+    for index, primary in zip(primary_indices, primary_attempts):
+        attempts_by_index[index] = [primary]
+        if primary.outcome is not CheckOutcome.NEUTRAL:
+            decisions[index] = _decision_from_attempts(
+                atoms[index],
+                (primary,),
+                globally_limited=globally_limited,
+            )
+            continue
+        fallback_contexts, fallback_complete = _fallback_contexts(
+            scoped_by_index[index], config
+        )
+        if not fallback_contexts:
+            decisions[index] = _unavailable_decision(
+                atoms[index], "fallback_source_unavailable"
+            )
+            continue
+        fallback_indices.append(index)
+        fallback_requests.append(
+            CheckRequest(
+                atom=atoms[index],
+                stage=CheckStage.FULL_SOURCE_FALLBACK,
+                contexts=fallback_contexts,
+                fallback_complete=fallback_complete,
+            )
+        )
+
+    fallback_attempts = _invoke_checker_many(
+        checker,
+        checker_id,
+        checker_revision,
+        fallback_requests,
+    )
+    for index, fallback in zip(fallback_indices, fallback_attempts):
+        attempts_by_index[index].append(fallback)
+        decisions[index] = _decision_from_attempts(
+            atoms[index],
+            attempts_by_index[index],
+            globally_limited=globally_limited,
+        )
+    if any(item is None for item in decisions):
+        raise FactReasonerError("batched checker left an atom without a decision")
+    return tuple(item for item in decisions if item is not None)
 
 
 def _field_decisions(
@@ -2445,16 +2694,13 @@ def run_factreasoner(
         config=config,
         source_availability=source_availability,
     )
-    decisions = tuple(
-        _decision_for_atom(
-            atom,
-            corpus,
-            checker,
-            checker_id,
-            checker_revision,
-            config,
-        )
-        for atom in atomization.atoms
+    decisions = _batched_atom_decisions(
+        atomization.atoms,
+        corpus,
+        checker,
+        checker_id,
+        checker_revision,
+        config,
     )
     return FactReasonerRecord(
         record_version=RECORD_VERSION,
@@ -2507,60 +2753,421 @@ def replay_factreasoner(
     return replayed
 
 
-class IBMFactReasonerAdapter:
-    """Lazy boundary for the pinned optional IBM FactReasoner revision.
+@dataclass(frozen=True)
+class IBMFactReasonerInference:
+    """Privacy-safe trace for one upstream FR1 marginal computation."""
 
-    The upstream package requires a separately configured inference backend.
-    Orchestration may inject a ``runner_factory`` that receives the lazily
-    imported ``fact_reasoner.assessor`` module and returns a callable accepting
-    ``(hypothesis, contexts)``.  Merely constructing this adapter imports
-    nothing and performs no inference.
+    request_sha256: str
+    upstream_revision: str
+    adapter_version: str
+    inference_method: str
+    nli_checker_id: str
+    nli_checker_revision: str
+    relation_probability: float
+    atom_false_probability: float
+    atom_true_probability: float
+    outcome: CheckOutcome
+    cited_chunk_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require_digest(self.request_sha256, "upstream inference request digest")
+        if self.upstream_revision != IBM_FACTREASONER_UPSTREAM_REVISION:
+            raise FactReasonerError("upstream inference revision is not pinned")
+        if self.adapter_version != IBM_FACTREASONER_ADAPTER_VERSION:
+            raise FactReasonerError("upstream inference adapter version is invalid")
+        if self.inference_method != IBM_FACTREASONER_INFERENCE_METHOD:
+            raise FactReasonerError("upstream inference method is invalid")
+        _require_code(self.nli_checker_id, "upstream inference NLI checker_id")
+        if not isinstance(self.nli_checker_revision, str) or not self.nli_checker_revision:
+            raise FactReasonerError("upstream inference NLI checker revision is invalid")
+        for value, label in (
+            (self.relation_probability, "relation probability"),
+            (self.atom_false_probability, "atom false probability"),
+            (self.atom_true_probability, "atom true probability"),
+        ):
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(value)
+                or not 0.0 <= value <= 1.0
+            ):
+                raise FactReasonerError(f"upstream inference {label} is invalid")
+        if self.relation_probability != IBM_FACTREASONER_RELATION_PROBABILITY:
+            raise FactReasonerError("upstream inference relation probability drifted")
+        if not math.isclose(
+            self.atom_false_probability + self.atom_true_probability,
+            1.0,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            raise FactReasonerError("upstream inference marginal is not normalized")
+        object.__setattr__(
+            self, "outcome", _enum(CheckOutcome, self.outcome, "upstream inference outcome")
+        )
+        cited = tuple(self.cited_chunk_ids)
+        if len(cited) != len(set(cited)) or any(
+            not isinstance(item, str) or not item.startswith("chunk-") for item in cited
+        ):
+            raise FactReasonerError("upstream inference cited chunks are invalid")
+        object.__setattr__(self, "cited_chunk_ids", cited)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "request_sha256": self.request_sha256,
+            "upstream_revision": self.upstream_revision,
+            "adapter_version": self.adapter_version,
+            "inference_method": self.inference_method,
+            "nli_checker_id": self.nli_checker_id,
+            "nli_checker_revision": self.nli_checker_revision,
+            "relation_probability": self.relation_probability,
+            "atom_marginal": [
+                self.atom_false_probability,
+                self.atom_true_probability,
+            ],
+            "outcome": self.outcome.value,
+            "cited_chunk_ids": list(self.cited_chunk_ids),
+        }
+
+
+@dataclass(frozen=True)
+class _IBMFactReasonerRuntime:
+    fact_reasoner: Any
+    fact_graph: Any
+    node: Any
+    edge: Any
+    variable_elimination: Any
+    prior_prob_atom: float
+    prior_prob_context: float
+
+
+class IBMFactReasonerAdapter:
+    """Run IBM FactReasoner's pinned FR1 graph around an exact NLI checker.
+
+    Every existing ``CheckRequest`` already represents one atom and only its
+    bounded, frozen contexts, which is precisely FR1's atom-to-own-contexts
+    topology.  The injected checker supplies the categorical NLI decision and
+    exact cited chunk IDs.  Cited support/contradiction contexts become upstream
+    ``FactGraph`` edges with the declared fixed probability above; neutral
+    decisions create no edge, matching upstream's neutral filtering.
+
+    The pinned upstream implementation builds its own ``MarkovNetwork``.  This
+    adapter queries and normalizes that network with pgmpy's exact
+    ``VariableElimination`` instead of invoking the separately compiled Merlin
+    executable.  Construction is lazy and performs no model or network call.
     """
 
-    checker_id = "ibm/factreasoner"
+    checker_id = "ibm/factreasoner-fr1"
     checker_revision = IBM_FACTREASONER_UPSTREAM_REVISION
+    adapter_version = IBM_FACTREASONER_ADAPTER_VERSION
+    inference_method = IBM_FACTREASONER_INFERENCE_METHOD
+    relation_probability = IBM_FACTREASONER_RELATION_PROBABILITY
 
-    def __init__(
-        self,
-        runner_factory: Callable[[Any], Callable[[str, tuple[str, ...]], Any]] | None = None,
-    ) -> None:
-        self._runner_factory = runner_factory
-        self._runner: Callable[[str, tuple[str, ...]], Any] | None = None
+    def __init__(self, nli_checker: FactChecker | None = None) -> None:
+        self._nli_checker = nli_checker
+        self._nli_identity = (
+            _checker_identity(nli_checker) if nli_checker is not None else None
+        )
+        self._upstream: _IBMFactReasonerRuntime | None = None
+        self._inferences: dict[str, IBMFactReasonerInference] = {}
 
     @staticmethod
-    def is_installed() -> bool:
-        return importlib.util.find_spec("fact_reasoner") is not None
+    def _module_exists(name: str) -> bool:
+        try:
+            return importlib.util.find_spec(name) is not None
+        except (AttributeError, ImportError, ValueError):
+            return False
 
-    def _load_runner(self) -> Callable[[str, tuple[str, ...]], Any]:
-        if self._runner is not None:
-            return self._runner
-        if self._runner_factory is None:
+    @staticmethod
+    def _normalized_repository_url(value: Any) -> str | None:
+        if not isinstance(value, str) or not value.strip():
+            return None
+        normalized = value.strip().rstrip("/").casefold()
+        return normalized[:-4] if normalized.endswith(".git") else normalized
+
+    @classmethod
+    def _installed_upstream_revision(cls) -> str | None:
+        try:
+            distribution = importlib_metadata.distribution("fact_reasoner")
+            raw = distribution.read_text("direct_url.json")
+            value = json.loads(raw) if raw is not None else None
+        except (
+            importlib_metadata.PackageNotFoundError,
+            json.JSONDecodeError,
+            OSError,
+            TypeError,
+            ValueError,
+        ):
+            return None
+        if not isinstance(value, Mapping):
+            return None
+        expected_url = cls._normalized_repository_url(IBM_FACTREASONER_UPSTREAM_URL)
+        actual_url = cls._normalized_repository_url(value.get("url"))
+        vcs = value.get("vcs_info")
+        if actual_url != expected_url or not isinstance(vcs, Mapping):
+            return None
+        revision = vcs.get("commit_id")
+        return revision if isinstance(revision, str) else None
+
+    @classmethod
+    def installation_status(cls) -> str:
+        """Return a stable, non-importing status for orchestration admission."""
+
+        if not cls._module_exists("fact_reasoner"):
+            return "ibm_factreasoner_dependency_unavailable"
+        if not cls._module_exists("pgmpy"):
+            return "ibm_factreasoner_pgmpy_unavailable"
+        if cls._installed_upstream_revision() != IBM_FACTREASONER_UPSTREAM_REVISION:
+            return "ibm_factreasoner_revision_unverified"
+        return "ibm_factreasoner_pinned_dependency_available"
+
+    @classmethod
+    def is_installed(cls) -> bool:
+        return (
+            cls.installation_status()
+            == "ibm_factreasoner_pinned_dependency_available"
+        )
+
+    def _load_upstream(self) -> _IBMFactReasonerRuntime:
+        if self._upstream is not None:
+            return self._upstream
+        status = self.installation_status()
+        if status != "ibm_factreasoner_pinned_dependency_available":
             raise UpstreamFactReasonerUnavailable(
-                "pinned IBM FactReasoner needs an injected backend runner factory"
+                "the exact pinned IBM FactReasoner and pgmpy dependencies are unavailable",
+                reason_code=status,
             )
         try:
-            assessor = importlib.import_module("fact_reasoner.assessor")
-        except ImportError as exc:
+            with _suppress_upstream_factreasoner_output():
+                assessor = importlib.import_module("fact_reasoner.assessor")
+                graph = importlib.import_module("fact_reasoner.fact_graph")
+                base = importlib.import_module("fact_reasoner.core.base")
+                inference = importlib.import_module("pgmpy.inference")
+                runtime = _IBMFactReasonerRuntime(
+                    fact_reasoner=getattr(assessor, "FactReasoner"),
+                    fact_graph=getattr(graph, "FactGraph"),
+                    node=getattr(graph, "Node"),
+                    edge=getattr(graph, "Edge"),
+                    variable_elimination=getattr(inference, "VariableElimination"),
+                    prior_prob_atom=float(getattr(base, "PRIOR_PROB_ATOM")),
+                    prior_prob_context=float(getattr(base, "PRIOR_PROB_CONTEXT")),
+                )
+        except Exception as exc:
             raise UpstreamFactReasonerUnavailable(
-                "pinned IBM FactReasoner is not installed"
+                "the pinned IBM FactReasoner API could not be imported",
+                reason_code="ibm_factreasoner_import_unavailable",
             ) from exc
-        runner = self._runner_factory(assessor)
-        if not callable(runner):
+        callables = (
+            runtime.fact_reasoner,
+            runtime.fact_graph,
+            runtime.node,
+            runtime.edge,
+            runtime.variable_elimination,
+        )
+        if not all(callable(item) for item in callables):
             raise UpstreamFactReasonerUnavailable(
-                "IBM FactReasoner runner factory did not return a callable"
+                "the pinned IBM FactReasoner API has an invalid shape",
+                reason_code="ibm_factreasoner_api_invalid",
             )
-        self._runner = runner
-        return runner
+        self._upstream = runtime
+        return runtime
+
+    def validate_installation(self) -> None:
+        """Import and validate the exact optional runtime without running NLI."""
+
+        self._load_upstream()
+
+    @staticmethod
+    def _request_sha256(request: CheckRequest) -> str:
+        return check_request_sha256(request)
+
+    def inference_for(self, request: CheckRequest) -> IBMFactReasonerInference | None:
+        """Return the recorded marginal for a completed request, if one exists."""
+
+        if not isinstance(request, CheckRequest):
+            raise FactReasonerError("upstream inference lookup requires a CheckRequest")
+        return self._inferences.get(self._request_sha256(request))
+
+    @property
+    def inferences(self) -> tuple[IBMFactReasonerInference, ...]:
+        return tuple(self._inferences[key] for key in sorted(self._inferences))
+
+    def provenance(self) -> dict[str, Any]:
+        nli_checker_id, nli_checker_revision = self._nli_identity or (None, None)
+        return {
+            "adapter_version": self.adapter_version,
+            "upstream_url": IBM_FACTREASONER_UPSTREAM_URL,
+            "upstream_revision": self.checker_revision,
+            "configuration": "FR1",
+            "inference_method": self.inference_method,
+            "relation_probability": self.relation_probability,
+            "nli_checker_id": nli_checker_id,
+            "nli_checker_revision": nli_checker_revision,
+        }
+
+    def _marginal(
+        self,
+        request: CheckRequest,
+        response: CheckerResponse,
+        runtime: _IBMFactReasonerRuntime,
+    ) -> tuple[float, float]:
+        graph = runtime.fact_graph()
+        atom_id = request.atom.atom_id
+        graph.add_node(runtime.node(atom_id, "atom", runtime.prior_prob_atom))
+        cited = set(response.cited_chunk_ids)
+        relation_type = {
+            CheckOutcome.SUPPORT: "entailment",
+            CheckOutcome.CONTRADICTION: "contradiction",
+        }.get(response.outcome)
+        for context in request.contexts:
+            chunk_id = context.chunk.chunk_id
+            graph.add_node(runtime.node(chunk_id, "context", runtime.prior_prob_context))
+            if relation_type is not None and chunk_id in cited:
+                graph.add_edge(
+                    runtime.edge(
+                        chunk_id,
+                        atom_id,
+                        relation_type,
+                        self.relation_probability,
+                        "context_atom",
+                    )
+                )
+
+        # Upstream currently requires a Merlin path at construction time even
+        # when loading a FactGraph. This explicit non-path sentinel is never
+        # executed: inference below uses pgmpy over the upstream-built network.
+        with _suppress_upstream_factreasoner_output():
+            reasoner = runtime.fact_reasoner(
+                nli_extractor=None,
+                merlin_path="pgmpy-variable-elimination-not-an-executable",
+                use_priors=True,
+            )
+            reasoner.from_fact_graph(graph)
+            query = runtime.variable_elimination(reasoner.markov_network).query(
+                variables=[atom_id],
+                show_progress=False,
+            )
+        raw_values = getattr(query, "values", None)
+        if raw_values is None:
+            raise UpstreamFactReasonerUnavailable(
+                "pgmpy did not return an atom marginal",
+                reason_code="ibm_factreasoner_inference_unavailable",
+            )
+        if hasattr(raw_values, "reshape"):
+            values = tuple(float(item) for item in raw_values.reshape(-1).tolist())
+        else:
+            try:
+                values = tuple(float(item) for item in raw_values)
+            except (TypeError, ValueError) as exc:
+                raise UpstreamFactReasonerUnavailable(
+                    "pgmpy returned an invalid atom marginal",
+                    reason_code="ibm_factreasoner_inference_unavailable",
+                ) from exc
+        if (
+            len(values) != 2
+            or any(not math.isfinite(item) or item < 0.0 for item in values)
+            or sum(values) <= 0.0
+        ):
+            raise UpstreamFactReasonerUnavailable(
+                "pgmpy returned an invalid atom marginal",
+                reason_code="ibm_factreasoner_inference_unavailable",
+            )
+        total = sum(values)
+        return values[0] / total, values[1] / total
+
+    def check_many(
+        self, requests: Sequence[CheckRequest]
+    ) -> tuple[CheckerResponse, ...]:
+        ordered = tuple(requests)
+        if (
+            not ordered
+            or len(ordered) > MAX_FACT_CHECKS_PER_BATCH
+            or not all(isinstance(item, CheckRequest) for item in ordered)
+        ):
+            raise FactReasonerError(
+                "IBM FactReasoner batch requires between 1 and 64 CheckRequests"
+            )
+        runtime = self._load_upstream()
+        if self._nli_checker is None or self._nli_identity is None:
+            raise UpstreamFactReasonerUnavailable(
+                "IBM FactReasoner requires an injected exact NLI checker",
+                reason_code="ibm_factreasoner_nli_checker_unavailable",
+            )
+        batch_method = getattr(self._nli_checker, "check_many", None)
+        if callable(batch_method):
+            nli_responses = batch_method(ordered)
+        else:
+            nli_responses = tuple(self._nli_checker.check(item) for item in ordered)
+        if (
+            not isinstance(nli_responses, Sequence)
+            or isinstance(nli_responses, (str, bytes, bytearray))
+            or len(nli_responses) != len(ordered)
+            or not all(isinstance(item, CheckerResponse) for item in nli_responses)
+        ):
+            raise FactReasonerError(
+                "the injected NLI checker returned invalid batch responses"
+            )
+
+        nli_checker_id, nli_checker_revision = self._nli_identity
+        output: list[CheckerResponse] = []
+        pending_inferences: dict[str, IBMFactReasonerInference] = {}
+        for request, response in zip(ordered, nli_responses):
+            available = {item.chunk.chunk_id for item in request.contexts}
+            if not set(response.cited_chunk_ids).issubset(available):
+                raise FactReasonerError(
+                    "the injected NLI checker cited an unavailable chunk"
+                )
+            if response.outcome is CheckOutcome.UNAVAILABLE:
+                output.append(response)
+                continue
+            try:
+                atom_false, atom_true = self._marginal(request, response, runtime)
+            except UpstreamFactReasonerUnavailable:
+                raise
+            except Exception as exc:
+                raise UpstreamFactReasonerUnavailable(
+                    "the pinned IBM FactReasoner graph could not be queried",
+                    reason_code="ibm_factreasoner_inference_unavailable",
+                ) from exc
+            if math.isclose(atom_true, atom_false, rel_tol=0.0, abs_tol=1e-12):
+                outcome = CheckOutcome.NEUTRAL
+            elif atom_true > atom_false:
+                outcome = CheckOutcome.SUPPORT
+            else:
+                outcome = CheckOutcome.CONTRADICTION
+            if outcome is not response.outcome:
+                raise UpstreamFactReasonerUnavailable(
+                    "the upstream FR1 marginal disagrees with the categorical NLI relation",
+                    reason_code="ibm_factreasoner_marginal_inconsistent",
+                )
+            request_sha256 = self._request_sha256(request)
+            pending_inferences[request_sha256] = IBMFactReasonerInference(
+                request_sha256=request_sha256,
+                upstream_revision=self.checker_revision,
+                adapter_version=self.adapter_version,
+                inference_method=self.inference_method,
+                nli_checker_id=nli_checker_id,
+                nli_checker_revision=nli_checker_revision,
+                relation_probability=self.relation_probability,
+                atom_false_probability=atom_false,
+                atom_true_probability=atom_true,
+                outcome=outcome,
+                cited_chunk_ids=response.cited_chunk_ids,
+            )
+            output.append(
+                CheckerResponse(
+                    outcome=outcome,
+                    reason_code={
+                        CheckOutcome.SUPPORT: "upstream_fr1_support",
+                        CheckOutcome.CONTRADICTION: "upstream_fr1_contradiction",
+                        CheckOutcome.NEUTRAL: "upstream_fr1_neutral",
+                    }[outcome],
+                    cited_chunk_ids=response.cited_chunk_ids,
+                )
+            )
+        self._inferences.update(pending_inferences)
+        return tuple(output)
 
     def check(self, request: CheckRequest) -> CheckerResponse:
-        runner = self._load_runner()
-        raw = runner(request.hypothesis, tuple(item.text for item in request.contexts))
-        if isinstance(raw, CheckerResponse):
-            return raw
-        if not isinstance(raw, Mapping):
-            raise FactReasonerError("IBM FactReasoner runner returned an invalid response")
-        return CheckerResponse(
-            outcome=raw.get("outcome", "unavailable"),
-            reason_code=raw.get("reason_code", "upstream_unavailable"),
-            cited_chunk_ids=tuple(raw.get("cited_chunk_ids", ())),
-        )
+        if not isinstance(request, CheckRequest):
+            raise FactReasonerError("IBM FactReasoner adapter requires a CheckRequest")
+        return self.check_many((request,))[0]

@@ -1,0 +1,11 @@
+{
+  "labels_version": "model-card-paired-audit-labels/v1",
+  "study_status": "design_only_no_human_results",
+  "blinded": false,
+  "items": [],
+  "annotator_confirmation": {
+    "completed": false,
+    "used_only_displayed_evidence": false,
+    "uncertainty_notes": "Template only; no human annotation has been performed."
+  }
+}

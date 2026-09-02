@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [deepseek\-v3\.json](<./deepseek-v3.json>)<br>
-SHA-256: `fbd1708fe3db2eac3bc151693b1fcd03a6bf5301498f9591d6116b8a7aea4acf`
+SHA-256: `c333b2a20a51e339e68d81c91f211f9264d0a2a2752c71cefe231224f144dc84`
 
 ## Identity
 
@@ -13,6 +13,7 @@ SHA-256: `fbd1708fe3db2eac3bc151693b1fcd03a6bf5301498f9591d6116b8a7aea4acf`
 | Name | DeepSeek\-V3 |
 | Developed by | deepseek\-ai |
 | Model type | text\-generation |
+| License | the Model License; commercial use supported: https://huggingface\.co/deepseek\-ai/DeepSeek\-V3/blob/e815299b0bcbac849fa540c768ef21845365c9eb/LICENSE\-MODEL |
 | Version | e815299b0bcbac849fa540c768ef21845365c9eb |
 | Summary | DeepSeek\-V3 is listed with 671B total parameters, 37B activated parameters per token, 128K context length\. |
 
@@ -53,7 +54,7 @@ SHA-256: `fbd1708fe3db2eac3bc151693b1fcd03a6bf5301498f9591d6116b8a7aea4acf`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The frozen README provides 12 exact\-target benchmark scores in this capped publication set; examples: MMLU: 88\.5; MMLU\-Redux: 89\.1; MMLU\-Pro: 75\.9\. |
+| Results summary | The frozen README provides 24 exact\-target benchmark scores; examples: MMLU: 88\.5; MMLU\-Redux: 89\.1; MMLU\-Pro: 75\.9\. |
 
 ### Benchmark Scores
 
@@ -62,15 +63,27 @@ SHA-256: `fbd1708fe3db2eac3bc151693b1fcd03a6bf5301498f9591d6116b8a7aea4acf`
 | MMLU | EM | 88\.5 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
 | MMLU\-Redux | EM | 89\.1 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
 | MMLU\-Pro | EM | 75\.9 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| DROP | 3\-shot F1 | 91\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| IF\-Eval | Prompt Strict | 86\.1 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| DROP \(3\-shot F1\) | README\-reported score | 91\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| IF\-Eval \(Prompt Strict\) | README\-reported score | 86\.1 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
 | GPQA\-Diamond | Pass@1 | 59\.1 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| SimpleQA | Correct | 24\.9 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| SimpleQA \(Correct\) | README\-reported score | 24\.9 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
 | FRAMES | Acc\. | 73\.3 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
 | LongBench v2 | Acc\. | 48\.7 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
 | HumanEval\-Mul | Pass@1 | 82\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| LiveCodeBench | Pass@1\-COT | 40\.5 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| LiveCodeBench \(Pass@1\-COT\) | README\-reported score | 40\.5 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
 | LiveCodeBench | Pass@1 | 37\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| Codeforces \(Percentile\) | README\-reported score | 51\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| SWE Verified \(Resolved\) | README\-reported score | 42\.0 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| Aider\-Edit | Acc\. | 79\.7 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| Aider\-Polyglot | Acc\. | 49\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| AIME 2024 | Pass@1 | 39\.2 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| MATH\-500 | EM | 90\.2 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| CNMO 2024 | Pass@1 | 43\.2 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| CLUEWSC | EM | 90\.9 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| C\-Eval | EM | 86\.5 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| C\-SimpleQA \(Correct\) | README\-reported score | 64\.8 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
+| Arena\-Hard | README\-reported score | 85\.5 | Open Ended Generation Evaluation; setting not stated | Not reported |
+| AlpacaEval 2\.0 | README\-reported score | 70\.0 | Open Ended Generation Evaluation; setting not stated | Not reported |
 
 ## Links
 
@@ -83,4 +96,4 @@ SHA-256: `fbd1708fe3db2eac3bc151693b1fcd03a6bf5301498f9591d6116b8a7aea4acf`
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.license`, `identity.release_date`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.

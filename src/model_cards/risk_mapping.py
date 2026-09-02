@@ -22,11 +22,12 @@ import json
 import logging
 import re
 from typing import Any, Iterable, Protocol, Sequence
+import warnings
 
 from .schema import canonical_field_path
 
 
-RISK_MAPPING_VERSION = "model-card-risk-mapping/v1"
+RISK_MAPPING_VERSION = "model-card-risk-mapping/v2"
 APPLICABILITY_GATE_VERSION = "risk-applicability-gate/v1"
 NEXUS_PACKAGE_VERSION = "1.2.4"
 NEXUS_TAXONOMY_ID = "ibm-risk-atlas"
@@ -350,6 +351,7 @@ class NexusGenericRiskDetector:
                 "interface": "identify_risks_from_usecases",
                 "taxonomy": NEXUS_TAXONOMY_ID,
                 "max_risks": max_risks,
+                "context_batch_size": max_risks,
                 "zero_shot_only": True,
                 "batch_inference": True,
                 "model": INFERENCE_MODEL,
@@ -365,19 +367,35 @@ class NexusGenericRiskDetector:
             raise RiskMappingError("Nexus detector received an unpinned taxonomy")
         if not contexts:
             return ()
+        # Nexus 1.2.4's batch detector applies ``max_risk`` to the outer result
+        # list as well as to each prompt.  Keep each supported generic-interface
+        # invocation no larger than that bound so every grounded use case is
+        # assessed instead of silently losing contexts after the first N.
+        results: list[Any] = []
         try:
             nexus = _new_nexus_instance()
-            results = nexus.identify_risks_from_usecases(
-                [item.description for item in contexts],
-                self.inference_engine,
-                taxonomy=NEXUS_TAXONOMY_ID,
-                max_risk=self.max_risks,
-                zero_shot_only=True,
-                batch_inference=True,
-            )
+            for offset in range(0, len(contexts), self.max_risks):
+                context_batch = contexts[offset : offset + self.max_risks]
+                batch_results = nexus.identify_risks_from_usecases(
+                    [item.description for item in context_batch],
+                    self.inference_engine,
+                    taxonomy=NEXUS_TAXONOMY_ID,
+                    max_risk=self.max_risks,
+                    zero_shot_only=True,
+                    batch_inference=True,
+                )
+                if not isinstance(batch_results, list) or len(batch_results) != len(
+                    context_batch
+                ):
+                    raise RiskMappingError(
+                        "AI Atlas Nexus returned incomplete use-case coverage"
+                    )
+                results.extend(batch_results)
+        except RiskMappingError:
+            raise
         except Exception as exc:
             raise RiskMappingError("AI Atlas Nexus generic risk detection is unavailable") from exc
-        if not isinstance(results, list) or len(results) != len(contexts):
+        if len(results) != len(contexts):
             raise RiskMappingError("AI Atlas Nexus returned incomplete use-case coverage")
         selected: dict[str, set[str]] = {}
         for context, risks in zip(contexts, results):
@@ -399,15 +417,20 @@ class NexusGenericRiskDetector:
 def _new_nexus_instance() -> Any:
     """Construct Nexus without letting its INFO logger corrupt CLI JSON output."""
 
-    from ai_atlas_nexus.library import AIAtlasNexus
+    # Nexus 1.2.4 imports one transitive LinkML module that emits a package
+    # deprecation warning at import time.  It is not actionable for callers and
+    # would corrupt the CLI's machine-readable stdout/stderr contract.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        from ai_atlas_nexus.library import AIAtlasNexus
 
-    logger = logging.getLogger("ai_atlas_nexus.library")
-    prior_level = logger.level
-    logger.setLevel(logging.WARNING)
-    try:
-        return AIAtlasNexus()
-    finally:
-        logger.setLevel(prior_level)
+        logger = logging.getLogger("ai_atlas_nexus.library")
+        prior_level = logger.level
+        logger.setLevel(logging.WARNING)
+        try:
+            return AIAtlasNexus()
+        finally:
+            logger.setLevel(prior_level)
 
 
 @dataclass(frozen=True)

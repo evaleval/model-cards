@@ -34,7 +34,7 @@ from .run_state import (
 
 
 USAGE_SUMMARY_VERSION = "model-card-usage-summary/v1"
-AUDIT_VIEW_VERSION = "model-card-audit-view/v1"
+AUDIT_VIEW_VERSION = "model-card-audit-view/v2"
 RUN_SUMMARY_RESULT_VERSION = "model-card-run-summary-result/v1"
 USAGE_SUMMARY_FILENAME = "usage-summary.json"
 AUDIT_VIEW_FILENAME = "audit-view.json"
@@ -717,7 +717,12 @@ def _validation_view(result: PipelineResult) -> dict[str, Any]:
             item.projection_eligible for item in result.claims
         ),
         "included_claim_count": sum(item.included for item in result.claims),
-        "conflict_count": result.conflict_count,
+        "conflict_count": (
+            result.conflict_count + result.publication_conflict_count
+        ),
+        "composition_conflict_count": result.conflict_count,
+        "publication_conflict_count": result.publication_conflict_count,
+        "publication_conflicts_sha256": result.publication_conflicts_sha256,
         "source_present_omission_count": result.source_present_omission_count,
         "validation_flags": flags,
         "passed_validation_flag_count": sum(flags.values()),

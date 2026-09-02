@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [mistral\-7b\-instruct\-v0\.3\.json](<./mistral-7b-instruct-v0.3.json>)<br>
-SHA-256: `f63de372ee01789d2ecc24c7de581c44d0b9bc02df76b969045ff274269827de`
+SHA-256: `2ee93e4e1f3832ccbff2aa8adce85d34f8498aa391f9027931443ba80340cd2b`
 
 ## Identity
 
@@ -12,10 +12,10 @@ SHA-256: `f63de372ee01789d2ecc24c7de581c44d0b9bc02df76b969045ff274269827de`
 | Model ID | mistralai/Mistral\-7B\-Instruct\-v0\.3 |
 | Name | Mistral\-7B\-Instruct\-v0\.3 |
 | Developed by | mistralai |
-| Model type | mistral config model type |
+| Model type | text\-generation |
 | License | apache\-2\.0 |
 | Version | c170c708c41dac9275d15a8fff4eca08d52bab71 |
-| Summary | The publisher README identifies Mistral\-7B\-Instruct\-v0\.3 as a post\-trained checkpoint for model inference\. |
+| Summary | Mistral\-7B\-Instruct\-v0\.3 is the publisher\-documented instruction\-fine\-tuned version of Mistral\-7B\-v0\.3\. |
 
 ## Lineage
 

@@ -58,6 +58,12 @@ class PackagingTests(unittest.TestCase):
             self.assertIn("Requires-Dist: jsonschema", metadata)
             self.assertIn("Provides-Extra: risk", metadata)
             self.assertIn("ai-atlas-nexus", metadata)
+            self.assertIn("Provides-Extra: factreasoner", metadata)
+            self.assertIn(
+                "https://github.com/IBM/FactReasoner.git@"
+                "41eb0c21baa2a8bba4030cf0d619aa00fae2ed84",
+                metadata,
+            )
             self.assertFalse(any("model-card-system" in name for name in names))
             self.assertFalse(any("auto_benchmarkcard" in name for name in names))
 

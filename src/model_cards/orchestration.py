@@ -21,7 +21,19 @@ from typing import Any, Callable, Mapping
 
 from .claim_gate import ClaimCandidate, GateName, ProseCheckerDecision
 from .extraction import EXTRACTION_VERSION, ExtractionBatch, materialize_quote_batch
-from .factreasoner import FACTREASONER_KERNEL_VERSION
+from .factreasoner import (
+    FACTREASONER_KERNEL_VERSION,
+    IBM_FACTREASONER_ADAPTER_VERSION,
+    IBM_FACTREASONER_INFERENCE_METHOD,
+    IBM_FACTREASONER_RELATION_PROBABILITY,
+    IBM_FACTREASONER_UPSTREAM_REVISION,
+    CheckOutcome,
+    CheckRequest,
+    CheckerResponse,
+    FactChecker,
+    IBMFactReasonerAdapter,
+    UpstreamFactReasonerUnavailable,
+)
 from .models import TargetIdentity
 from .pipeline import PIPELINE_VERSION, PipelineResult, run_offline_pipeline
 from .provider import (
@@ -41,6 +53,7 @@ from .provider_adapters import (
     OpenRouterFactChecker,
     OpenRouterQuoteExtractor,
     ProviderAdapterError,
+    _validate_existing_pinned_ledger,
     build_nexus_openrouter_inference_engine,
 )
 from .risk_mapping import (
@@ -51,10 +64,11 @@ from .risk_mapping import (
     load_pinned_nexus_catalog,
 )
 from .run_state import MANIFEST_FILENAME, RunStore, USAGE_LEDGER_FILENAME
+from .run_ledger import path_sha256
 from .source_state import ImmutableSourceState, load_source_state
 
 
-ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v8"
+ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v11"
 ORCHESTRATION_SCOPE = "immutable_source_state_catalog"
 ORCHESTRATION_MANIFEST_FILENAME = "provider-orchestration.json"
 DEFAULT_MAX_RISKS = 5
@@ -189,6 +203,30 @@ def _safe_run_paths(
     return resolved_root, resolved_ledger, resolved_decisions, decision_namespace_sha256
 
 
+def _safe_aggregate_budget_path(
+    value: str | os.PathLike[str] | None,
+    *,
+    ledger_path: Path,
+) -> Path | None:
+    if value is None:
+        return None
+    path = Path(value)
+    if path.is_symlink() or path.parent.is_symlink():
+        raise OrchestrationError("aggregate budget path is unsafe")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        resolved = path.resolve(strict=False)
+    except OSError as exc:
+        raise OrchestrationError("aggregate budget path is unavailable") from exc
+    if resolved == ledger_path.resolve():
+        raise OrchestrationError(
+            "aggregate budget journal must be distinct from the usage ledger"
+        )
+    if resolved.exists() and not resolved.is_file():
+        raise OrchestrationError("aggregate budget journal is not a regular file")
+    return resolved
+
+
 def _read_json(path: Path) -> Any:
     def reject_nonfinite(_: str) -> None:
         raise ValueError("non-finite JSON value")
@@ -310,6 +348,7 @@ def _build_risk_interfaces(
     transport: ProviderTransport | None,
     call: CallFunction,
     max_risks: int,
+    aggregate_budget_path: Path | None = None,
 ) -> tuple[Any | None, Any | None, str]:
     if catalog is None:
         return None, None, "risk_catalog_unavailable"
@@ -332,6 +371,7 @@ def _build_risk_interfaces(
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget_path=aggregate_budget_path,
         )
     except ProviderAdapterError as exc:
         if str(exc) == "ai-atlas-nexus 1.2.4 is unavailable":
@@ -348,10 +388,73 @@ def _build_risk_interfaces(
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget_path=aggregate_budget_path,
         )
     except (ProviderAdapterError, RiskMappingError) as exc:
         raise OrchestrationError("risk provider interfaces failed closed") from exc
     return detector, checker, "nexus_provider_enabled"
+
+
+class _UnavailableIBMFactReasonerChecker:
+    """Visible fail-closed checker used when the exact optional runtime is absent."""
+
+    checker_id = "ibm/factreasoner-fr1-unavailable"
+    checker_revision = IBM_FACTREASONER_UPSTREAM_REVISION
+
+    def __init__(self, reason_code: str) -> None:
+        if not re.fullmatch(r"[a-z][a-z0-9_]{2,127}", reason_code):
+            raise OrchestrationError("FactReasoner unavailability reason is invalid")
+        self.reason_code = reason_code
+
+    def check(self, request: CheckRequest) -> CheckerResponse:
+        if not isinstance(request, CheckRequest):
+            raise OrchestrationError("FactReasoner checker requires a CheckRequest")
+        return CheckerResponse(
+            outcome=CheckOutcome.UNAVAILABLE,
+            reason_code=self.reason_code,
+        )
+
+    def check_many(
+        self, requests: tuple[CheckRequest, ...]
+    ) -> tuple[CheckerResponse, ...]:
+        return tuple(self.check(item) for item in requests)
+
+
+def _build_factreasoner_interface(
+    *,
+    provider: str,
+    ledger_path: Path,
+    decision_dir: Path,
+    environment: Mapping[str, str] | None,
+    transport: ProviderTransport | None,
+    call: CallFunction,
+    aggregate_budget_path: Path | None = None,
+) -> tuple[FactChecker, str]:
+    """Select genuine upstream FR1 or an explicit no-provider-call failure."""
+
+    status = IBMFactReasonerAdapter.installation_status()
+    if status != "ibm_factreasoner_pinned_dependency_available":
+        return _UnavailableIBMFactReasonerChecker(status), status
+    try:
+        nli_checker = OpenRouterFactChecker(
+            provider=provider,
+            ledger_path=ledger_path,
+            decision_dir=decision_dir,
+            environment=environment,
+            transport=transport,
+            call=call,
+            aggregate_budget_path=aggregate_budget_path,
+        )
+    except ProviderAdapterError as exc:
+        raise OrchestrationError(
+            "FactReasoner NLI provider initialization failed closed"
+        ) from exc
+    adapter = IBMFactReasonerAdapter(nli_checker)
+    try:
+        adapter.validate_installation()
+    except UpstreamFactReasonerUnavailable as exc:
+        return _UnavailableIBMFactReasonerChecker(exc.reason_code), exc.reason_code
+    return adapter, "ibm_factreasoner_fr1_enabled"
 
 
 @dataclass(frozen=True)
@@ -369,6 +472,7 @@ class ProviderOrchestrationResult:
     prose_decision_sha256s: tuple[str, ...]
     risk_catalog_sha256: str | None
     risk_interface_status: str
+    factreasoner_interface_status: str
     pipeline_result: PipelineResult = dataclass_field(repr=False)
     orchestration_version: str = ORCHESTRATION_VERSION
     result_sha256: str = dataclass_field(init=False)
@@ -416,6 +520,10 @@ class ProviderOrchestrationResult:
             )
         if not re.fullmatch(r"[a-z][a-z0-9_]{2,127}", self.risk_interface_status):
             raise OrchestrationError("risk interface status is invalid")
+        if not re.fullmatch(
+            r"[a-z][a-z0-9_]{2,127}", self.factreasoner_interface_status
+        ):
+            raise OrchestrationError("FactReasoner interface status is invalid")
         if not isinstance(self.pipeline_result, PipelineResult):
             raise OrchestrationError("orchestration requires a typed pipeline result")
         if (
@@ -449,6 +557,7 @@ class ProviderOrchestrationResult:
             "prose_decision_sha256s": list(self.prose_decision_sha256s),
             "risk_catalog_sha256": self.risk_catalog_sha256,
             "risk_interface_status": self.risk_interface_status,
+            "factreasoner_interface_status": self.factreasoner_interface_status,
             "pipeline_result_sha256": self.pipeline_result.result_sha256,
         }
 
@@ -464,6 +573,7 @@ def run_provider_assisted_pipeline(
     provider: str,
     ledger_path: str | os.PathLike[str],
     decision_dir: str | os.PathLike[str],
+    aggregate_budget_path: str | os.PathLike[str] | None = None,
     environment: Mapping[str, str] | None = None,
     transport: ProviderTransport | None = None,
     call: CallFunction = structured_json_call,
@@ -475,7 +585,8 @@ def run_provider_assisted_pipeline(
     Text documents from the verified Hugging Face and optional ancestry-bound
     official-source bundles are eligible. JSON documents stay on the
     deterministic structured-extraction path; each exact-target text document
-    receives exactly one quote-extraction call.
+    receives one general quote-extraction call and, when relevant signals are
+    present, at most one dedicated publisher use/risk extraction call.
     """
 
     if provider != PINNED_PROVIDER:
@@ -490,6 +601,16 @@ def run_provider_assisted_pipeline(
         raise OrchestrationError("max_risks must be between 1 and 10")
     root, ledger, decisions, decision_namespace_sha256 = _safe_run_paths(
         run_directory, ledger_path, decision_dir
+    )
+    try:
+        _validate_existing_pinned_ledger(ledger, provider)
+    except ProviderAdapterError as exc:
+        raise OrchestrationError(
+            "existing provider usage ledger is invalid or unpinned"
+        ) from exc
+    aggregate_budget = _safe_aggregate_budget_path(
+        aggregate_budget_path,
+        ledger_path=ledger,
     )
     try:
         source_state = load_source_state(
@@ -512,6 +633,16 @@ def run_provider_assisted_pipeline(
         transport=transport,
         call=call,
         max_risks=max_risks,
+        aggregate_budget_path=aggregate_budget,
+    )
+    fact_checker, factreasoner_status = _build_factreasoner_interface(
+        provider=provider,
+        ledger_path=ledger,
+        decision_dir=decisions,
+        environment=environment,
+        transport=transport,
+        call=call,
+        aggregate_budget_path=aggregate_budget,
     )
     eligible = tuple(
         sorted(
@@ -544,11 +675,22 @@ def run_provider_assisted_pipeline(
         "eligible_source_set_sha256": _digest([item.source_id for item in eligible]),
         "ledger_slot_sha256": _digest(USAGE_LEDGER_FILENAME),
         "decision_namespace_sha256": decision_namespace_sha256,
+        "aggregate_budget_path_sha256": (
+            None if aggregate_budget is None else path_sha256(aggregate_budget)
+        ),
         "risk_catalog_sha256": (
             None if selected_catalog is None else selected_catalog.catalog_sha256
         ),
         "risk_catalog_status": catalog_status,
         "risk_interface_status": risk_status,
+        "factreasoner_interface_status": factreasoner_status,
+        "factreasoner_checker_id": fact_checker.checker_id,
+        "factreasoner_checker_revision": fact_checker.checker_revision,
+        "factreasoner_adapter_version": IBM_FACTREASONER_ADAPTER_VERSION,
+        "factreasoner_upstream_revision": IBM_FACTREASONER_UPSTREAM_REVISION,
+        "factreasoner_configuration": "FR1",
+        "factreasoner_inference_method": IBM_FACTREASONER_INFERENCE_METHOD,
+        "factreasoner_relation_probability": IBM_FACTREASONER_RELATION_PROBABILITY,
         "max_risks": max_risks,
     }
     _atomic_admit(root / ORCHESTRATION_MANIFEST_FILENAME, admission)
@@ -561,6 +703,7 @@ def run_provider_assisted_pipeline(
             environment=environment,
             transport=transport,
             call=call,
+            aggregate_budget_path=aggregate_budget,
         )
         claim_checker = OpenRouterClaimChecker(
             provider=provider,
@@ -569,14 +712,7 @@ def run_provider_assisted_pipeline(
             environment=environment,
             transport=transport,
             call=call,
-        )
-        fact_checker = OpenRouterFactChecker(
-            provider=provider,
-            ledger_path=ledger,
-            decision_dir=decisions,
-            environment=environment,
-            transport=transport,
-            call=call,
+            aggregate_budget_path=aggregate_budget,
         )
         batches = tuple(
             extractor.extract_source(
@@ -643,6 +779,7 @@ def run_provider_assisted_pipeline(
             None if selected_catalog is None else selected_catalog.catalog_sha256
         ),
         risk_interface_status=risk_status,
+        factreasoner_interface_status=factreasoner_status,
         pipeline_result=pipeline_result,
     )
 

@@ -51,7 +51,7 @@ OPENROUTER_ROUTE_URL = (
     "deepseek/deepseek-v4-flash-0731/endpoints"
 )
 OPENROUTER_KEY_ENV = "OPENROUTER_API_KEY"
-PROVIDER_RUNTIME_VERSION = "openrouter-structured-provider/v6"
+PROVIDER_RUNTIME_VERSION = "openrouter-structured-provider/v7"
 REASONING_CONFIG = {"effort": "minimal", "exclude": True}
 DETERMINISTIC_USER_AGENT = "evaleval-model-cards/0.1 structured-provider/v1"
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
@@ -287,6 +287,21 @@ class ProviderTransport(Protocol):
         """Perform exactly one HTTP request with no automatic retry or fallback."""
 
 
+class PaidSendBudget(Protocol):
+    """Authorize one exact route-bounded send before its target reservation."""
+
+    def authorize_send(
+        self,
+        *,
+        binding: AttemptBinding,
+        retry_index: int,
+        route: RouteSnapshot,
+        input_token_ceiling: int,
+        output_token_ceiling: int,
+    ) -> None:
+        ...
+
+
 class _RejectRedirects(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
         return None
@@ -406,6 +421,7 @@ def structured_json_call(
     clock: Clock = utc_now,
     monotonic: Monotonic = time.monotonic,
     sleeper: Sleeper = time.sleep,
+    paid_send_budget: PaidSendBudget | None = None,
 ) -> StructuredCallResult:
     """Run or deterministically resume one strict structured-output attempt."""
 
@@ -490,6 +506,14 @@ def structured_json_call(
         if len(paid_request_bytes) > MAX_REQUEST_BYTES:
             raise ProviderError("route-bound provider request exceeds its byte bound")
         input_ceiling = len(paid_request_bytes) + PROMPT_TOKEN_SAFETY_OVERHEAD
+        if paid_send_budget is not None:
+            paid_send_budget.authorize_send(
+                binding=binding,
+                retry_index=next_retry,
+                route=route,
+                input_token_ceiling=input_ceiling,
+                output_token_ceiling=spec.max_output_tokens,
+            )
         token = ledger.reserve(
             binding,
             retry_index=next_retry,
@@ -1192,6 +1216,7 @@ __all__ = [
     "OPENROUTER_API_URL",
     "OPENROUTER_KEY_ENV",
     "OPENROUTER_ROUTE_URL",
+    "PaidSendBudget",
     "PINNED_PROVIDER",
     "PROVIDER_RESPONSE_REASON_CODES",
     "PROVIDER_RUNTIME_VERSION",

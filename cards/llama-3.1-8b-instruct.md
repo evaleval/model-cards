@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [llama\-3\.1\-8b\-instruct\.json](<./llama-3.1-8b-instruct.json>)<br>
-SHA-256: `0b67e87020aec1cefa273ce08876306b3ded3eb08f90238eb60020ee601027e5`
+SHA-256: `4cdfe9f5f004f5ce86d1d3e6f685f43a337014aa1e286fcb078f766527927c45`
 
 ## Identity
 
@@ -11,17 +11,17 @@ SHA-256: `0b67e87020aec1cefa273ce08876306b3ded3eb08f90238eb60020ee601027e5`
 | --- | --- |
 | Model ID | meta\-llama/Llama\-3\.1\-8B\-Instruct |
 | Name | Llama\-3\.1\-8B\-Instruct |
-| Developed by | meta\-llama |
+| Developed by | Meta |
 | Model type | text\-generation |
-| License | llama3\.1 |
+| License | A custom commercial license, the Llama 3\.1 Community License, is available at: https://github\.com/meta\-llama/llama\-models/blob/main/models/llama3\_1/LICENSE |
 | Release date | July 23, 2024 |
 | Version | 0e9e39f249a16976918f6564b8830bc894c89659 |
+| Summary | The publisher describes Llama\-3\.1\-8B\-Instruct as an instruction\-tuned, multilingual model with text input and output\. |
 
 ## Lineage
 
 | Field | Value |
 | --- | --- |
-| Base models | meta\-llama/Meta\-Llama\-3\.1\-8B (base model) |
 | Model family | llama |
 
 ## Specifications
@@ -33,7 +33,7 @@ SHA-256: `0b67e87020aec1cefa273ce08876306b3ded3eb08f90238eb60020ee601027e5`
 | Context length | 128K tokens \(README\-declared context length\) |
 | Precision | bfloat16 stored tensor weights \(safetensors parameter\-count metadata\) |
 | Model size | 14\.96 GiB estimated tensor payload \(16,060,522,496 bytes; from safetensors dtype counts\) |
-| Input / output | input: text<br>output: text<br>model stage: instruction\-tuned |
+| Input / output | input: Multilingual Text<br>output: Multilingual Text and code<br>supported languages: English, German, French, Italian, Portuguese, Hindi, Spanish, and Thai<br>model stage: instruction\-tuned |
 
 ## Training Context
 
@@ -56,7 +56,8 @@ SHA-256: `0b67e87020aec1cefa273ce08876306b3ded3eb08f90238eb60020ee601027e5`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The frozen README provides 12 exact\-target benchmark scores in this capped publication set; examples: MMLU: 69\.4; MMLU \(CoT\): 73\.0; MMLU\-Pro \(CoT\): 48\.3\. |
+| Results summary | The frozen README provides 17 exact\-target benchmark scores; examples: MMLU: 69\.4; MMLU \(CoT\): 73\.0; MMLU\-Pro \(CoT\): 48\.3\. |
+| Safety evaluations | The publisher reports family/system\-level adversarial safety evaluation and recurring red teaming covering CBRNE, child\-safety, and cyber risks; this section does not state a checkpoint\-specific numeric safety score\. |
 
 ### Benchmark Scores
 
@@ -74,6 +75,11 @@ SHA-256: `0b67e87020aec1cefa273ce08876306b3ded3eb08f90238eb60020ee601027e5`
 | Multipl\-E MBPP | pass@1 | 52\.4 | 0 shots | Not reported |
 | GSM\-8K \(CoT\) | em\_maj1@1 | 84\.5 | 8 shots | Not reported |
 | MATH \(CoT\) | final\_em | 51\.9 | 0 shots | Not reported |
+| API\-Bank | acc | 82\.6 | 0 shots | Not reported |
+| BFCL | acc | 76\.1 | 0 shots | Not reported |
+| Gorilla Benchmark API Bench | acc | 8\.2 | 0 shots | Not reported |
+| Nexus | macro\_avg/acc | 38\.5 | 0 shots | Not reported |
+| Multilingual MGSM \(CoT\) | em | 68\.9 | 0 shots | Not reported |
 
 ## Links
 
@@ -84,4 +90,4 @@ SHA-256: `0b67e87020aec1cefa273ce08876306b3ded3eb08f90238eb60020ee601027e5`
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.summary`, `lineage.derivatives`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.
+Unavailable agreed fields (not specified in the publication data): `lineage.base_models`, `lineage.derivatives`, `evaluation.human_evals`, `links.system_card`, `links.tech_report`, `links.citation`.

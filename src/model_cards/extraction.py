@@ -15,11 +15,13 @@ from enum import Enum
 import hashlib
 import json
 import re
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
+from urllib.parse import urlsplit
 
 from .bindings import binding_id_for, resolve_json_pointer, structured_binding
 from .claim_gate import (
     ClaimCandidate,
+    ClaimGateRecord,
     make_context_statement_value,
     make_mitigation_value,
     make_publisher_risk_value,
@@ -34,6 +36,7 @@ from .models import (
     JsonValue,
     RelationToTarget,
     SourceDocument,
+    SourceRole,
     TargetIdentity,
 )
 from .pointer_registry import DEFAULT_POINTER_FIELD_REGISTRY, PointerFieldRegistry
@@ -49,8 +52,12 @@ from .schema import (
 from .source_documents import SourceDocumentCatalog
 
 
-EXTRACTION_VERSION = "model-card-evidence-extraction/v3"
-EXTRACTION_SCHEMA_NAME = "model_card_quote_evidence_extraction_v1"
+EXTRACTION_VERSION = "model-card-evidence-extraction/v8"
+EXTRACTION_SCHEMA_NAME = "model_card_quote_evidence_extraction_v2"
+USE_RISK_EXTRACTION_SCHEMA_NAME = "model_card_use_risk_quote_extraction_v1"
+DETERMINISTIC_PUBLISHER_CONTEXT_VERSION = (
+    "deterministic-root-publisher-context/v5"
+)
 INFERENCE_MODEL = "deepseek/deepseek-v4-flash-0731"
 DEFAULT_WINDOW_CHARS = 12_000
 DEFAULT_WINDOW_OVERLAP = 500
@@ -59,6 +66,13 @@ DEFAULT_MAX_WINDOWS = 16
 # completion ceiling. Extraction is deliberately selective, and downstream
 # field-level omission records keep absent coverage explicit.
 MAX_PROVIDER_PROPOSALS = 8
+MAX_USE_RISK_PROVIDER_PROPOSALS = 8
+# A source can contribute one general provider response and, when it contains
+# deterministic use/risk signals, one bounded dedicated response. This is a
+# persisted-batch bound, not a per-call output allowance.
+MAX_EXTRACTION_BATCH_PROPOSALS = (
+    MAX_PROVIDER_PROPOSALS + MAX_USE_RISK_PROVIDER_PROPOSALS
+)
 MAX_PROVIDER_FIELD_PATH_CHARS = 160
 MAX_PROVIDER_VALUE_JSON_CHARS = 1_600
 MAX_PROVIDER_QUOTE_CHARS = 800
@@ -67,6 +81,7 @@ MAX_PROVIDER_SCOPE_JSON_CHARS = 1_000
 MAX_PROVIDER_RISK_NAME_CHARS = 256
 MAX_PROVIDER_RISK_DESCRIPTION_CHARS = 640
 MAX_PROVIDER_RISK_RATIONALE_CHARS = 512
+MAX_DETERMINISTIC_PUBLISHER_CONTEXTS_PER_FIELD = 8
 
 PUBLISHER_RISK_FIELD = "use_and_risk.identified_risks"
 PUBLISHER_RISK_PROPOSAL_FIELDS = (
@@ -98,6 +113,105 @@ _CONTEXT_FIELDS = frozenset(
         "use_and_risk.known_biases",
     }
 )
+_USE_RISK_FIELDS = frozenset(
+    set(_CONTEXT_FIELDS) | {PUBLISHER_RISK_FIELD, "use_and_risk.mitigations"}
+)
+_USE_RISK_FIELD_PATH_PATTERN = (
+    "^(?:"
+    + "|".join(re.escape(item) for item in sorted(_USE_RISK_FIELDS))
+    + ")\\[(?:0|[1-9][0-9]*)\\]$"
+)
+_USE_RISK_SIGNAL_RE = re.compile(
+    r"\b(?:intended\s+uses?|use\s+cases?|out[-\s]+of[-\s]+scope|"
+    r"limitations?|known\s+bias(?:es)?|safety|risks?|misuse|"
+    r"mitigations?|restrictions?)\b",
+    re.IGNORECASE,
+)
+
+_PUBLISHER_CONTEXT_FIELDS = (
+    "use_and_risk.intended_uses",
+    "use_and_risk.out_of_scope_uses",
+    "use_and_risk.limitations",
+    "use_and_risk.known_biases",
+    "use_and_risk.mitigations",
+)
+_MARKDOWN_HEADING_RE = re.compile(r"^(#{1,6})\s+(\S.*?)\s*$")
+_MARKDOWN_LIST_RE = re.compile(
+    r"^\s*(?:[-+*]|[0-9]{1,3}[.)])\s+(?:\[[ xX]\]\s+)?(\S.*)$"
+)
+_SENTENCE_BOUNDARY_RE = re.compile(
+    r"(?<=[.!?])\s+(?=(?:[\"'({\[])?[A-Z0-9])"
+)
+_WORD_RE = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
+_MODEL_ID_IN_PROSE_RE = re.compile(
+    r"(?<![/:])\b[A-Za-z0-9][A-Za-z0-9._-]{0,63}/"
+    r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}\b"
+)
+_RELATED_MODEL_RE = re.compile(
+    r"\b(?:base\s+(?:model|checkpoint)|parent\s+(?:model|checkpoint)|"
+    r"sibling(?:\s+(?:model|checkpoint))?|comparison\s+(?:model|checkpoint)|"
+    r"related\s+(?:model|checkpoint)|previous\s+(?:model|version|checkpoint)|"
+    r"earlier\s+(?:model|version|checkpoint)|other\s+(?:model|checkpoint)s?|"
+    r"derived\s+from|fine[-\s]+tuned\s+from|compared\s+(?:with|to))\b",
+    re.IGNORECASE,
+)
+_MITIGATION_ACTION_RE = re.compile(
+    r"(?:\b(?:users?|developers?|deployers?|operators?|publishers?)\s+"
+    r"(?:should|must|need\s+to|are\s+recommended\s+to)\b|"
+    r"\b(?:we|the\s+publisher)\s+recommend(?:s|ed)?\b|"
+    r"\b(?:should|must)\s+be\s+(?:reviewed|validated|verified|filtered|"
+    r"monitored|tested|restricted)\b|"
+    r"^(?:use|apply|implement|perform|conduct|monitor|review|validate|verify|"
+    r"filter|restrict|avoid|require)\b)",
+    re.IGNORECASE,
+)
+_MITIGATION_HARM_RE = re.compile(
+    r"\b(?:harms?|risks?|unsafe|safety|limitations?|bias(?:es|ed)?|inaccurate|"
+    r"incorrect|hallucinat(?:e|es|ed|ion|ions)|misinformation|toxic(?:ity)?|"
+    r"offensive|privacy|personal\s+data|sensitive\s+data|medical|legal|financial|"
+    r"malicious|abuse|misuse|discriminat(?:e|es|ed|ion)|stereotyp(?:e|es|ed|ing)|"
+    r"factual\s+(?:errors?|inaccurac(?:y|ies))|unreliable)\b",
+    re.IGNORECASE,
+)
+_MODEL_OR_OUTPUT_RE = re.compile(
+    r"\b(?:model|checkpoint|system|outputs?|responses?|generations?|predictions?)\b",
+    re.IGNORECASE,
+)
+_FORBIDDEN_CONTEXT_SECTION_RE = re.compile(
+    r"(?:licenses?|licensing|legal|terms(?: of use)?|acceptable use(?: policy)?|"
+    r"aup|use policy|citations?|references?|community|contact|contributing|"
+    r"installation|getting started|quick ?start|how to use|inference(?: examples?)?|"
+    r"generation (?:settings?|configuration|parameters?)|configuration|sampling|"
+    r"decoding|prompt format|weights?|downloads?)"
+)
+_LEGAL_CONTEXT_VALUE_RE = re.compile(
+    r"\b(?:licenses?|acceptable use policy|terms(?: of use)?)\b",
+    re.IGNORECASE,
+)
+_INLINE_FIELD_LABEL_RE = re.compile(
+    r"^(?:(?:\*\*|__)(?P<bold>intended\s+use(?:\s+cases?)?s?|"
+    r"out[-\s]+of[-\s]+scope(?:\s+uses?)?|limitations?|mitigations?)"
+    r"(?:\s*:)?(?:\*\*|__)|(?P<colon>intended\s+use(?:\s+cases?)?s?|"
+    r"out[-\s]+of[-\s]+scope(?:\s+uses?)?|limitations?|mitigations?)\s*:)"
+    r"\s*(?P<body>\S.*)$",
+    re.IGNORECASE,
+)
+_MIXED_VARIANT_RE = re.compile(
+    r"\b(?:(?:instruction[-\s]+tuned|instruct)\b[^.!?]{0,180}\b"
+    r"(?:whereas|while|but)\b[^.!?]{0,180}\bpretrained\b|"
+    r"pretrained\b[^.!?]{0,180}\b(?:whereas|while|but)\b[^.!?]{0,180}\b"
+    r"(?:instruction[-\s]+tuned|instruct)\b)",
+    re.IGNORECASE,
+)
+_LLAMA_31_TARGET_RE = re.compile(
+    r"^meta-llama/Llama-3\.1-(?:8B|70B|405B)(?P<instruct>-Instruct)?$",
+    re.IGNORECASE,
+)
+_LLAMA_31_MIXED_INTENDED_USE_RE = re.compile(
+    r"^(?P<instruct>Instruction tuned text only models are intended for "
+    r"assistant-like chat), whereas (?P<pretrained>pretrained models can be "
+    r"adapted for a variety of natural language generation tasks\.)$"
+)
 
 
 class ExtractionError(ValueError):
@@ -122,7 +236,7 @@ class ProviderProposalRejection:
         if (
             not isinstance(self.proposal_index, int)
             or isinstance(self.proposal_index, bool)
-            or not 0 <= self.proposal_index < MAX_PROVIDER_PROPOSALS
+            or not 0 <= self.proposal_index < MAX_EXTRACTION_BATCH_PROPOSALS
         ):
             raise ExtractionError("provider rejection index is invalid")
         if not _DIGEST_RE.fullmatch(self.proposal_sha256):
@@ -309,6 +423,44 @@ def build_source_windows(
     return tuple(windows)
 
 
+def build_use_risk_windows(
+    source: SourceDocument,
+    *,
+    windows: Iterable[SourceWindow] | None = None,
+) -> tuple[SourceWindow, ...]:
+    """Select bounded windows that can contain publisher use/risk evidence.
+
+    Selection is deterministic and deliberately recall-oriented: a window is
+    retained when it overlaps a structurally classified limitation/risk
+    section, has a use/risk heading, or contains one of the closed, strong
+    lexical signals.  Provider output is still quote-replayed and passes all
+    downstream claim gates, so this routing step never creates evidence.
+    """
+
+    if source.text is None:
+        raise ExtractionError("use/risk extraction windows require a text source")
+    candidates = tuple(build_source_windows(source) if windows is None else windows)
+    if not candidates:
+        return ()
+    index = build_document_index(source.text)
+    spans = tuple(
+        (section.char_start, section.char_end)
+        for section in index.sections
+        if section.region in {"limitations", "risk"}
+        or _USE_RISK_SIGNAL_RE.search(section.title)
+    )
+    selected = tuple(
+        window
+        for window in candidates
+        if _USE_RISK_SIGNAL_RE.search(window.excerpt)
+        or any(
+            window.normalized_start < end and start < window.normalized_end
+            for start, end in spans
+        )
+    )
+    return selected
+
+
 @dataclass(frozen=True)
 class QuoteProposal:
     """Untrusted provider proposal whose coordinates are computed locally."""
@@ -457,7 +609,10 @@ class ExtractionBatch:
     def __post_init__(self) -> None:
         object.__setattr__(self, "proposals", tuple(self.proposals))
         object.__setattr__(self, "rejections", tuple(self.rejections))
-        if len(self.proposals) + len(self.rejections) > MAX_PROVIDER_PROPOSALS:
+        if (
+            len(self.proposals) + len(self.rejections)
+            > MAX_EXTRACTION_BATCH_PROPOSALS
+        ):
             raise ExtractionError("extraction batch exceeds its proposal bound")
         if self.extraction_version != EXTRACTION_VERSION:
             raise ExtractionError("extraction batch version is unsupported")
@@ -811,11 +966,648 @@ def deterministic_structured_candidates(
     return _make_result(catalog.target, input_digest, candidate_values, outcome_values)
 
 
-def extraction_response_schema() -> dict[str, Any]:
-    """Strict server-side JSON Schema for one provider quote-extraction response."""
+@dataclass(frozen=True)
+class _PublisherTextSegment:
+    description: str
+    section_path: tuple[str, ...]
+    inline_field: str | None
+    complete_clause_without_terminal_punctuation: bool = False
 
+
+def _target_scoped_publisher_segments(
+    segment: _PublisherTextSegment,
+    source: SourceDocument,
+    target: TargetIdentity,
+) -> tuple[_PublisherTextSegment, ...]:
+    """Split one exact publisher sentence only when its checkpoint scope is closed.
+
+    The Llama 3.1 publisher describes the base and instruction-tuned checkpoints in
+    two clauses of one sentence.  The general mixed-variant guard must continue to
+    reject that sentence as a whole.  This narrow registered rule instead selects
+    one exact contiguous clause from the exact-target README after the target name
+    establishes which checkpoint the clause concerns.  Unknown families and stages
+    keep the original segment and therefore still fail the mixed-variant guard.
+    """
+
+    pinned_root_uris = {
+        f"https://huggingface.co/{target.model_id}/{route}/"
+        f"{target.revision}/README.md"
+        for route in ("resolve", "blob")
+    }
+    is_pinned_root_readme = (
+        source.role is SourceRole.HUGGING_FACE_SNAPSHOT
+        and source.target == target
+        and source.source_uri in pinned_root_uris
+    )
+    if (
+        not is_pinned_root_readme
+        or segment.inline_field != "use_and_risk.intended_uses"
+    ):
+        return (segment,)
+    sentence = _LLAMA_31_MIXED_INTENDED_USE_RE.fullmatch(segment.description)
+    checkpoint = _LLAMA_31_TARGET_RE.fullmatch(target.model_id)
+    if sentence is None or checkpoint is None:
+        return (segment,)
+    group = "instruct" if checkpoint.group("instruct") else "pretrained"
+    return (
+        _PublisherTextSegment(
+            description=sentence.group(group),
+            section_path=segment.section_path,
+            inline_field=segment.inline_field,
+            complete_clause_without_terminal_punctuation=(group == "instruct"),
+        ),
+    )
+
+
+def _normalized_heading(title: str) -> str:
+    value = normalize_ws(title).casefold().replace("&", " and ")
+    value = re.sub(r"[`*_~]", "", value)
+    return re.sub(r"[^a-z0-9]+", " ", value).strip()
+
+
+def _publisher_structural_fields(
+    section_path: Sequence[str],
+) -> frozenset[str]:
+    """Return fields permitted by the nearest recognized safety/use ancestry."""
+
+    headings = tuple(_normalized_heading(item) for item in section_path)
+    if not headings or any(
+        _FORBIDDEN_CONTEXT_SECTION_RE.search(item) for item in headings
+    ):
+        return frozenset()
+    for title in reversed(headings):
+        if re.fullmatch(
+            r"(?:out of scope(?: uses?)?|non intended uses?|not intended(?: uses?)?|"
+            r"prohibited uses?|disallowed uses?|restricted uses?|misuse(?: cases?)?)",
+            title,
+        ):
+            return frozenset({"use_and_risk.out_of_scope_uses"})
+        if re.fullmatch(
+            r"(?:(?:intended|primary|direct|supported|downstream) uses?|uses?|"
+            r"use cases?|intended applications?)",
+            title,
+        ):
+            return frozenset(
+                {
+                    "use_and_risk.intended_uses",
+                    "use_and_risk.out_of_scope_uses",
+                }
+            )
+        if re.fullmatch(
+            r"(?:(?:known )?(?:limitations?|issues?|failure modes?|shortcomings?))",
+            title,
+        ):
+            return frozenset(
+                {
+                    "use_and_risk.limitations",
+                    "use_and_risk.known_biases",
+                    "use_and_risk.mitigations",
+                }
+            )
+        if re.fullmatch(r"(?:(?:known )?bias(?:es)?)", title):
+            return frozenset({"use_and_risk.known_biases"})
+        if re.fullmatch(
+            r"(?:mitigations?|safety recommendations?|safety guidelines?|"
+            r"safeguards?)",
+            title,
+        ):
+            return frozenset({"use_and_risk.mitigations"})
+        if re.fullmatch(
+            r"(?:risks?|safety(?: and security)?|responsible use|"
+            r"ethical considerations?|hazards?)",
+            title,
+        ):
+            return frozenset(
+                {
+                    "use_and_risk.limitations",
+                    "use_and_risk.known_biases",
+                    "use_and_risk.mitigations",
+                }
+            )
+        # The nearest heading controls the paragraph. Walking past an unknown
+        # child heading can reassign a sibling/model-specific subsection to a
+        # broader Limitation or Risk ancestor.
+        return frozenset()
+    return frozenset()
+
+
+def _inline_label_field(label: str) -> str | None:
+    normalized = _normalized_heading(label)
+    if re.fullmatch(r"out of scope(?: uses?)?", normalized):
+        return "use_and_risk.out_of_scope_uses"
+    if re.fullmatch(r"intended use(?: cases?)?s?", normalized):
+        return "use_and_risk.intended_uses"
+    if re.fullmatch(r"limitations?", normalized):
+        return "use_and_risk.limitations"
+    if re.fullmatch(r"mitigations?", normalized):
+        return "use_and_risk.mitigations"
+    return None
+
+
+def _strip_segment_prefix(value: str) -> tuple[str, str | None]:
+    text = normalize_ws(value)
+    match = _MARKDOWN_LIST_RE.fullmatch(text)
+    if match is not None:
+        text = normalize_ws(match.group(1))
+    match = _INLINE_FIELD_LABEL_RE.fullmatch(text)
+    if match is not None:
+        label = match.group("bold") or match.group("colon")
+        text = normalize_ws(match.group("body"))
+        return text, _inline_label_field(label)
+    return text, None
+
+
+def _publisher_text_segments(text: str) -> tuple[_PublisherTextSegment, ...]:
+    """Return exact substrings with locally reconstructed Markdown ancestry."""
+
+    lines = text.splitlines()
+    stack: list[tuple[int, str]] = []
+    paragraph: list[str] = []
+    paragraph_path: tuple[str, ...] = ()
+    raw_segments: list[tuple[str, tuple[str, ...]]] = []
+    in_fence = False
+    in_frontmatter = False
+    first_content_seen = False
+    list_indent: int | None = None
+
+    def flush() -> None:
+        nonlocal paragraph, list_indent
+        if paragraph:
+            raw_segments.append((" ".join(paragraph), paragraph_path))
+            paragraph = []
+        list_indent = None
+
+    for line in lines:
+        stripped = line.strip()
+        if not first_content_seen and not stripped:
+            continue
+        if not first_content_seen:
+            first_content_seen = True
+            if stripped == "---":
+                in_frontmatter = True
+                continue
+        if in_frontmatter:
+            if stripped in {"---", "..."}:
+                in_frontmatter = False
+            continue
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            flush()
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        heading = _MARKDOWN_HEADING_RE.fullmatch(stripped)
+        if heading is not None:
+            flush()
+            level = len(heading.group(1))
+            while stack and stack[-1][0] >= level:
+                stack.pop()
+            stack.append((level, heading.group(2).strip()))
+            continue
+        if not stripped:
+            flush()
+            continue
+        if stripped.startswith(">") or stripped.startswith("|"):
+            flush()
+            continue
+        list_item = _MARKDOWN_LIST_RE.fullmatch(line)
+        if list_item is not None:
+            flush()
+            paragraph_path = tuple(item[1] for item in stack)
+            paragraph = [list_item.group(1)]
+            list_indent = len(line) - len(line.lstrip())
+            continue
+        indentation = len(line) - len(line.lstrip())
+        if list_indent is not None and indentation > list_indent:
+            paragraph.append(stripped)
+            continue
+        if line.startswith("    "):
+            flush()
+            continue
+        current_path = tuple(item[1] for item in stack)
+        if paragraph and paragraph_path != current_path:
+            flush()
+        if not paragraph:
+            paragraph_path = current_path
+        paragraph.append(stripped)
+    flush()
+
+    results: list[_PublisherTextSegment] = []
+    seen: set[tuple[str, tuple[str, ...], str | None]] = set()
+    for raw, path in raw_segments:
+        scoped_text, inline_field = _strip_segment_prefix(raw)
+        for sentence in _SENTENCE_BOUNDARY_RE.split(scoped_text):
+            description, nested_field = _strip_segment_prefix(sentence)
+            field = inline_field or nested_field
+            key = (description, path, field)
+            if description and key not in seen:
+                seen.add(key)
+                results.append(
+                    _PublisherTextSegment(
+                        description,
+                        path,
+                        field,
+                    )
+                )
+    return tuple(results)
+
+
+def _publisher_statement_fields(
+    description: str, target: TargetIdentity
+) -> frozenset[str]:
+    model_id = re.escape(target.model_id)
+    model_name = re.escape(target.model_id.split("/", 1)[1])
+    subject = (
+        rf"(?:(?:this|the|our)\s+(?:model|checkpoint|system)|the\s+exact\s+target|"
+        rf"{model_id}|{model_name})"
+    )
+    explicit_model_reference = re.search(
+        rf"(?:\b{subject}\b|\b(?:model|checkpoint|system)\s+"
+        r"(?:outputs?|responses?|generations?|predictions?)\b)",
+        description,
+        re.IGNORECASE,
+    )
+    fields: set[str] = set()
+    if re.search(
+        rf"(?:\b{subject}\s+(?:is|was)\s+not\s+(?:intended|designed|developed|"
+        rf"built|suitable|recommended)\s+for\b|\b{subject}\s+(?:should|must)\s+"
+        rf"not\s+be\s+(?:used|deployed)\b|\b(?:do\s+not|never)\s+"
+        rf"(?:use|deploy)\s+{subject}\b)",
+        description,
+        re.IGNORECASE,
+    ):
+        fields.add("use_and_risk.out_of_scope_uses")
+    if re.search(
+        rf"(?:\b{subject}\s+(?:is|was)\s+(?:intended|designed|developed|built)\s+"
+        rf"(?:for|to)\b|\b{subject}\s+can\s+be\s+used\s+for\b|"
+        rf"\b(?:publisher|developers?)\s+(?:intends?|designed|developed)\s+"
+        rf"(?:this|the)\s+(?:model|checkpoint)\s+for\b)",
+        description,
+        re.IGNORECASE,
+    ):
+        fields.add("use_and_risk.intended_uses")
+    if re.search(
+        rf"(?:\b{subject}\s+(?:cannot|can't|does\s+not|is\s+unable\s+to|"
+        rf"is\s+limited\s+(?:to|by|in)|may\s+not|suffers?\s+from|"
+        rf"struggles?\s+with|has\s+difficulty\s+with|"
+        rf"(?:may|can|could)\s+(?:produce|generate|expose|fail|hallucinate|omit|"
+        rf"misclassify|provide|return|repeat))\b|\b(?:a|one)\s+limitation\s+of\s+"
+        rf"{subject}\s+(?:is|are)\b)",
+        description,
+        re.IGNORECASE,
+    ):
+        fields.add("use_and_risk.limitations")
+    if re.search(
+        rf"(?:\b{subject}\b[^.!?]{{0,120}}\b(?:known\s+)?bias(?:es|ed)?\b|"
+        rf"\b(?:known\s+)?bias(?:es)?\s+(?:of|in)\s+{subject}\b)",
+        description,
+        re.IGNORECASE,
+    ):
+        fields.add("use_and_risk.known_biases")
+    if (
+        "use_and_risk.out_of_scope_uses" not in fields
+        and _MITIGATION_ACTION_RE.search(description)
+        and _MITIGATION_HARM_RE.search(description)
+        and explicit_model_reference is not None
+    ):
+        fields.add("use_and_risk.mitigations")
+    return frozenset(fields)
+
+
+def _publisher_statement_is_substantive(
+    description: str,
+    *,
+    complete_clause_without_terminal_punctuation: bool = False,
+) -> bool:
+    normalized = normalize_ws(description)
+    if not 20 <= len(normalized) <= MAX_PROVIDER_QUOTE_CHARS:
+        return False
+    if len(_WORD_RE.findall(normalized)) < 5:
+        return False
+    if (
+        normalized[-1] not in ".?!"
+        and not complete_clause_without_terminal_punctuation
+    ):
+        return False
+    folded = normalized.casefold().strip(" .:;-_")
+    if folded in {
+        "n/a",
+        "n a",
+        "none",
+        "not applicable",
+        "not specified",
+        "tbd",
+        "todo",
+        "unknown",
+    }:
+        return False
+    return True
+
+
+def _publisher_statement_has_exact_scope(
+    description: str,
+    section_path: Sequence[str],
+    target: TargetIdentity,
+) -> bool:
+    scope_text = " ".join((*section_path, description))
+    if _RELATED_MODEL_RE.search(scope_text) or _MIXED_VARIANT_RE.search(
+        description
+    ):
+        return False
+    target_id = target.model_id.casefold()
+    if not all(
+        match.group(0).casefold() == target_id
+        for match in _MODEL_ID_IN_PROSE_RE.finditer(scope_text)
+    ):
+        return False
+    return True
+
+
+def _accepted_publisher_context_fields(
+    gate_records: Iterable[ClaimGateRecord],
+) -> tuple[tuple[ClaimGateRecord, ...], frozenset[str]]:
+    values = tuple(gate_records)
+    if not all(isinstance(item, ClaimGateRecord) for item in values):
+        raise ExtractionError(
+            "existing publisher-context gate records must be typed"
+        )
+    for item in values:
+        item.validate_integrity()
+    populated = frozenset(
+        canonical_field_path(item.candidate.field_path)
+        for item in values
+        if item.projection_eligible
+        and item.candidate.relation is RelationToTarget.EXACT_TARGET
+        and canonical_field_path(item.candidate.field_path)
+        in _PUBLISHER_CONTEXT_FIELDS
+    )
+    return values, populated
+
+
+def _publisher_context_source_is_eligible(
+    source: SourceDocument, target: TargetIdentity
+) -> bool:
+    if (
+        source.text is None
+        or source.synthetic
+        or source.target != target
+    ):
+        return False
+    # The frozen, root model-card README is publisher documentation bound to the
+    # exact Hub revision. Other declared Markdown/text snapshots and developer
+    # reports require provider-assisted semantic binding because the document
+    # type alone does not prove checkpoint scope.
+    if source.role is not SourceRole.HUGGING_FACE_SNAPSHOT:
+        return False
+    parsed = urlsplit(source.source_uri)
+    return (
+        parsed.scheme == "https"
+        and parsed.netloc.casefold() == "huggingface.co"
+        and parsed.path
+        in {
+            f"/{target.model_id}/resolve/{target.revision}/README.md",
+            f"/{target.model_id}/blob/{target.revision}/README.md",
+        }
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def deterministic_publisher_context_candidates(
+    catalog: SourceDocumentCatalog,
+    *,
+    existing_gate_records: Iterable[ClaimGateRecord] = (),
+) -> ExtractionResult:
+    """Extract exact context from the pinned root README.
+
+    This pass does not infer risks and never invents prose. It admits only an
+    exact substring from an exact-target, non-synthetic publisher source only
+    when closed structural ancestry and an exact-subject predicate agree.
+    A field already populated by a provider candidate that passed the complete
+    claim gate is left untouched, preserving the provider's list indices. Mere
+    materialization is not sufficient: an unverified or semantically rejected
+    provider proposal cannot suppress stronger deterministic evidence.
+    """
+
+    existing, populated_fields = _accepted_publisher_context_fields(
+        existing_gate_records
+    )
+    material: list[
+        tuple[str, int, str, str, QuoteProposal, Evidence]
+    ] = []
+    for source in sorted(catalog.documents, key=lambda item: item.source_id):
+        if not _publisher_context_source_is_eligible(source, catalog.target):
+            continue
+        for raw_segment in _publisher_text_segments(source.text):
+            for segment in _target_scoped_publisher_segments(
+                raw_segment, source, catalog.target
+            ):
+                if not _publisher_statement_is_substantive(
+                    segment.description,
+                    complete_clause_without_terminal_punctuation=(
+                        segment.complete_clause_without_terminal_punctuation
+                    ),
+                ):
+                    continue
+                structural_fields = _publisher_structural_fields(
+                    segment.section_path
+                )
+                if not structural_fields:
+                    continue
+                if not _publisher_statement_has_exact_scope(
+                    segment.description,
+                    segment.section_path,
+                    catalog.target,
+                ):
+                    continue
+                explicit_fields = _publisher_statement_fields(
+                    segment.description, catalog.target
+                )
+                if segment.inline_field is not None:
+                    field_path = segment.inline_field
+                    if explicit_fields and explicit_fields != {field_path}:
+                        continue
+                else:
+                    if len(explicit_fields) != 1:
+                        continue
+                    field_path = next(iter(explicit_fields))
+                if (
+                    field_path not in structural_fields
+                    or field_path in populated_fields
+                ):
+                    continue
+                if (
+                    field_path != "use_and_risk.out_of_scope_uses"
+                    and _LEGAL_CONTEXT_VALUE_RE.search(segment.description)
+                ):
+                    continue
+                if (
+                    field_path == "use_and_risk.mitigations"
+                    and not _MITIGATION_ACTION_RE.search(segment.description)
+                ):
+                    continue
+                evidence = _quote_evidence(source, segment.description)
+                if (
+                    not evidence.verified
+                    or evidence.char_start is None
+                    or evidence.section_path != segment.section_path
+                ):
+                    # Ambiguous duplicate prose can otherwise replay to a related-model
+                    # section. Omission is safer than accepting a different occurrence.
+                    continue
+                proposal = QuoteProposal(
+                    source_id=source.source_id,
+                    field_path=f"{field_path}[0]",  # replaced after stable grouping
+                    value=segment.description,
+                    quote=segment.description,
+                    claim_entity=(
+                        f"{catalog.target.model_id}@{catalog.target.revision}"
+                    ),
+                    relation=RelationToTarget.EXACT_TARGET,
+                    origin="source_stated",
+                )
+                material.append(
+                    (
+                        source.source_id,
+                        evidence.char_start,
+                        field_path,
+                        segment.description,
+                        proposal,
+                        evidence,
+                    )
+                )
+
+    candidates: list[ClaimCandidate] = []
+    outcomes: list[ProposalOutcome] = []
+    counts = {field_path: 0 for field_path in _PUBLISHER_CONTEXT_FIELDS}
+    seen: set[tuple[str, str]] = set()
+    for _source_id, _start, field_path, description, prototype, evidence in sorted(
+        material, key=lambda item: (item[0], item[1], item[2], item[3])
+    ):
+        key = (field_path, normalize_ws(description).casefold())
+        if key in seen:
+            continue
+        index = counts[field_path]
+        if index >= MAX_DETERMINISTIC_PUBLISHER_CONTEXTS_PER_FIELD:
+            continue
+        seen.add(key)
+        counts[field_path] += 1
+        proposal = QuoteProposal(
+            source_id=prototype.source_id,
+            field_path=f"{field_path}[{index}]",
+            value=prototype.value,
+            quote=prototype.quote,
+            claim_entity=prototype.claim_entity,
+            relation=prototype.relation,
+            origin=prototype.origin,
+        )
+        if field_path == "use_and_risk.mitigations":
+            value: JsonValue = make_mitigation_value(
+                description=description, evidence=(evidence,)
+            )
+        else:
+            value = make_context_statement_value(
+                field_path=proposal.field_path,
+                description=description,
+                origin="publisher_reported",
+                evidence=(evidence,),
+            )
+        binding = _binding_from_quote_evidence(
+            catalog.target, proposal, value, evidence
+        )
+        candidate = ClaimCandidate.from_binding(catalog.target, binding)
+        candidates.append(candidate)
+        outcomes.append(
+            ProposalOutcome(
+                proposal.proposal_id,
+                ProposalStatus.MATERIALIZED,
+                "candidate_materialized",
+                candidate.candidate_id,
+            )
+        )
+
+    input_digest = _digest(
+        {
+            "mode": DETERMINISTIC_PUBLISHER_CONTEXT_VERSION,
+            "catalog_sha256": catalog.catalog_sha256,
+            "existing_gate_records": [
+                {
+                    "candidate_id": item.candidate.candidate_id,
+                    "candidate_sha256": item.candidate.content_sha256,
+                    "gate_record_sha256": item.content_sha256,
+                }
+                for item in sorted(
+                    existing, key=lambda item: item.candidate.candidate_id
+                )
+            ],
+            "populated_fields": sorted(populated_fields),
+        }
+    )
+    return _make_result(
+        catalog.target,
+        input_digest,
+        tuple(sorted(candidates, key=lambda item: item.candidate_id)),
+        tuple(sorted(outcomes, key=lambda item: item.proposal_id)),
+    )
+
+
+def _quote_proposal_item_schema(field_path_pattern: str) -> dict[str, Any]:
     return {
-        "name": EXTRACTION_SCHEMA_NAME,
+        "type": "object",
+        "required": [
+            "source_id",
+            "field_path",
+            "value_json",
+            "quote",
+            "claim_entity",
+            "relation",
+            "origin",
+        ],
+        "properties": {
+            "source_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+            },
+            "field_path": {
+                "type": "string",
+                "pattern": field_path_pattern,
+                "maxLength": MAX_PROVIDER_FIELD_PATH_CHARS,
+            },
+            "value_json": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_PROVIDER_VALUE_JSON_CHARS,
+                "description": (
+                    "JSON text encoding the exact field value; preserve stated units "
+                    "and satisfy the supplied field contract"
+                ),
+            },
+            "quote": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_PROVIDER_QUOTE_CHARS,
+            },
+            "claim_entity": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": MAX_PROVIDER_ENTITY_CHARS,
+            },
+            "relation": {"enum": [item.value for item in RelationToTarget]},
+            "origin": {"enum": ["source_stated", "source_derived"]},
+        },
+        "additionalProperties": False,
+    }
+
+
+def _response_schema(
+    *,
+    name: str,
+    max_proposals: int,
+    field_path_pattern: str,
+) -> dict[str, Any]:
+    return {
+        "name": name,
         "strict": True,
         "schema": {
             "type": "object",
@@ -823,66 +1615,38 @@ def extraction_response_schema() -> dict[str, Any]:
             "properties": {
                 "proposals": {
                     "type": "array",
-                    "maxItems": MAX_PROVIDER_PROPOSALS,
-                    "items": {
-                        "type": "object",
-                        "required": [
-                            "source_id",
-                            "field_path",
-                            "value_json",
-                            "quote",
-                            "claim_entity",
-                            "relation",
-                            "benchmark_scope_json",
-                            "origin",
-                        ],
-                        "properties": {
-                            "source_id": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 128,
-                            },
-                            "field_path": {
-                                "type": "string",
-                                "pattern": _PROVIDER_FIELD_PATH_PATTERN,
-                                "maxLength": MAX_PROVIDER_FIELD_PATH_CHARS,
-                            },
-                            "value_json": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": MAX_PROVIDER_VALUE_JSON_CHARS,
-                                "description": (
-                                    "JSON text encoding the exact field value; preserve "
-                                    "stated units and satisfy the supplied field contract"
-                                ),
-                            },
-                            "quote": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": MAX_PROVIDER_QUOTE_CHARS,
-                            },
-                            "claim_entity": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": MAX_PROVIDER_ENTITY_CHARS,
-                            },
-                            "relation": {"enum": [item.value for item in RelationToTarget]},
-                            "benchmark_scope_json": {
-                                "type": ["string", "null"],
-                                "maxLength": MAX_PROVIDER_SCOPE_JSON_CHARS,
-                                "description": (
-                                    "null, or JSON text encoding a benchmark-scope object"
-                                ),
-                            },
-                            "origin": {"enum": ["source_stated", "source_derived"]},
-                        },
-                        "additionalProperties": False,
-                    },
+                    "maxItems": max_proposals,
+                    "items": _quote_proposal_item_schema(field_path_pattern),
                 }
             },
             "additionalProperties": False,
         },
     }
+
+
+def extraction_response_schema() -> dict[str, Any]:
+    """Strict server schema for the general quote-extraction response.
+
+    Benchmark scope is intentionally absent from provider output.  For a
+    benchmark-score row, the three scope coordinates are copied locally from
+    the already typed row, eliminating a redundant provider-controlled value.
+    """
+
+    return _response_schema(
+        name=EXTRACTION_SCHEMA_NAME,
+        max_proposals=MAX_PROVIDER_PROPOSALS,
+        field_path_pattern=_PROVIDER_FIELD_PATH_PATTERN,
+    )
+
+
+def use_risk_extraction_response_schema() -> dict[str, Any]:
+    """Strict schema for the bounded publisher use/risk recovery pass."""
+
+    return _response_schema(
+        name=USE_RISK_EXTRACTION_SCHEMA_NAME,
+        max_proposals=MAX_USE_RISK_PROVIDER_PROPOSALS,
+        field_path_pattern=_USE_RISK_FIELD_PATH_PATTERN,
+    )
 
 
 def proposals_from_provider_value(value: Any) -> tuple[QuoteProposal, ...]:
@@ -905,7 +1669,6 @@ def proposals_from_provider_value(value: Any) -> tuple[QuoteProposal, ...]:
                 "quote",
                 "claim_entity",
                 "relation",
-                "benchmark_scope_json",
                 "origin",
             },
             "provider quote proposal",
@@ -922,15 +1685,19 @@ def proposals_from_provider_value(value: Any) -> tuple[QuoteProposal, ...]:
             raise ExtractionError("provider proposal contains invalid canonical JSON") from exc
         except json.JSONDecodeError as exc:
             # Some structured-output providers obey the outer schema but return
-            # an unquoted scalar in the nested JSON-string field.  Recover only
-            # when the destination is scalar text: the exact returned bytes are
-            # retained as the proposed value and still face quote replay, field
-            # fit, value support, and schema validation.  Structured/list claims
-            # remain fail-closed.
+            # unquoted prose in the nested JSON-string field. Recover only plain
+            # scalar fields and the closed set of description-only publisher
+            # use/risk list fields. The exact bytes still face quote replay,
+            # field fit, value support, and schema validation; all structured
+            # list items remain fail-closed.
             base = canonical_field_path(entry["field_path"])
             raw_value = entry["value_json"]
             if (
-                base in LIST_FIELDS
+                (
+                    base in LIST_FIELDS
+                    and base not in _CONTEXT_FIELDS
+                    and base != "use_and_risk.mitigations"
+                )
                 or not isinstance(raw_value, str)
                 or not normalize_ws(raw_value)
             ):
@@ -939,26 +1706,14 @@ def proposals_from_provider_value(value: Any) -> tuple[QuoteProposal, ...]:
                 ) from exc
             proposed_value = raw_value
 
-        raw_scope = entry["benchmark_scope_json"]
-        if raw_scope is None or (
-            isinstance(raw_scope, str)
-            and normalize_ws(raw_scope).casefold()
-            in {"", "none", "null", "not applicable", "n/a"}
-        ):
-            scope = None
-        else:
-            try:
-                scope = json.loads(
-                    raw_scope,
-                    object_pairs_hook=_reject_duplicate_keys,
-                    parse_constant=_reject_nonfinite,
-                )
-            except (json.JSONDecodeError, ExtractionError) as exc:
-                raise ExtractionError(
-                    "provider proposal contains invalid canonical JSON"
-                ) from exc
-        if scope is not None and not isinstance(scope, dict):
-            raise ExtractionError("provider benchmark_scope_json must decode to an object")
+        base = canonical_field_path(entry["field_path"])
+        scope = None
+        if base == "evaluation.benchmark_scores" and isinstance(proposed_value, dict):
+            if all(key in proposed_value for key in ("benchmark", "metric", "setting")):
+                scope = {
+                    key: deepcopy(proposed_value[key])
+                    for key in ("benchmark", "metric", "setting")
+                }
         proposals.append(
             QuoteProposal(
                 source_id=entry["source_id"],
@@ -1139,15 +1894,19 @@ def _make_result(
 
 
 __all__ = [
+    "DETERMINISTIC_PUBLISHER_CONTEXT_VERSION",
     "DEFAULT_MAX_WINDOWS",
     "DEFAULT_WINDOW_CHARS",
     "DEFAULT_WINDOW_OVERLAP",
     "EXTRACTION_SCHEMA_NAME",
     "EXTRACTION_VERSION",
+    "USE_RISK_EXTRACTION_SCHEMA_NAME",
     "ExtractionBatch",
     "ExtractionError",
     "ExtractionResult",
     "MAX_PROVIDER_ENTITY_CHARS",
+    "MAX_EXTRACTION_BATCH_PROPOSALS",
+    "MAX_DETERMINISTIC_PUBLISHER_CONTEXTS_PER_FIELD",
     "MAX_PROVIDER_FIELD_PATH_CHARS",
     "MAX_PROVIDER_PROPOSALS",
     "MAX_PROVIDER_QUOTE_CHARS",
@@ -1156,6 +1915,7 @@ __all__ = [
     "MAX_PROVIDER_RISK_RATIONALE_CHARS",
     "MAX_PROVIDER_SCOPE_JSON_CHARS",
     "MAX_PROVIDER_VALUE_JSON_CHARS",
+    "MAX_USE_RISK_PROVIDER_PROPOSALS",
     "PUBLISHER_RISK_FIELD",
     "PUBLISHER_RISK_PROPOSAL_FIELDS",
     "ProposalOutcome",
@@ -1164,10 +1924,13 @@ __all__ = [
     "QuoteProposal",
     "SourceWindow",
     "build_source_windows",
+    "build_use_risk_windows",
+    "deterministic_publisher_context_candidates",
     "deterministic_structured_candidates",
     "extraction_response_schema",
     "materialize_quote_batch",
     "normalize_provider_proposals",
     "publisher_risk_proposal_schema",
     "proposals_from_provider_value",
+    "use_risk_extraction_response_schema",
 ]

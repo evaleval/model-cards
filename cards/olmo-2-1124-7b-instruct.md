@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [olmo\-2\-1124\-7b\-instruct\.json](<./olmo-2-1124-7b-instruct.json>)<br>
-SHA-256: `37962f2d91aeeb4ad073434aff73d64c264f9dc509ad0ee3f32cfbeff06b3799`
+SHA-256: `6fc2d0b30020f94623bed390a1f69e1257da52aeaaec4da9b8af71f2e6b44f35`
 
 ## Identity
 
@@ -15,7 +15,7 @@ SHA-256: `37962f2d91aeeb4ad073434aff73d64c264f9dc509ad0ee3f32cfbeff06b3799`
 | Model type | text\-generation |
 | License | apache\-2\.0 |
 | Version | 470b1fba1ae01581f270116362ee4aa1b97f4c84 |
-| Summary | The publisher README identifies OLMo\-2\-1124\-7B\-Instruct as a post\-trained checkpoint for text generation\. |
+| Summary | The publisher describes OLMo\-2\-1124\-7B\-Instruct as an instruction\-tuned model\. |
 
 ## Lineage
 
@@ -54,7 +54,7 @@ SHA-256: `37962f2d91aeeb4ad073434aff73d64c264f9dc509ad0ee3f32cfbeff06b3799`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The frozen README provides 10 exact\-target benchmark scores in this capped publication set; examples: AlpacaEval: 29\.1; BBH: 46\.6; DROP: 60\.5\. |
+| Results summary | The frozen README provides 10 exact\-target benchmark scores; examples: AlpacaEval: 29\.1; BBH: 46\.6; DROP: 60\.5\. |
 | Safety evaluations | README performance table reports Safety score 80\.6 \(README\-reported score; Performance; setting not stated\)\. |
 
 ### Benchmark Scores
