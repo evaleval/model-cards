@@ -6,6 +6,7 @@ from pathlib import Path
 import unittest
 
 from model_cards.migrate import migrate_legacy_card
+from model_cards.publication_schema import validate_publication_card
 from model_cards.schema import validate_public_card
 
 
@@ -96,11 +97,11 @@ class MigrationTests(unittest.TestCase):
         self.assertIn("use_and_risk.identified_risks", first["validation"]["missing_fields"])
         validate_public_card(first)
 
-    def test_checked_in_cards_are_idempotent_contract_instances(self) -> None:
+    def test_checked_in_cards_are_exact_publication_instances(self) -> None:
         for path in sorted((self.ROOT / "cards").glob("*.json")):
             with self.subTest(path=path):
                 value = json.loads(path.read_text(encoding="utf-8"))
-                self.assertEqual(migrate_legacy_card(value), value)
+                validate_publication_card(value)
 
 
 if __name__ == "__main__":

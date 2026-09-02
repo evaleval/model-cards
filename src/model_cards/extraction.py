@@ -916,17 +916,47 @@ def proposals_from_provider_value(value: Any) -> tuple[QuoteProposal, ...]:
                 object_pairs_hook=_reject_duplicate_keys,
                 parse_constant=_reject_nonfinite,
             )
-            scope = (
-                None
-                if entry["benchmark_scope_json"] is None
-                else json.loads(
-                    entry["benchmark_scope_json"],
+        except ExtractionError as exc:
+            # Duplicate keys and non-finite values are ambiguous and must never
+            # be repaired into a different claim.
+            raise ExtractionError("provider proposal contains invalid canonical JSON") from exc
+        except json.JSONDecodeError as exc:
+            # Some structured-output providers obey the outer schema but return
+            # an unquoted scalar in the nested JSON-string field.  Recover only
+            # when the destination is scalar text: the exact returned bytes are
+            # retained as the proposed value and still face quote replay, field
+            # fit, value support, and schema validation.  Structured/list claims
+            # remain fail-closed.
+            base = canonical_field_path(entry["field_path"])
+            raw_value = entry["value_json"]
+            if (
+                base in LIST_FIELDS
+                or not isinstance(raw_value, str)
+                or not normalize_ws(raw_value)
+            ):
+                raise ExtractionError(
+                    "provider proposal contains invalid canonical JSON"
+                ) from exc
+            proposed_value = raw_value
+
+        raw_scope = entry["benchmark_scope_json"]
+        if raw_scope is None or (
+            isinstance(raw_scope, str)
+            and normalize_ws(raw_scope).casefold()
+            in {"", "none", "null", "not applicable", "n/a"}
+        ):
+            scope = None
+        else:
+            try:
+                scope = json.loads(
+                    raw_scope,
                     object_pairs_hook=_reject_duplicate_keys,
                     parse_constant=_reject_nonfinite,
                 )
-            )
-        except (json.JSONDecodeError, ExtractionError) as exc:
-            raise ExtractionError("provider proposal contains invalid canonical JSON") from exc
+            except (json.JSONDecodeError, ExtractionError) as exc:
+                raise ExtractionError(
+                    "provider proposal contains invalid canonical JSON"
+                ) from exc
         if scope is not None and not isinstance(scope, dict):
             raise ExtractionError("provider benchmark_scope_json must decode to an object")
         proposals.append(

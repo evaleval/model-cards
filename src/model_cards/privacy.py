@@ -21,11 +21,12 @@ from typing import Any, Iterable, Sequence
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+from .public_markdown import render_public_markdown
 from .public_export import PublicExportError, assert_public_projection
-from .schema import (
-    ContractValidationError,
-    load_contract_schema,
-    validate_public_card,
+from .publication_schema import (
+    PUBLICATION_SCHEMA,
+    PublicationValidationError,
+    validate_publication_card,
 )
 
 
@@ -109,11 +110,15 @@ _PRIVATE_JSON_KEYS = frozenset(
         "bindings",
         "context_after",
         "context_before",
+        "contract_version",
         "cost_ledger",
         "evidence",
+        "environmental_information",
         "exact_text",
+        "lifecycle",
         "omission_review_events",
         "prompt",
+        "provenance",
         "provider_trace",
         "raw_prompt",
         "raw_request",
@@ -128,6 +133,8 @@ _PRIVATE_JSON_KEYS = frozenset(
         "surrounding_context",
         "system_prompt",
         "usage_ledger",
+        "use_and_risk",
+        "validation",
         "validation_checks",
     }
 )
@@ -227,6 +234,7 @@ class PrivacyFindingCode(str, Enum):
     CARD_SCHEMA_INVALID = "card_schema_invalid"
     CARD_RUNTIME_INVALID = "card_runtime_invalid"
     CARD_PRIVACY_INVALID = "card_privacy_invalid"
+    CARD_MARKDOWN_INVALID = "card_markdown_invalid"
     CARD_NON_JSON = "card_non_json"
 
 
@@ -438,11 +446,11 @@ def audit_public_tree(
     else:
         relative_paths = _normalize_explicit_paths(tracked_files)
         scope = "explicit_file_list"
+    audited_paths = frozenset(relative_paths)
 
-    packaged_schema = load_contract_schema()
-    Draft202012Validator.check_schema(packaged_schema)
+    Draft202012Validator.check_schema(PUBLICATION_SCHEMA)
     card_validator = Draft202012Validator(
-        packaged_schema, format_checker=FormatChecker()
+        PUBLICATION_SCHEMA, format_checker=FormatChecker()
     )
 
     findings: list[PrivacyFinding] = []
@@ -478,9 +486,10 @@ def audit_public_tree(
         )
         findings.extend(_path_findings(snapshot))
         is_card = _is_card_path(relative)
+        is_card_markdown = _is_card_markdown_path(relative)
         if is_card:
             cards_checked += 1
-        elif _is_cards_entry(relative) and Path(relative).suffix.lower() != ".json":
+        elif _is_cards_entry(relative) and not is_card_markdown:
             findings.append(_finding(snapshot, PrivacyFindingCode.CARD_NON_JSON, relative))
         if snapshot.content is None:
             if is_card:
@@ -500,6 +509,22 @@ def audit_public_tree(
         if is_card:
             findings.extend(
                 _card_findings(snapshot, json_value, card_validator)
+            )
+            findings.extend(
+                _card_json_pair_findings(
+                    root,
+                    snapshot,
+                    json_value,
+                    audited_paths=audited_paths,
+                )
+            )
+        elif is_card_markdown:
+            findings.extend(
+                _card_markdown_findings(
+                    root,
+                    snapshot,
+                    audited_paths=audited_paths,
+                )
             )
 
     ordered = tuple(
@@ -910,8 +935,8 @@ def _card_findings(
             )
         )
     try:
-        validate_public_card(value)
-    except (ContractValidationError, KeyError, TypeError, ValueError) as exc:
+        validate_publication_card(value)
+    except (PublicationValidationError, KeyError, TypeError, ValueError) as exc:
         findings.append(
             _finding(
                 snapshot,
@@ -930,6 +955,153 @@ def _card_findings(
             )
         )
     return findings
+
+
+def _card_markdown_findings(
+    root: Path,
+    snapshot: _FileSnapshot,
+    *,
+    audited_paths: frozenset[str],
+) -> list[PrivacyFinding]:
+    """Require ``cards/NAME.md`` to exactly render sibling ``NAME.json``."""
+
+    if snapshot.content is None:
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "markdown_content_unavailable",
+            )
+        ]
+
+    markdown_path = PurePosixPath(snapshot.relative_path)
+    json_relative = markdown_path.with_suffix(".json")
+    if json_relative.as_posix() not in audited_paths:
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "sibling_json_outside_audit_scope",
+            )
+        ]
+    json_path = root.joinpath(*json_relative.parts)
+    if json_path.is_symlink() or not json_path.is_file():
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "sibling_json_unavailable",
+            )
+        ]
+
+    try:
+        json_raw = json_path.read_bytes()
+        card = json.loads(
+            json_raw.decode("utf-8"),
+            object_pairs_hook=_reject_duplicate_file_keys,
+            parse_constant=_reject_nonfinite_file_number,
+        )
+        validate_publication_card(card)
+        assert_public_projection(card)
+        expected = render_public_markdown(
+            card,
+            json_filename=json_relative.name,
+            json_sha256=_sha256(json_raw),
+        ).encode("utf-8")
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        _DuplicateJsonKey,
+        _NonfiniteJsonNumber,
+        PublicationValidationError,
+        PublicExportError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "sibling_json_invalid:" + type(exc).__name__,
+            )
+        ]
+
+    if snapshot.content != expected:
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "render_mismatch",
+            )
+        ]
+    return []
+
+
+def _card_json_pair_findings(
+    root: Path,
+    snapshot: _FileSnapshot,
+    value: Any | None,
+    *,
+    audited_paths: frozenset[str],
+) -> list[PrivacyFinding]:
+    """Require ``cards/NAME.json`` to have its exact deterministic Markdown."""
+
+    json_path = PurePosixPath(snapshot.relative_path)
+    markdown_relative = json_path.with_suffix(".md")
+    if markdown_relative.as_posix() not in audited_paths:
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "sibling_markdown_outside_audit_scope",
+            )
+        ]
+    markdown_path = root.joinpath(*markdown_relative.parts)
+    if markdown_path.is_symlink() or not markdown_path.is_file():
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "sibling_markdown_unavailable",
+            )
+        ]
+    if snapshot.content is None or not isinstance(value, dict):
+        return []
+    try:
+        validate_publication_card(value)
+        assert_public_projection(value)
+        expected = render_public_markdown(
+            value,
+            json_filename=json_path.name,
+            json_sha256=_sha256(snapshot.content),
+        ).encode("utf-8")
+        actual = markdown_path.read_bytes()
+    except (
+        OSError,
+        PublicationValidationError,
+        PublicExportError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "sibling_markdown_check_failed:" + type(exc).__name__,
+            )
+        ]
+    if actual != expected:
+        return [
+            _finding(
+                snapshot,
+                PrivacyFindingCode.CARD_MARKDOWN_INVALID,
+                "sibling_markdown_render_mismatch",
+            )
+        ]
+    return []
 
 
 def _private_json_keys(value: Any, path: str = "$") -> Iterable[tuple[str, str]]:
@@ -956,9 +1128,18 @@ def _is_card_path(relative: str) -> bool:
         and path.suffix.casefold() == ".json"
 
 
+def _is_card_markdown_path(relative: str) -> bool:
+    path = PurePosixPath(relative)
+    return (
+        len(path.parts) == 2
+        and path.parts[0].casefold() == "cards"
+        and path.suffix == ".md"
+    )
+
+
 def _is_cards_entry(relative: str) -> bool:
     path = PurePosixPath(relative)
-    return len(path.parts) == 2 and path.parts[0].casefold() == "cards"
+    return bool(path.parts) and path.parts[0].casefold() == "cards"
 
 
 def _machine_prefixes(root: Path) -> tuple[str, ...]:

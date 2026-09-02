@@ -825,10 +825,20 @@ def _eligible_field_specs(
         if not isinstance(section_value, Mapping):
             fields.append((section, section_value))
             continue
+        required_fields = {
+            item
+            for item in section_schema.get("required", ())
+            if isinstance(item, str)
+        }
         for field in _property_order(section_schema):
             if field not in section_value:
-                raise FactReasonerError(f"eligible field is missing from card: {section}.{field}")
-            fields.append((f"{section}.{field}", section_value[field]))
+                if field in required_fields:
+                    raise FactReasonerError(
+                        f"eligible field is missing from card: {section}.{field}"
+                    )
+                fields.append((f"{section}.{field}", None))
+            else:
+                fields.append((f"{section}.{field}", section_value[field]))
     if not fields:
         raise FactReasonerError("schema exposes no eligible final fields")
     return tuple(fields)

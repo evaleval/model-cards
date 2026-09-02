@@ -47,6 +47,8 @@ from .quality_report import (
     write_quality_report,
 )
 from .public_export import export_public_card
+from .publication_contract import build_publication_schema
+from .publication_schema import publication_coverage, validate_publication_card
 from .render import save_html, save_json
 from .review import append_review, load_artifact, save_artifact
 from .run_ledger import BudgetCapError, LedgerError, UncertainSendError
@@ -61,7 +63,6 @@ from .schema import (
     CONTRACT_VERSION,
     canonical_field_path,
     get_field,
-    load_contract_schema,
     validate_field_path,
     validate_public_card,
 )
@@ -928,35 +929,47 @@ def _cmd_validate(args: argparse.Namespace) -> int:
     if "artifact_id" in value:
         artifact = CardArtifact.from_dict(value)
         card = project_card(artifact)
-        kind = "artifact"
-    else:
-        card = value
         validate_public_card(card)
-        kind = "public_card"
-    validate_public_card(card)
-    print(
-        json.dumps(
-            {
-                "contract_version": CONTRACT_VERSION,
-                "kind": kind,
-                "lifecycle_status": card["lifecycle"]["status"],
-                "valid": True,
-            },
-            ensure_ascii=False,
-            sort_keys=True,
-        )
-    )
+        kind = "artifact"
+        result = {
+            "contract_version": CONTRACT_VERSION,
+            "kind": kind,
+            "lifecycle_status": card["lifecycle"]["status"],
+            "valid": True,
+        }
+    elif "contract_version" in value:
+        validate_public_card(value)
+        result = {
+            "contract_version": CONTRACT_VERSION,
+            "kind": "audit_card",
+            "lifecycle_status": value["lifecycle"]["status"],
+            "valid": True,
+        }
+    else:
+        validate_publication_card(value)
+        result = {
+            "coverage_score": publication_coverage(value),
+            "kind": "public_card",
+            "valid": True,
+        }
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0
 
 
 def _cmd_export(args: argparse.Namespace) -> int:
-    record = export_public_card(args.artifact, args.output, force=args.force)
+    record = export_public_card(
+        args.artifact,
+        args.output,
+        source_bundle_directory=args.source_bundle,
+        official_bundle_directory=args.official_bundle,
+        force=args.force,
+    )
     print(json.dumps(record, ensure_ascii=False, sort_keys=True))
     return 0
 
 
 def _cmd_schema(args: argparse.Namespace) -> int:
-    print(json.dumps(load_contract_schema(), ensure_ascii=False, indent=2))
+    print(json.dumps(build_publication_schema(), ensure_ascii=False, indent=2))
     return 0
 
 
@@ -1078,6 +1091,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     export.add_argument("artifact")
     export.add_argument("--output", required=True)
+    export.add_argument("--source-bundle", required=True)
+    export.add_argument("--official-bundle")
     export.add_argument("--force", action="store_true")
     export.set_defaults(handler=_cmd_export)
 

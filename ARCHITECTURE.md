@@ -1,8 +1,10 @@
 # Architecture
 
-The system generates one JSON Model Card for one exact model revision. Its source
-state, stage inputs, decisions, and outputs are content-addressed so a completed run
-can be replayed without changing the evidence beneath the card.
+The system generates one Model Card for one exact model revision. Its source state,
+stage inputs, decisions, and outputs are content-addressed so a completed run can be
+replayed without changing the evidence beneath the card. The canonical public output
+is an exact seven-section JSON object; repository publication derives a deterministic
+Markdown companion from those JSON bytes.
 
 ```text
 MODEL[@REVISION]
@@ -31,10 +33,32 @@ exact Hugging Face bundle ---- declared official links
              targeted repair / withholding
                         |
                         v
-           risk gate + final audits + privacy
+             local risk gate + audit artifact
                         |
                         v
-         CardArtifact --------> public-card.json
+                    CardArtifact
+                        |
+                        v
+          33-field allowlisted projection
+                        |
+                        v
+        frozen-source enrichment + provenance
+                        |
+                        v
+        pre-withhold publication FactReasoner
+                        |
+                        v
+        deletion-only field withholding + replay
+                        |
+                        v
+       final FactReasoner + schema + privacy
+                        |
+                        v
+                 public-card.json
+                        |
+              repository publisher
+                        |
+             paired JSON + Markdown
 ```
 
 ## Invariants
@@ -49,12 +73,39 @@ exact Hugging Face bundle ---- declared official links
 - Composition receives accepted candidates, not an unrestricted source corpus.
 - Conflicting accepted values do not use last-write-wins behavior; the affected field
   is withheld.
-- Unsupported fields remain `Not specified`. `Not applicable` is reserved for fields
-  shown not to apply.
+- The local audit projection uses explicit absence values. The generated public
+  projection instead omits an agreed field when the retained sources do not support
+  a value; `Not applicable` is reserved for a field shown not to apply.
 - Provider-free and provider-assisted runs are different admitted modes and cannot
   overwrite or resume one another.
-- Public cards contain portable source references and locators, never frozen source
-  bodies, credentials, prompts, raw provider payloads, run paths, or journals.
+- Public cards contain only the 33 agreed fields. They never expose evidence or
+  provenance records, risk or environmental audit material, validation checks,
+  lifecycle state, frozen source bodies, credentials, prompts, raw provider payloads,
+  run paths, or journals.
+
+## Public contract and local audit boundary
+
+The required public section objects and their complete field allowlist are:
+
+| Section | Fields |
+| --- | --- |
+| `identity` | `model_id`, `name`, `developed_by`, `model_type`, `license`, `release_date`, `version`, `summary` |
+| `lineage` | `base_models`, `model_family`, `derivatives` |
+| `specifications` | `architecture_type`, `num_parameters`, `context_length`, `precision`, `model_size`, `input_output` |
+| `training_context` | `training_data`, `training_data_size`, `data_cutoff`, `adaptations` |
+| `access_and_adoption` | `access_type`, `downloads`, `likes` |
+| `evaluation` | `results_summary`, `benchmark_scores`, `human_evals`, `safety_evals` |
+| `links` | `model_card`, `system_card`, `tech_report`, `code_repository`, `citation` |
+
+Together these are exactly 33 fields. Unknown top-level sections and unknown fields
+inside a section are rejected. The local audit contract is intentionally richer so
+the pipeline can retain source bindings, risk and environmental material, validation,
+review events, lifecycle state, and operational provenance without extending the
+public schema. `publication.py` is the allowlisted audit-to-public bridge;
+`publication_sources.py` adds narrowly derived values from the verified frozen source
+catalog and records their provenance only in the local artifact. Guarded public prose
+must not reproduce 12 consecutive normalized words from any retained source; a match
+fails closed before the publication snapshot is created.
 
 ## 1. Exact source collection
 
@@ -128,9 +179,11 @@ records omissions and conflicts. `field_repair.py` operates only on affected fie
 replays all proposed evidence, and emits typed repair records. Contradicted or neutral
 claims are withheld without an additional semantic submission; unavailable checks
 remain visible for later review. The pipeline saves both the original and post-repair
-composition, FactReasoner, and omission artifacts.
+composition, FactReasoner, and omission artifacts. The post-repair audit-content
+record is `factreasoner-content.json`; it is distinct from the later checks of the
+33-field publication projection.
 
-## 5. Risks
+## 5. Local risk audit
 
 Publisher-reported uses, limitations, biases, risks, and mitigations use the normal
 evidence-binding path. They are not interchangeable with taxonomy inferences.
@@ -139,10 +192,10 @@ evidence-binding path. They are not interchangeable with taxonomy inferences.
 IBM AI Risk Atlas snapshot. The Nexus dependency is loaded only when the exact package
 version is installed on Python 3.11 or newer. Taxonomy candidates require accepted use
 context, a valid risk identifier, an applicability rationale, supporting field
-references, and an applicability decision. Public entries label their origin as
-`taxonomy_identified`; they cannot masquerade as publisher statements or confirmed
-harms. An unavailable dependency or checker produces an unavailable stage, not a
-replacement taxonomy result.
+references, and an applicability decision. They remain in local audit artifacts and
+cannot masquerade as publisher statements or confirmed harms. No risk or environmental
+field crosses the public-card allowlist. An unavailable dependency or checker produces
+an unavailable stage, not a replacement taxonomy result.
 
 ## 6. Lifecycle and export
 
@@ -161,11 +214,24 @@ hold:
 Otherwise the lifecycle is `generated_unreviewed`. These values describe automated
 pipeline state, not human review or release approval.
 
-`public_export.py` projects the typed artifact to one JSON card and validates the
-projection against the packaged Draft 2020-12 schema. `privacy.py` independently
-audits proposed public files for schema drift, non-finite or ambiguous JSON, source
-bodies, credentials, authenticated URLs, machine paths, provider material, forbidden
-file types, and unsafe symlinks.
+Lifecycle is local audit state and is not a public-card field. `publication.py`
+projects the typed artifact through the exact 33-field allowlist, and
+`publication_sources.py` adds only registered values replayed from the verified frozen
+catalog while keeping provenance local. The enriched pre-withhold card is checked in
+`factreasoner-publication-original.json`. `publication_validation.py` accounts for all
+33 fields and may only delete a field with a terminal `repair_or_withhold` action; it
+never rewrites a value, and immutable `identity.model_id` and `identity.version` cannot
+be withheld. It then recomputes registered derivations with the blocked fields and
+requires that replay to equal the deletion result exactly. The final public card is
+checked again in `factreasoner.json`; no actionable result may survive that pass.
+
+`public_export.py` validates the resulting seven-section object against the packaged
+Draft 2020-12 publication schema. `public_markdown.py` renders a human-readable
+companion only from a validated public JSON object and the SHA-256 of the exact sibling
+JSON bytes. `privacy.py` independently audits proposed public files for schema drift,
+non-finite or ambiguous JSON, source bodies, credentials, authenticated URLs, machine
+paths, provider material, forbidden file types, and unsafe symlinks. The repository
+publisher preflights and audits the JSON/Markdown pair before writing either file.
 
 ## 7. Provider-assisted orchestration
 
@@ -204,9 +270,10 @@ verified against the journal and filesystem before reuse.
 `run_summary.py` produces `audit-view.json` and `usage-summary.json`. They expose stage
 counts, repair counts, validation status, and cost/latency totals without source text,
 prompts, or raw ledger rows. `quality_report.py` re-verifies complete batch artifact
-chains and aggregates the same body-free measures. With a paired replay it also
-compares value, artifact, decision, validation, risk, omission, privacy, and
-cost/latency surfaces.
+chains, replays publication enrichment/provenance and deletion-only validation, and
+requires final FactReasoner coverage of the 33-field publication contract. With a
+paired replay it also compares value, artifact, decision, validation, risk, omission,
+privacy, and cost/latency surfaces.
 
 ## Artifact layout
 
@@ -215,10 +282,13 @@ cost/latency surfaces.
 | `source-bundle/`, `official-source-bundle/` | Frozen bytes and closed manifests | No |
 | `source-state.json`, `source-catalog.json` | Combined immutable source identity | No |
 | `extraction.json`, `claim-gates.json` | Candidates and support decisions | No |
-| `composition*.json`, `factreasoner*.json`, `omissions*.json` | Before/after repair projections and audits | No |
-| `repairs.json`, `risk-mapping.json`, `privacy.json` | Repair, taxonomy, and publication checks | No |
+| `composition*.json`, `factreasoner-original.json`, `factreasoner-content.json`, `omissions*.json` | Before/after audit-content repair projections and checks | No |
+| `repairs.json`, `risk-mapping.json` | Local field repair and taxonomy audit | No |
+| `factreasoner-publication-original.json`, `publication-validation.json` | Enriched pre-withhold public check and deletion-only decisions | No |
+| `factreasoner.json`, `privacy.json` | Final public-card factuality and privacy checks | No |
 | `card-artifact.json` | Bindings, reviews, validation, and derived card | No |
-| `public-card.json` | Contract-valid source-clean projection | Yes |
+| `public-card.json` | Exact 33-field-allowlisted seven-section JSON projection | Yes |
+| `cards/NAME.json`, `cards/NAME.md` | Published canonical JSON and its deterministic human-readable companion | Yes |
 | `run-manifest.json`, `journal.jsonl`, `pipeline-result.json` | Run and artifact integrity chain | No |
 | `audit-view.json`, `usage-summary.json` | Body-free operational summaries | No |
 | `quality-report.json` | Body-free batch or paired-replay aggregate | Separate publishable report |
@@ -227,7 +297,8 @@ cost/latency surfaces.
 
 | Modules | Responsibility |
 | --- | --- |
-| `contract.py`, `schema.py` | Neutral public contract, absence values, and runtime validation |
+| `contract.py`, `schema.py` | Rich local audit contract, absence values, and audit validation |
+| `publication_contract.py`, `publication_schema.py`, `publication.py`, `publication_sources.py`, `publication_validation.py` | Exact 33-field public contract, allowlisted projection, frozen-source enrichment/provenance replay, and deletion-only validation |
 | `source_bundle.py`, `hf_adapter.py` | Exact-revision Hugging Face collection and replay |
 | `official_discovery.py`, `official_http.py`, `official_sources.py`, `official_documents.py` | Declared official-source boundary |
 | `source_state.py`, `combined_sources.py`, `source_documents.py` | Immutable source state and typed catalogs |
@@ -235,7 +306,7 @@ cost/latency surfaces.
 | `factreasoner.py`, `findings.py`, `field_repair.py` | Atomic factuality, omission/conflict audits, and targeted repair |
 | `risk_mapping.py` | Pinned taxonomy integration and applicability gate |
 | `provider.py`, `provider_adapters.py`, `run_ledger.py`, `orchestration.py` | Exact provider route, bounded calls, normalized decisions, and accounting |
-| `artifact.py`, `review.py`, `public_export.py`, `privacy.py` | Typed artifact, append-only review, export, and publication boundary |
+| `artifact.py`, `review.py`, `public_export.py`, `public_markdown.py`, `privacy.py` | Typed artifact, append-only review, frozen-source replay-bound JSON export, deterministic Markdown, and publication boundary |
 | `run_state.py`, `pipeline.py`, `run_summary.py`, `quality_report.py` | End-to-end execution, resume, summaries, and batch aggregation |
 | `cli.py` | `collect`, `generate`, `batch`, `report`, inspection, review, repair-record, validation, and export commands |
 
@@ -244,7 +315,7 @@ cost/latency surfaces.
 ```sh
 PYTHONPATH=src python3 -m pytest -q
 PYTHONPATH=src python3 -m model_cards schema > build/model-card.schema.json
-PYTHONPATH=src python3 -m model_cards validate cards/olmo-2-1124-7b.json
+PYTHONPATH=src python3 -m model_cards validate cards/NAME.json
 ```
 
 The default suite uses fixtures and injected transports. It does not issue paid

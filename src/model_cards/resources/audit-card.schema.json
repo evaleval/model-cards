@@ -1,0 +1,1960 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:evaleval:model-cards:local-audit-card:v1",
+  "title": "Local Model Card audit contract",
+  "description": "Private evidence-pipeline contract for generated Model Card audit artifacts; this is not the seven-section publication schema.",
+  "$comment": "Source bodies, evidence text, prompts, provider traces, review history, and local paths remain outside the public card. Application validators enforce cross-reference and privacy rules.",
+  "x-model-card": {
+    "contract_version": "1",
+    "bindable_sections": [
+      "identity",
+      "lineage",
+      "model_details",
+      "training",
+      "evaluation",
+      "environmental_information",
+      "use_and_risk"
+    ],
+    "computed_sections": [
+      "provenance",
+      "validation",
+      "lifecycle"
+    ],
+    "list_fields": [
+      "lineage.base_models",
+      "lineage.derivatives",
+      "model_details.modalities",
+      "evaluation.benchmark_scores",
+      "evaluation.related_model_scores",
+      "evaluation.evaluation_sources",
+      "use_and_risk.intended_uses",
+      "use_and_risk.out_of_scope_uses",
+      "use_and_risk.limitations",
+      "use_and_risk.known_biases",
+      "use_and_risk.identified_risks",
+      "use_and_risk.mitigations"
+    ]
+  },
+  "type": "object",
+  "required": [
+    "contract_version",
+    "identity",
+    "lineage",
+    "model_details",
+    "training",
+    "evaluation",
+    "environmental_information",
+    "use_and_risk",
+    "provenance",
+    "validation",
+    "lifecycle"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1"
+    },
+    "identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "lineage": {
+      "$ref": "#/$defs/lineage"
+    },
+    "model_details": {
+      "$ref": "#/$defs/model_details"
+    },
+    "training": {
+      "$ref": "#/$defs/training"
+    },
+    "evaluation": {
+      "$ref": "#/$defs/evaluation"
+    },
+    "environmental_information": {
+      "$ref": "#/$defs/environmental_information"
+    },
+    "use_and_risk": {
+      "$ref": "#/$defs/use_and_risk"
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "validation": {
+      "$ref": "#/$defs/validation"
+    },
+    "lifecycle": {
+      "$ref": "#/$defs/lifecycle"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "status": {
+                "const": "generated_validated"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "lifecycle"
+        ]
+      },
+      "then": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "overall_status": {
+                "const": "passed"
+              },
+              "checks": {
+                "required": [
+                  "claim_support",
+                  "privacy"
+                ],
+                "properties": {
+                  "claim_support": {
+                    "$ref": "#/$defs/completedGateSummary"
+                  },
+                  "privacy": {
+                    "$ref": "#/$defs/completedGateSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "lifecycle": {
+            "properties": {
+              "status": {
+                "const": "generated_unreviewed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "lifecycle"
+        ]
+      },
+      "then": {
+        "properties": {
+          "validation": {
+            "properties": {
+              "overall_status": {
+                "not": {
+                  "const": "passed"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "baseFieldPath": {
+      "enum": [
+        "identity.model_id",
+        "identity.name",
+        "identity.developed_by",
+        "identity.model_type",
+        "identity.license",
+        "identity.release_date",
+        "identity.revision",
+        "identity.summary",
+        "lineage.base_models",
+        "lineage.model_family",
+        "lineage.derivatives",
+        "model_details.architecture_type",
+        "model_details.num_parameters",
+        "model_details.context_length",
+        "model_details.precision",
+        "model_details.model_size",
+        "model_details.modalities",
+        "model_details.model_stage",
+        "model_details.access_type",
+        "model_details.downloads",
+        "model_details.likes",
+        "model_details.model_card",
+        "model_details.system_card",
+        "model_details.technical_report",
+        "model_details.code_repository",
+        "model_details.citation",
+        "training.training_data",
+        "training.training_data_size",
+        "training.data_cutoff",
+        "training.adaptations",
+        "evaluation.results_summary",
+        "evaluation.benchmark_scores",
+        "evaluation.related_model_scores",
+        "evaluation.human_evals",
+        "evaluation.safety_evals",
+        "evaluation.evaluation_sources",
+        "environmental_information.hardware",
+        "environmental_information.training_time",
+        "environmental_information.energy_consumption",
+        "environmental_information.carbon_emissions",
+        "environmental_information.measurement_method",
+        "use_and_risk.intended_uses",
+        "use_and_risk.out_of_scope_uses",
+        "use_and_risk.limitations",
+        "use_and_risk.known_biases",
+        "use_and_risk.identified_risks",
+        "use_and_risk.mitigations"
+      ]
+    },
+    "fieldPath": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/baseFieldPath"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?:lineage\\.base_models|lineage\\.derivatives|model_details\\.modalities|evaluation\\.benchmark_scores|evaluation\\.related_model_scores|evaluation\\.evaluation_sources|use_and_risk\\.intended_uses|use_and_risk\\.out_of_scope_uses|use_and_risk\\.limitations|use_and_risk\\.known_biases|use_and_risk\\.identified_risks|use_and_risk\\.mitigations)\\[(?:0|[1-9][0-9]*)\\]$"
+        }
+      ]
+    },
+    "modelReference": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "relation"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "pattern": "^[^/@\\s]+/[^/@\\s]+$"
+        },
+        "relation": {
+          "enum": [
+            "exact_target",
+            "base_model",
+            "derivative_model",
+            "model_family",
+            "sibling_checkpoint",
+            "comparison_model",
+            "unknown"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "baseModel": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "relation"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "pattern": "^[^/@\\s]+/[^/@\\s]+$"
+        },
+        "relation": {
+          "const": "base_model"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "benchmarkScore": {
+      "type": "object",
+      "required": [
+        "benchmark",
+        "metric",
+        "score",
+        "setting"
+      ],
+      "properties": {
+        "benchmark": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "setting": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "minProperties": 1
+            }
+          ]
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "relatedModel": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "link"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "pattern": "^[^/@\\s]+/[^/@\\s]+$"
+        },
+        "link": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "contextStatement": {
+      "type": "object",
+      "required": [
+        "context_id",
+        "description",
+        "origin",
+        "source_refs"
+      ],
+      "properties": {
+        "context_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._:-]{1,127}$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "enum": [
+            "publisher_reported",
+            "source_derived",
+            "operator_defined"
+          ]
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": [
+        "risk_id",
+        "identification_origin",
+        "taxonomy",
+        "name",
+        "description",
+        "applicability_rationale",
+        "grounds",
+        "source_refs",
+        "mapping_provenance",
+        "review_status",
+        "mitigation_assessment",
+        "mitigation_refs"
+      ],
+      "properties": {
+        "risk_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "identification_origin": {
+          "enum": [
+            "publisher_reported",
+            "taxonomy_identified"
+          ]
+        },
+        "taxonomy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/taxonomyReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "applicability_rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/riskGround"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        },
+        "mapping_provenance": {
+          "$ref": "#/$defs/mappingProvenance"
+        },
+        "review_status": {
+          "enum": [
+            "generated_unreviewed",
+            "generated_validated",
+            "rejected"
+          ]
+        },
+        "mitigation_assessment": {
+          "enum": [
+            "linked",
+            "none_identified",
+            "not_applicable"
+          ]
+        },
+        "mitigation_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^mitigation:[a-z0-9][a-z0-9._-]*$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "riskGround": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref",
+        "relevance"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "card_field",
+            "use_context"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relevance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "taxonomyReference": {
+      "type": "object",
+      "required": [
+        "taxonomy_id",
+        "name",
+        "version",
+        "source_url",
+        "snapshot_sha256"
+      ],
+      "properties": {
+        "taxonomy_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mappingProvenance": {
+      "type": "object",
+      "required": [
+        "method",
+        "tool_version",
+        "inference_model",
+        "inference_config_sha256"
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "source_binding",
+            "ai_atlas_nexus"
+          ]
+        },
+        "tool_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inference_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inference_config_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "mitigation": {
+      "type": "object",
+      "required": [
+        "mitigation_id",
+        "description",
+        "origin",
+        "source_refs"
+      ],
+      "properties": {
+        "mitigation_id": {
+          "type": "string",
+          "pattern": "^mitigation:[a-z0-9][a-z0-9._-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "origin": {
+          "enum": [
+            "publisher_reported",
+            "taxonomy_recommended",
+            "project_recommended",
+            "operator_defined"
+          ]
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sourceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "derivationClaimInput": {
+      "type": "object",
+      "required": [
+        "candidate_id",
+        "candidate_sha256",
+        "gate_record_sha256",
+        "source_refs"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^claim-[0-9a-f]{24}$"
+        },
+        "candidate_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "gate_record_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "taxonomyRiskDerivationReference": {
+      "type": "object",
+      "required": [
+        "derivation_id",
+        "derivation_version",
+        "output_sha256",
+        "risk_report_sha256",
+        "risk_catalog_sha256",
+        "risk_candidate_sha256",
+        "applicability_decision_sha256",
+        "context_sha256s",
+        "input_claims",
+        "supporting_source_refs"
+      ],
+      "properties": {
+        "derivation_id": {
+          "type": "string",
+          "pattern": "^derivation-[0-9a-f]{24}$"
+        },
+        "derivation_version": {
+          "const": "taxonomy-risk-derivation/v1"
+        },
+        "output_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "risk_report_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "risk_catalog_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "risk_candidate_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "applicability_decision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "context_sha256s": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "input_claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/derivationClaimInput"
+          },
+          "minItems": 1
+        },
+        "supporting_source_refs": {
+          "$ref": "#/$defs/sourceRefs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "fieldReference": {
+      "type": "object",
+      "required": [
+        "source_id",
+        "source_uri",
+        "source_role",
+        "source_revision",
+        "source_sha256",
+        "locator",
+        "claimed_entity",
+        "relation"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{1,127}$"
+        },
+        "source_uri": {
+          "$ref": "#/$defs/publicSourceUri"
+        },
+        "source_role": {
+          "enum": [
+            "hugging_face_metadata",
+            "hugging_face_snapshot",
+            "developer_report",
+            "developer_code",
+            "eee_index"
+          ]
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "locator": {
+          "$ref": "#/$defs/locator"
+        },
+        "claimed_entity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "enum": [
+            "exact_target",
+            "base_model",
+            "derivative_model",
+            "model_family",
+            "sibling_checkpoint",
+            "comparison_model",
+            "unknown"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicSourceReference": {
+      "type": "object",
+      "required": [
+        "source_uri",
+        "source_role",
+        "source_revision",
+        "source_sha256"
+      ],
+      "properties": {
+        "source_uri": {
+          "$ref": "#/$defs/publicSourceUri"
+        },
+        "source_role": {
+          "enum": [
+            "hugging_face_metadata",
+            "hugging_face_snapshot",
+            "developer_report",
+            "developer_code",
+            "eee_index"
+          ]
+        },
+        "source_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "publicSourceUri": {
+      "type": "string",
+      "format": "uri",
+      "maxLength": 2048,
+      "pattern": "^(?:https://(?!(?:localhost|127\\.0\\.0\\.1)(?::|/|$))[^\\s]+|hf://[^\\s]+|doi:[^\\s]+|arxiv:[0-9.]+|urn:sha256:[0-9a-f]{64})$"
+    },
+    "locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "start",
+            "end"
+          ],
+          "properties": {
+            "kind": {
+              "const": "exact_span"
+            },
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "pointer"
+          ],
+          "properties": {
+            "kind": {
+              "const": "json_pointer"
+            },
+            "pointer": {
+              "type": "string",
+              "pattern": "^/(?:[^~\\r\\n]|~[01])*$"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "generator": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$"
+        },
+        "commit": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            {
+              "const": "Not specified"
+            }
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "checkSummary": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "completed",
+            "partial",
+            "failed",
+            "unavailable"
+          ]
+        },
+        "checked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "withheld": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unavailable": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "completedGateSummary": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/checkSummary"
+        },
+        {
+          "type": "object",
+          "required": [
+            "status",
+            "checked",
+            "passed",
+            "withheld",
+            "failed",
+            "unavailable"
+          ],
+          "properties": {
+            "status": {
+              "const": "completed"
+            },
+            "failed": {
+              "const": 0
+            },
+            "unavailable": {
+              "const": 0
+            }
+          }
+        }
+      ]
+    },
+    "fieldFinding": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "binding_id": {
+          "type": "string",
+          "pattern": "^binding-[0-9a-f]{24}$"
+        },
+        "disposition": {
+          "enum": [
+            "accepted",
+            "withheld",
+            "rejected"
+          ]
+        },
+        "relation": {
+          "enum": [
+            "exact_target",
+            "base_model",
+            "derivative_model",
+            "model_family",
+            "sibling_checkpoint",
+            "comparison_model",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._:-]{1,127}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "name",
+        "developed_by",
+        "model_type",
+        "license",
+        "release_date",
+        "revision",
+        "summary"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "pattern": "^[^/@\\s]+/[^/@\\s]+$",
+          "default": "Not specified"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "developed_by": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "model_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "release_date": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$",
+          "default": "Not specified"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "lineage": {
+      "type": "object",
+      "required": [
+        "base_models",
+        "model_family",
+        "derivatives"
+      ],
+      "properties": {
+        "base_models": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/baseModel"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "model_family": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "derivatives": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/modelReference"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "model_details": {
+      "type": "object",
+      "required": [
+        "architecture_type",
+        "num_parameters",
+        "context_length",
+        "precision",
+        "model_size",
+        "modalities",
+        "model_stage",
+        "access_type",
+        "downloads",
+        "likes",
+        "model_card",
+        "system_card",
+        "technical_report",
+        "code_repository",
+        "citation"
+      ],
+      "properties": {
+        "architecture_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "num_parameters": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "context_length": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "model_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "modalities": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "model_stage": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "access_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "downloads": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "likes": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "model_card": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "system_card": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "technical_report": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "code_repository": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "citation": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "training": {
+      "type": "object",
+      "required": [
+        "training_data",
+        "training_data_size",
+        "data_cutoff",
+        "adaptations"
+      ],
+      "properties": {
+        "training_data": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "training_data_size": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "data_cutoff": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "adaptations": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "evaluation": {
+      "type": "object",
+      "required": [
+        "results_summary",
+        "benchmark_scores",
+        "related_model_scores",
+        "human_evals",
+        "safety_evals",
+        "evaluation_sources"
+      ],
+      "properties": {
+        "results_summary": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "benchmark_scores": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/benchmarkScore"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "related_model_scores": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/relatedModel"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "human_evals": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "safety_evals": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "evaluation_sources": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "environmental_information": {
+      "type": "object",
+      "required": [
+        "hardware",
+        "training_time",
+        "energy_consumption",
+        "carbon_emissions",
+        "measurement_method"
+      ],
+      "properties": {
+        "hardware": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "training_time": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "energy_consumption": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "carbon_emissions": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        },
+        "measurement_method": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "use_and_risk": {
+      "type": "object",
+      "required": [
+        "intended_uses",
+        "out_of_scope_uses",
+        "limitations",
+        "known_biases",
+        "identified_risks",
+        "mitigations"
+      ],
+      "properties": {
+        "intended_uses": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/contextStatement"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "out_of_scope_uses": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/contextStatement"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "limitations": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/contextStatement"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "known_biases": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/contextStatement"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "identified_risks": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/risk"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        },
+        "mitigations": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/mitigation"
+              },
+              "uniqueItems": true
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "source_manifest",
+        "field_references",
+        "generator"
+      ],
+      "properties": {
+        "source_manifest": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/publicSourceReference"
+          },
+          "default": {}
+        },
+        "field_references": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/fieldPath"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/fieldReference"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "default": {}
+        },
+        "generator": {
+          "$ref": "#/$defs/generator",
+          "default": {
+            "name": "evaleval-model-cards"
+          }
+        },
+        "derivations": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^use_and_risk\\.identified_risks\\[(?:0|[1-9][0-9]*)\\]$"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/taxonomyRiskDerivationReference"
+            },
+            "minItems": 1,
+            "maxItems": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "validation": {
+      "type": "object",
+      "required": [
+        "overall_status",
+        "checks",
+        "flagged_fields",
+        "missing_fields",
+        "coverage_score"
+      ],
+      "properties": {
+        "overall_status": {
+          "enum": [
+            "not_run",
+            "partial",
+            "passed",
+            "failed",
+            "unavailable"
+          ],
+          "default": "not_run"
+        },
+        "checks": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]{1,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/checkSummary"
+          },
+          "default": {}
+        },
+        "flagged_fields": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/fieldPath"
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/fieldFinding"
+            },
+            "minItems": 1
+          },
+          "default": {}
+        },
+        "missing_fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baseFieldPath"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "coverage_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "lifecycle": {
+      "type": "object",
+      "required": [
+        "status",
+        "generated_at",
+        "validated_at"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "generated_unreviewed",
+            "generated_validated"
+          ],
+          "default": "generated_unreviewed"
+        },
+        "generated_at": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ],
+          "default": "Not specified"
+        },
+        "validated_at": {
+          "anyOf": [
+            {
+              "enum": [
+                "Not specified",
+                "Not applicable"
+              ]
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ],
+          "default": "Not specified"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -86,13 +86,19 @@ class RenderAndCliTests(unittest.TestCase):
             self.assertEqual(main(["validate", str(json_path)]), 0)
             public_path = destination / "public.json"
             self.assertEqual(
-                main(["export", str(json_path), "--output", str(public_path)]),
-                0,
+                main(
+                    [
+                        "export",
+                        str(json_path),
+                        "--output",
+                        str(public_path),
+                        "--source-bundle",
+                        str(destination / "missing-source-bundle"),
+                    ]
+                ),
+                2,
             )
-            self.assertEqual(main(["validate", str(public_path)]), 0)
-            public = json.loads(public_path.read_text(encoding="utf-8"))
-            self.assertEqual(public["contract_version"], "1")
-            self.assertEqual(public["lifecycle"]["status"], "generated_unreviewed")
+            self.assertFalse(public_path.exists())
 
     def test_loader_rejects_a_tampered_projection(self) -> None:
         payload = synthetic_artifact().to_dict()

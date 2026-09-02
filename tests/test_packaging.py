@@ -52,7 +52,9 @@ class PackagingTests(unittest.TestCase):
                 metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
                 metadata = archive.read(metadata_name).decode("utf-8")
             self.assertIn("model_cards/resources/model-card.schema.json", names)
+            self.assertIn("model_cards/resources/audit-card.schema.json", names)
             self.assertIn("model_cards/contract.py", names)
+            self.assertIn("model_cards/publication_schema.py", names)
             self.assertIn("Requires-Dist: jsonschema", metadata)
             self.assertIn("Provides-Extra: risk", metadata)
             self.assertIn("ai-atlas-nexus", metadata)
@@ -98,14 +100,14 @@ class PackagingTests(unittest.TestCase):
                     "-I",
                     "-c",
                     (
-                        "from model_cards.schema import blank_card, load_contract_schema, "
-                        "validate_public_card; "
+                        "from model_cards.publication_schema import blank_publication_card, "
+                        "load_publication_schema, validate_publication_card; "
                         "from model_cards.cli import main; "
-                        "assert load_contract_schema()['x-model-card']['contract_version']=='1'; "
-                        "card=blank_card(); "
+                        "assert len(load_publication_schema()['properties'])==7; "
+                        "card=blank_publication_card(); "
                         "card['identity']['model_id']='example/model'; "
-                        "card['identity']['revision']='a'*40; "
-                        "validate_public_card(card); "
+                        "card['identity']['version']='a'*40; "
+                        "validate_publication_card(card); "
                         "assert main(['schema']) == 0"
                     ),
                 ),

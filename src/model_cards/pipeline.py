@@ -9,6 +9,7 @@ contains only identifiers, hashes, counts, and safe relative filenames.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field as dataclass_field, replace
 from enum import Enum
 import hashlib
@@ -85,6 +86,19 @@ from .models import (
 )
 from .policy import decide_binding
 from .public_export import PublicExportError, assert_public_projection
+from .publication import project_publication_card
+from .publication_schema import validate_publication_card
+from .publication_schema import PUBLICATION_SCHEMA
+from .publication_sources import (
+    PublicationSourceError,
+    assert_no_source_excerpt,
+    enrich_publication_card,
+)
+from .publication_validation import (
+    PublicationValidationError,
+    remove_publication_fields,
+    run_publication_validation,
+)
 from .risk_mapping import (
     ApplicabilityChecker,
     ApplicabilityStatus,
@@ -112,7 +126,7 @@ from .schema import (
 from .source_state import SourceStateMode, load_source_state
 
 
-PIPELINE_VERSION = "offline-model-card-pipeline/v5"
+PIPELINE_VERSION = "offline-model-card-pipeline/v9"
 PRIVACY_SCAN_VERSION = "public-card-privacy-scan/v1"
 RISK_STAGE_VERSION = "pipeline-risk-stage/v1"
 REPAIR_STAGE_VERSION = "pipeline-fact-withholding/v1"
@@ -732,6 +746,9 @@ class PipelineResult:
     conflict_count: int
     omission_audit_sha256: str
     source_present_omission_count: int
+    content_factreasoner_sha256: str
+    publication_original_factreasoner_sha256: str
+    publication_validation_sha256: str
     factreasoner_sha256: str
     risk: RiskStageSummary
     privacy: PrivacyScanReport
@@ -758,6 +775,9 @@ class PipelineResult:
             "source_catalog_sha256",
             "composition_sha256",
             "omission_audit_sha256",
+            "content_factreasoner_sha256",
+            "publication_original_factreasoner_sha256",
+            "publication_validation_sha256",
             "factreasoner_sha256",
             "artifact_sha256",
             "public_card_sha256",
@@ -824,6 +844,11 @@ class PipelineResult:
             "conflict_count": self.conflict_count,
             "omission_audit_sha256": self.omission_audit_sha256,
             "source_present_omission_count": self.source_present_omission_count,
+            "content_factreasoner_sha256": self.content_factreasoner_sha256,
+            "publication_original_factreasoner_sha256": (
+                self.publication_original_factreasoner_sha256
+            ),
+            "publication_validation_sha256": self.publication_validation_sha256,
             "factreasoner_sha256": self.factreasoner_sha256,
             "risk": self.risk.to_dict(),
             "privacy": self.privacy.to_dict(),
@@ -855,6 +880,9 @@ class PipelineResult:
                 "conflict_count",
                 "omission_audit_sha256",
                 "source_present_omission_count",
+                "content_factreasoner_sha256",
+                "publication_original_factreasoner_sha256",
+                "publication_validation_sha256",
                 "factreasoner_sha256",
                 "risk",
                 "privacy",
@@ -885,6 +913,11 @@ class PipelineResult:
             conflict_count=item["conflict_count"],
             omission_audit_sha256=item["omission_audit_sha256"],
             source_present_omission_count=item["source_present_omission_count"],
+            content_factreasoner_sha256=item["content_factreasoner_sha256"],
+            publication_original_factreasoner_sha256=item[
+                "publication_original_factreasoner_sha256"
+            ],
+            publication_validation_sha256=item["publication_validation_sha256"],
             factreasoner_sha256=item["factreasoner_sha256"],
             risk=RiskStageSummary.from_dict(item["risk"]),
             privacy=PrivacyScanReport.from_dict(item["privacy"]),
@@ -1632,10 +1665,11 @@ def _reindex_taxonomy_derivations(
 
 
 def _privacy_scan_final_projection(
-    card: Mapping[str, Any],
+    publication_card: Mapping[str, Any],
     candidates: Sequence[ClaimCandidate],
     included_ids: set[str],
     privacy_withheld_ids: Sequence[str],
+    source_catalog: Any,
 ) -> PrivacyScanReport:
     withheld = tuple(sorted(set(privacy_withheld_ids)))
     if set(withheld).intersection(included_ids):
@@ -1644,13 +1678,15 @@ def _privacy_scan_final_projection(
     try:
         for candidate_id in sorted(included_ids):
             assert_public_projection({"candidate_value": by_id[candidate_id].value})
-        assert_public_projection(card)
-    except (KeyError, PublicExportError) as exc:
+        validate_publication_card(publication_card)
+        assert_public_projection(publication_card)
+        _assert_publication_source_overlap(publication_card, source_catalog)
+    except (KeyError, PublicExportError, ValueError) as exc:
         raise PipelineError("post-repair public projection failed the privacy boundary") from exc
     checked = len(included_ids) + len(withheld) + 1
     passed = len(included_ids) + 1
     return PrivacyScanReport(
-        scanned_card_sha256=_file_digest(card),
+        scanned_card_sha256=_file_digest(publication_card),
         checked=checked,
         passed=passed,
         withheld_candidate_ids=withheld,
@@ -1659,6 +1695,19 @@ def _privacy_scan_final_projection(
             "privacy_safe_projection" if not withheld else "unsafe_candidates_withheld"
         ),
     )
+
+
+def _assert_publication_source_overlap(
+    publication_card: Mapping[str, Any], source_catalog: Any
+) -> None:
+    """Apply the excerpt boundary to every active Hub and official document."""
+
+    try:
+        assert_no_source_excerpt(publication_card, source_catalog)
+    except PublicationSourceError as exc:
+        raise PipelineError(
+            "public card contains a prohibited frozen-source excerpt"
+        ) from exc
 
 
 def _factreasoner_claim_counts(
@@ -1688,8 +1737,16 @@ def _validation_checks(
     privacy_passed: int,
     privacy_withheld: int,
     omission_audit: OmissionAudit,
+    publication_omission_count: int,
     conflict_count: int,
 ) -> tuple[ValidationCheck, ...]:
+    if (
+        not isinstance(publication_omission_count, int)
+        or isinstance(publication_omission_count, bool)
+        or publication_omission_count < 0
+        or publication_omission_count > 33
+    ):
+        raise PipelineError("publication omission count is invalid")
     fact_checked, fact_passed, fact_failed, fact_unavailable = fact_counts
     if fact_unavailable:
         fact_status = ValidationCheckStatus.UNAVAILABLE
@@ -1737,10 +1794,17 @@ def _validation_checks(
         ValidationCheck(
             check_id="omission_audit",
             status=ValidationCheckStatus.COMPLETED,
-            checked=len(omission_audit.records),
-            passed=len(omission_audit.records)
-            - len(omission_audit.source_present_omissions),
-            withheld=len(omission_audit.source_present_omissions),
+            checked=len(omission_audit.records) + 33,
+            passed=(
+                len(omission_audit.records)
+                + 33
+                - len(omission_audit.source_present_omissions)
+                - publication_omission_count
+            ),
+            withheld=(
+                len(omission_audit.source_present_omissions)
+                + publication_omission_count
+            ),
         ),
         ValidationCheck(
             check_id="conflict_audit",
@@ -2352,27 +2416,33 @@ def run_offline_pipeline(
         )
     )
 
-    fact_counts = _factreasoner_claim_counts(fact_record, candidates, included_ids)
-    fact_stage_unavailable = bool(fact_record.decisions) and all(
-        item.outcome is CheckOutcome.UNAVAILABLE for item in fact_record.decisions
+    content_fact_record = fact_record
+    content_fact_counts = _factreasoner_claim_counts(
+        content_fact_record, candidates, included_ids
+    )
+    content_fact_stage_unavailable = bool(content_fact_record.decisions) and all(
+        item.outcome is CheckOutcome.UNAVAILABLE
+        for item in content_fact_record.decisions
     )
     artifact_refs.append(
         _record_artifact(
             store,
             stage="factreasoner",
-            logical_id="post_repair_claims",
-            status="unavailable" if fact_stage_unavailable else "completed",
+            logical_id="post_repair_audit_claims",
+            status=(
+                "unavailable" if content_fact_stage_unavailable else "completed"
+            ),
             reason=(
                 (
                     "fact_checker_unavailable"
                     if fact_checker is None
                     else "fact_checks_unavailable"
                 )
-                if fact_stage_unavailable
-                else "post_repair_factreasoner_completed"
+                if content_fact_stage_unavailable
+                else "post_repair_audit_factreasoner_completed"
             ),
-            filename="factreasoner.json",
-            value=fact_record.to_dict(),
+            filename="factreasoner-content.json",
+            value=content_fact_record.to_dict(),
             input_sha256s=(
                 composition_sha256,
                 risk_summary.summary_sha256,
@@ -2380,11 +2450,11 @@ def run_offline_pipeline(
                 catalog.catalog_sha256,
             ),
             metrics={
-                "atom_count": len(fact_record.atoms),
-                "eligible_atom_count": fact_counts[0],
-                "supported_atom_count": fact_counts[1],
-                "actionable_atom_count": fact_counts[2],
-                "unavailable_atom_count": fact_counts[3],
+                "atom_count": len(content_fact_record.atoms),
+                "eligible_atom_count": content_fact_counts[0],
+                "supported_atom_count": content_fact_counts[1],
+                "actionable_atom_count": content_fact_counts[2],
+                "unavailable_atom_count": content_fact_counts[3],
             },
         )
     )
@@ -2429,74 +2499,219 @@ def run_offline_pipeline(
         )
     )
 
-    privacy_precheck = _privacy_scan_final_projection(
-        content_card,
-        candidates,
-        included_ids,
-        privacy_writer.withheld,
-    )
-
-    gate_by_id = {item.candidate.candidate_id: item for item in gate_records}
-    claim_support_passed = (
-        composition_status is CompositionStatus.COMPLETED
-        and all(
-            gate_by_id[candidate_id].projection_eligible
-            for candidate_id in included_ids
-        )
-    )
-    fact_passed = fact_counts[0] == fact_counts[1]
-    validation = PipelineValidationSummary(
-        claim_support_passed=claim_support_passed,
-        factreasoner_passed=fact_passed,
-        schema_passed=True,
-        risk_passed=risk_summary.passed,
-        privacy_passed=privacy_precheck.passed_without_withholding,
-        conflicts_clear=conflict_count == 0,
-        omissions_clear=not omission_audit.source_present_omissions,
-    )
-    lifecycle = (
-        LifecycleStatus.GENERATED_VALIDATED
-        if validation.all_passed
-        else LifecycleStatus.GENERATED_UNREVIEWED
-    )
-    checks = _validation_checks(
-        included_count=len(bindings_by_id),
-        fact_counts=fact_counts,
-        risk=risk_summary,
-        privacy_checked=privacy_precheck.checked,
-        privacy_passed=privacy_precheck.passed,
-        privacy_withheld=len(privacy_precheck.withheld_candidate_ids),
-        omission_audit=omission_audit,
-        conflict_count=conflict_count,
-    )
-    artifact = CardArtifact(
+    provisional_artifact = CardArtifact(
         target=catalog.target,
         bindings=tuple(sorted(bindings_by_id.values(), key=lambda item: item.binding_id)),
-        validation_checks=checks,
-        lifecycle_status=lifecycle,
         derivations=taxonomy_derivations,
     )
-    public_card = project_card(artifact)
+    audit_card = project_card(provisional_artifact)
     for field_path in CONTENT_FIELD_PATHS:
-        if get_field(public_card, field_path) != get_field(content_card, field_path):
+        if get_field(audit_card, field_path) != get_field(content_card, field_path):
             raise PipelineError("final artifact content differs from evidence composition")
-    validate_public_card(public_card)
+    validate_public_card(audit_card)
+    base_publication_card = project_publication_card(audit_card)
+    initial_publication = enrich_publication_card(
+        source_state.hf_catalog,
+        base_publication_card,
+    )
+    _assert_publication_source_overlap(initial_publication.card, catalog)
+    original_publication_fact_record = run_factreasoner(
+        initial_publication.card,
+        PUBLICATION_SCHEMA,
+        catalog.target,
+        catalog.documents,
+        selected_fact_checker,
+        source_availability=source_availability,
+        config=fact_config,
+    )
+    original_publication_fact_unavailable = bool(
+        original_publication_fact_record.decisions
+    ) and all(
+        item.outcome is CheckOutcome.UNAVAILABLE
+        for item in original_publication_fact_record.decisions
+    )
+    original_publication_fact_counts = _factreasoner_claim_counts(
+        original_publication_fact_record, candidates, included_ids
+    )
+    artifact_refs.append(
+        _record_artifact(
+            store,
+            stage="factreasoner",
+            logical_id="publication_pre_withhold_claims",
+            status=(
+                "unavailable"
+                if original_publication_fact_unavailable
+                else "completed"
+            ),
+            reason=(
+                (
+                    "fact_checker_unavailable"
+                    if fact_checker is None
+                    else "fact_checks_unavailable"
+                )
+                if original_publication_fact_unavailable
+                else "publication_factreasoner_completed"
+            ),
+            filename="factreasoner-publication-original.json",
+            value=original_publication_fact_record.to_dict(),
+            input_sha256s=(
+                content_fact_record.content_sha256,
+                catalog.catalog_sha256,
+            ),
+            metrics={
+                "atom_count": len(original_publication_fact_record.atoms),
+                "eligible_atom_count": original_publication_fact_counts[0],
+                "supported_atom_count": original_publication_fact_counts[1],
+                "actionable_atom_count": original_publication_fact_counts[2],
+                "unavailable_atom_count": original_publication_fact_counts[3],
+                "field_count": 33,
+            },
+        )
+    )
+
+    try:
+        publication_validation_outcome = run_publication_validation(
+            initial_publication.card,
+            original_publication_fact_record,
+        )
+    except PublicationValidationError as exc:
+        raise PipelineError("final publication validation failed closed") from exc
+    publication_validation = publication_validation_outcome.report
+    failed_publication_fields = set(publication_validation.withheld_field_paths)
+    if {"identity.model_id", "identity.version"}.intersection(
+        failed_publication_fields
+    ):
+        raise PipelineError("FactReasoner rejected immutable publication identity")
+    enriched_paths = {
+        item.field_path for item in initial_publication.provenance
+    }
+    derived_withheld_fields = tuple(
+        sorted(failed_publication_fields.intersection(enriched_paths))
+    )
+    direct_withheld_fields = tuple(
+        sorted(failed_publication_fields - enriched_paths)
+    )
+    final_publication = enrich_publication_card(
+        source_state.hf_catalog,
+        base_publication_card,
+        withheld_fields=derived_withheld_fields,
+    )
+    public_card = remove_publication_fields(
+        final_publication.card,
+        direct_withheld_fields,
+    )
+    if public_card != publication_validation_outcome.final_card:
+        raise PipelineError(
+            "publication provenance replay differs from FactReasoner withholding"
+        )
+
+    final_publication_fact_record = run_factreasoner(
+        public_card,
+        PUBLICATION_SCHEMA,
+        catalog.target,
+        catalog.documents,
+        selected_fact_checker,
+        source_availability=source_availability,
+        config=fact_config,
+    )
+    if any(
+        item.field_action is FieldAction.REPAIR_OR_WITHHOLD
+        for item in final_publication_fact_record.decisions
+    ):
+        raise PipelineError(
+            "actionable FactReasoner claim survived final publication withholding"
+        )
+    final_publication_fact_counts = _factreasoner_claim_counts(
+        final_publication_fact_record, candidates, included_ids
+    )
+    final_publication_fact_unavailable = bool(
+        final_publication_fact_record.decisions
+    ) and all(
+        item.outcome is CheckOutcome.UNAVAILABLE
+        for item in final_publication_fact_record.decisions
+    )
+    artifact_refs.append(
+        _record_artifact(
+            store,
+            stage="publication_validate",
+            logical_id="publication_fields",
+            status=(
+                "withheld"
+                if publication_validation.withheld_field_paths
+                else "completed"
+            ),
+            reason=(
+                "actionable_publication_fields_withheld"
+                if publication_validation.withheld_field_paths
+                else "publication_fields_accounted"
+            ),
+            filename="publication-validation.json",
+            value=publication_validation.to_dict(),
+            input_sha256s=(
+                original_publication_fact_record.content_sha256,
+                catalog.catalog_sha256,
+            ),
+            metrics={
+                "field_count": len(publication_validation.records),
+                "withheld_count": len(
+                    publication_validation.withheld_field_paths
+                ),
+                "source_present_omission_count": len(
+                    publication_validation.source_present_omissions
+                ),
+            },
+        )
+    )
+    artifact_refs.append(
+        _record_artifact(
+            store,
+            stage="factreasoner",
+            logical_id="publication_final_claims",
+            status=(
+                "unavailable" if final_publication_fact_unavailable else "completed"
+            ),
+            reason=(
+                (
+                    "fact_checker_unavailable"
+                    if fact_checker is None
+                    else "fact_checks_unavailable"
+                )
+                if final_publication_fact_unavailable
+                else "final_publication_factreasoner_completed"
+            ),
+            filename="factreasoner.json",
+            value=final_publication_fact_record.to_dict(),
+            input_sha256s=(
+                publication_validation.content_sha256,
+                catalog.catalog_sha256,
+            ),
+            metrics={
+                "atom_count": len(final_publication_fact_record.atoms),
+                "eligible_atom_count": final_publication_fact_counts[0],
+                "supported_atom_count": final_publication_fact_counts[1],
+                "actionable_atom_count": final_publication_fact_counts[2],
+                "unavailable_atom_count": final_publication_fact_counts[3],
+                "field_count": 33,
+            },
+        )
+    )
+
+    validate_publication_card(public_card)
     try:
         assert_public_projection(public_card)
     except PublicExportError as exc:  # computed metadata must never reopen the boundary
         raise PipelineError("final public card failed the privacy boundary") from exc
 
-    artifact_payload = artifact.to_dict()
     public_card_sha256 = _file_digest(public_card)
-    artifact_sha256 = _file_digest(artifact_payload)
-    privacy_report = PrivacyScanReport(
-        scanned_card_sha256=public_card_sha256,
-        checked=privacy_precheck.checked,
-        passed=privacy_precheck.passed,
-        withheld_candidate_ids=privacy_precheck.withheld_candidate_ids,
-        status=privacy_precheck.status,
-        reason=privacy_precheck.reason,
+    privacy_report = _privacy_scan_final_projection(
+        public_card,
+        candidates,
+        included_ids,
+        privacy_writer.withheld,
+        catalog,
     )
+    if privacy_report.scanned_card_sha256 != public_card_sha256:
+        raise PipelineError("privacy scan did not bind the final public card")
     artifact_refs.append(
         _record_artifact(
             store,
@@ -2509,6 +2724,8 @@ def run_offline_pipeline(
             input_sha256s=(
                 composition_sha256,
                 repair_report.report_sha256,
+                publication_validation.content_sha256,
+                catalog.catalog_sha256,
                 public_card_sha256,
             ),
             metrics={
@@ -2518,6 +2735,68 @@ def run_offline_pipeline(
             },
         )
     )
+
+    gate_by_id = {item.candidate.candidate_id: item for item in gate_records}
+    claim_support_passed = (
+        composition_status is CompositionStatus.COMPLETED
+        and all(
+            gate_by_id[candidate_id].projection_eligible
+            for candidate_id in included_ids
+        )
+    )
+    fact_passed = (
+        final_publication_fact_counts[0] == final_publication_fact_counts[1]
+    )
+    publication_omission_count = len(
+        publication_validation.source_present_omissions
+    )
+    validation = PipelineValidationSummary(
+        claim_support_passed=claim_support_passed,
+        factreasoner_passed=fact_passed,
+        schema_passed=True,
+        risk_passed=risk_summary.passed,
+        privacy_passed=privacy_report.passed_without_withholding,
+        conflicts_clear=conflict_count == 0,
+        omissions_clear=(
+            not omission_audit.source_present_omissions
+            and publication_omission_count == 0
+        ),
+    )
+    lifecycle = (
+        LifecycleStatus.GENERATED_VALIDATED
+        if validation.all_passed
+        else LifecycleStatus.GENERATED_UNREVIEWED
+    )
+    checks = _validation_checks(
+        included_count=len(bindings_by_id),
+        fact_counts=final_publication_fact_counts,
+        risk=risk_summary,
+        privacy_checked=privacy_report.checked,
+        privacy_passed=privacy_report.passed,
+        privacy_withheld=len(privacy_report.withheld_candidate_ids),
+        omission_audit=omission_audit,
+        publication_omission_count=publication_omission_count,
+        conflict_count=conflict_count,
+    )
+    artifact = CardArtifact(
+        target=catalog.target,
+        bindings=tuple(sorted(bindings_by_id.values(), key=lambda item: item.binding_id)),
+        validation_checks=checks,
+        lifecycle_status=lifecycle,
+        derivations=taxonomy_derivations,
+        publication_card=public_card,
+        publication_provenance=final_publication.provenance,
+        publication_withheld_fields=direct_withheld_fields,
+        publication_source_catalog_sha256=catalog.catalog_sha256,
+    )
+    final_audit_card = project_card(artifact)
+    for field_path in CONTENT_FIELD_PATHS:
+        if get_field(final_audit_card, field_path) != get_field(
+            content_card, field_path
+        ):
+            raise PipelineError("final artifact content differs from evidence composition")
+    artifact_payload = artifact.to_dict()
+    artifact_sha256 = _file_digest(artifact_payload)
     artifact_refs.append(
         _record_artifact(
             store,
@@ -2530,7 +2809,10 @@ def run_offline_pipeline(
             input_sha256s=(
                 composition_sha256,
                 repair_report.report_sha256,
-                fact_record.content_sha256,
+                content_fact_record.content_sha256,
+                original_publication_fact_record.content_sha256,
+                publication_validation.content_sha256,
+                final_publication_fact_record.content_sha256,
                 omission_audit.content_sha256,
                 privacy_report.report_sha256,
                 risk_summary.summary_sha256,
@@ -2538,6 +2820,12 @@ def run_offline_pipeline(
             metrics={
                 "binding_count": len(artifact.bindings),
                 "derivation_count": len(artifact.derivations),
+                "publication_derivation_count": len(
+                    artifact.publication_provenance
+                ),
+                "publication_withheld_count": len(
+                    publication_validation.withheld_field_paths
+                ),
             },
         )
     )
@@ -2550,7 +2838,11 @@ def run_offline_pipeline(
             reason="privacy_safe_public_card",
             filename="public-card.json",
             value=public_card,
-            input_sha256s=(artifact_sha256, privacy_report.report_sha256),
+            input_sha256s=(
+                artifact_sha256,
+                privacy_report.report_sha256,
+                final_publication_fact_record.content_sha256,
+            ),
             metrics={"included_claim_count": len(included_ids)},
         )
     )
@@ -2576,10 +2868,16 @@ def run_offline_pipeline(
         claims=claims,
         conflict_count=conflict_count,
         omission_audit_sha256=omission_audit.content_sha256,
-        source_present_omission_count=len(
-            omission_audit.source_present_omissions
+        source_present_omission_count=(
+            len(omission_audit.source_present_omissions)
+            + publication_omission_count
         ),
-        factreasoner_sha256=fact_record.content_sha256,
+        content_factreasoner_sha256=content_fact_record.content_sha256,
+        publication_original_factreasoner_sha256=(
+            original_publication_fact_record.content_sha256
+        ),
+        publication_validation_sha256=publication_validation.content_sha256,
+        factreasoner_sha256=final_publication_fact_record.content_sha256,
         risk=risk_summary,
         privacy=privacy_report,
         validation=validation,

@@ -283,6 +283,13 @@ class QualityReportTests(unittest.TestCase):
             hf_only["metrics"]["sources"]["total"],
         )
         self.assertGreater(combined["metrics"]["sources"]["loaded"], 0)
+        combined_run = next(self.official.glob("targets/*"))
+        source_state = json.loads((combined_run / "source-state.json").read_text())
+        artifact = json.loads((combined_run / "card-artifact.json").read_text())
+        self.assertEqual(
+            source_state["active_catalog_sha256"],
+            artifact["publication"]["source_catalog_sha256"],
+        )
         serialized = serialize_quality_report(combined_report)
         self.assertNotIn(OFFICIAL_BODY_SENTINEL.encode("utf-8"), serialized)
 

@@ -61,6 +61,7 @@ _STAGES = frozenset(
         "compose",
         "risk_map",
         "factreasoner",
+        "publication_validate",
         "omission_audit",
         "repair",
         "privacy",

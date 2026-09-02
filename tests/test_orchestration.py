@@ -417,7 +417,7 @@ class OrchestrationTests(unittest.TestCase):
         result = self.invoke(fake)
 
         self.assertEqual(1, len(result.quote_candidate_ids))
-        card = json.loads((self.run / "public-card.json").read_text())
+        card = json.loads((self.run / "card-artifact.json").read_text())["card"]
         risks = card["use_and_risk"]["identified_risks"]
         self.assertEqual(1, len(risks))
         risk = risks[0]
@@ -501,7 +501,7 @@ class OrchestrationTests(unittest.TestCase):
             "hf_and_official",
             json.loads((self.run / "source-state.json").read_text())["mode"],
         )
-        card = json.loads((self.run / "public-card.json").read_text())
+        card = json.loads((self.run / "card-artifact.json").read_text())["card"]
         intended = card["use_and_risk"]["intended_uses"]
         self.assertEqual([OFFICIAL_USE], [item["description"] for item in intended])
         self.assertTrue(intended[0]["source_refs"][0].startswith("primary_src_"))

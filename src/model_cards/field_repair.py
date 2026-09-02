@@ -39,6 +39,7 @@ from .findings import (
 )
 from .models import Evidence, SourceDocument, TargetIdentity
 from .public_export import SENSITIVE_TEXT, assert_public_projection
+from .publication import project_publication_card
 from .risk_mapping import MappingStatus, RiskMappingReport
 from .schema import CONTENT_FIELD_PATHS, canonical_field_path, get_field, validate_public_card
 
@@ -948,7 +949,7 @@ def evaluate_downstream_reaudits(
     privacy_status = ReauditStatus.PASSED
     privacy_reason = "public_projection_privacy_passed"
     try:
-        assert_public_projection(card)
+        assert_public_projection(project_publication_card(card))
     except Exception:
         privacy_status = ReauditStatus.FAILED
         privacy_reason = "public_projection_privacy_failed"

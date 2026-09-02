@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
 
+from model_cards.public_markdown import render_public_markdown
 from model_cards.privacy import (
     PrivacyAuditError,
     PrivacyAuditReport,
@@ -17,7 +19,45 @@ from model_cards.privacy import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SAFE_CARD = ROOT / "cards" / "olmo-2-1124-7b.json"
+
+
+def _safe_card() -> dict[str, object]:
+    return {
+        "identity": {
+            "model_id": "acme-labs/reference-model",
+            "name": "Reference Model",
+            "developed_by": "Acme Labs",
+            "model_type": "Decoder-only language model",
+            "license": "Apache-2.0",
+            "version": "0123456789abcdef",
+            "summary": "A public language model used to verify publication.",
+        },
+        "lineage": {},
+        "specifications": {
+            "num_parameters": "7 billion",
+            "input_output": ["text input", "text output"],
+        },
+        "training_context": {},
+        "access_and_adoption": {"access_type": "Public weights"},
+        "evaluation": {},
+        "links": {
+            "model_card": "https://huggingface.co/acme-labs/reference-model"
+        },
+    }
+
+
+def _safe_card_bytes() -> bytes:
+    return (json.dumps(_safe_card(), ensure_ascii=False, indent=2) + "\n").encode(
+        "utf-8"
+    )
+
+
+def _safe_markdown(json_filename: str, raw: bytes) -> str:
+    return render_public_markdown(
+        json.loads(raw),
+        json_filename=json_filename,
+        json_sha256=hashlib.sha256(raw).hexdigest(),
+    )
 
 
 class PrivacyAuditTests(unittest.TestCase):
@@ -69,11 +109,14 @@ class PrivacyAuditTests(unittest.TestCase):
             + "\n",
         )
         self.write(root, "assets/diagram.pdf", b"%PDF-1.4\npublic diagram\n")
-        self.write(root, "cards/model.json", SAFE_CARD.read_bytes())
+        card_raw = _safe_card_bytes()
+        self.write(root, "cards/model.json", card_raw)
+        self.write(root, "cards/model.md", _safe_markdown("model.json", card_raw))
         files = (
             "README.md",
             "assets/diagram.pdf",
             "cards/model.json",
+            "cards/model.md",
             "schema/concepts.json",
             "src/tool.py",
         )
@@ -81,7 +124,7 @@ class PrivacyAuditTests(unittest.TestCase):
         second = audit_public_tree(root, tuple(reversed(files)))
         self.assertTrue(first.passed)
         self.assertEqual((), first.findings)
-        self.assertEqual(5, first.files_checked)
+        self.assertEqual(6, first.files_checked)
         self.assertEqual(1, first.cards_checked)
         self.assertEqual(first, second)
         self.assertEqual(first, load_privacy_report(serialize_privacy_report(first)))
@@ -232,16 +275,18 @@ class PrivacyAuditTests(unittest.TestCase):
 
     def test_every_card_uses_packaged_schema_runtime_and_export_privacy_boundary(self) -> None:
         root = self.temporary_root()
-        card = json.loads(SAFE_CARD.read_text(encoding="utf-8"))
+        card = _safe_card()
         card["source_bundle"] = {"source_text": "private publisher body"}
         self.write(root, "cards/unsafe.json", json.dumps(card) + "\n")
         self.write(root, "cards/notes.md", "not a public JSON card\n")
+        self.write(root, "cards/asset.txt", "arbitrary non-card file\n")
         report = audit_public_tree(root)
         codes = self.codes(report)
         self.assertEqual(1, report.cards_checked)
         self.assertIn(PrivacyFindingCode.CARD_SCHEMA_INVALID, codes)
         self.assertIn(PrivacyFindingCode.CARD_RUNTIME_INVALID, codes)
         self.assertIn(PrivacyFindingCode.CARD_PRIVACY_INVALID, codes)
+        self.assertIn(PrivacyFindingCode.CARD_MARKDOWN_INVALID, codes)
         self.assertIn(PrivacyFindingCode.CARD_NON_JSON, codes)
         self.assertIn(PrivacyFindingCode.JSON_PRIVATE_KEY, codes)
         serialized = serialize_privacy_report(report)
@@ -253,6 +298,73 @@ class PrivacyAuditTests(unittest.TestCase):
         self.assertEqual(1, malformed.cards_checked)
         self.assertIn(PrivacyFindingCode.JSON_MALFORMED, self.codes(malformed))
         self.assertIn(PrivacyFindingCode.CARD_SCHEMA_INVALID, self.codes(malformed))
+
+    def test_markdown_companion_must_exactly_match_its_public_json(self) -> None:
+        root = self.temporary_root()
+        raw = _safe_card_bytes()
+        self.write(root, "cards/model.json", raw)
+        self.write(root, "cards/model.md", _safe_markdown("model.json", raw))
+        valid = audit_public_tree(root)
+        self.assertTrue(valid.passed)
+        self.assertEqual(1, valid.cards_checked)
+
+        self.write(root, "cards/model.md", "# Tampered card\n")
+        tampered = audit_public_tree(root)
+        self.assertEqual(
+            {PrivacyFindingCode.CARD_MARKDOWN_INVALID}, self.codes(tampered)
+        )
+
+        orphan_root = self.temporary_root()
+        self.write(orphan_root, "cards/orphan.md", "# Orphan\n")
+        orphan = audit_public_tree(orphan_root)
+        self.assertEqual(
+            {PrivacyFindingCode.CARD_MARKDOWN_INVALID}, self.codes(orphan)
+        )
+
+        json_only_root = self.temporary_root()
+        self.write(json_only_root, "cards/orphan.json", raw)
+        json_only = audit_public_tree(json_only_root)
+        self.assertEqual(
+            {PrivacyFindingCode.CARD_MARKDOWN_INVALID}, self.codes(json_only)
+        )
+
+        scoped_root = self.temporary_root()
+        self.write(scoped_root, "cards/model.json", raw)
+        self.write(scoped_root, "cards/model.md", _safe_markdown("model.json", raw))
+        json_scope = audit_public_tree(scoped_root, ("cards/model.json",))
+        markdown_scope = audit_public_tree(scoped_root, ("cards/model.md",))
+        self.assertEqual(
+            {PrivacyFindingCode.CARD_MARKDOWN_INVALID}, self.codes(json_scope)
+        )
+        self.assertEqual(
+            {PrivacyFindingCode.CARD_MARKDOWN_INVALID}, self.codes(markdown_scope)
+        )
+
+    def test_nested_cards_entries_never_bypass_public_card_checks(self) -> None:
+        root = self.temporary_root()
+        audit_card = _safe_card()
+        audit_card["environmental_information"] = {"carbon_emissions": "hidden"}
+        self.write(root, "cards/archive/audit-card.json", json.dumps(audit_card) + "\n")
+        self.write(root, "cards/archive/readme.md", "nested card material\n")
+
+        report = audit_public_tree(root)
+        self.assertEqual(0, report.cards_checked)
+        self.assertIn(PrivacyFindingCode.CARD_NON_JSON, self.codes(report))
+        self.assertIn(PrivacyFindingCode.JSON_PRIVATE_KEY, self.codes(report))
+
+    def test_audit_contract_card_is_not_a_valid_public_card(self) -> None:
+        root = self.temporary_root()
+        card = _safe_card()
+        card["lifecycle"] = {"status": "generated_unreviewed"}
+        self.write(root, "cards/model.json", json.dumps(card) + "\n")
+
+        report = audit_public_tree(root)
+        self.assertTrue(
+            {
+                PrivacyFindingCode.CARD_SCHEMA_INVALID,
+                PrivacyFindingCode.CARD_RUNTIME_INVALID,
+            }.issubset(self.codes(report))
+        )
 
     def test_tree_scope_sees_run_artifacts_while_explicit_scope_is_exact(self) -> None:
         root = self.temporary_root()

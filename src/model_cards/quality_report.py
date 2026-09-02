@@ -32,6 +32,7 @@ from .claim_gate import (
     GateName,
     verify_claim_gate_record,
 )
+from .combined_sources import CombinedSourceDocumentCatalog
 from .composer import CompositionResult
 from .extraction import (
     EXTRACTION_VERSION,
@@ -39,7 +40,7 @@ from .extraction import (
     ExtractionResult,
     ProposalOutcome,
 )
-from .factreasoner import FactReasonerRecord
+from .factreasoner import FactReasonerRecord, FieldAction
 from .findings import FieldAuditStatus, OmissionAudit, OmissionReason
 from .models import (
     EvidenceKind,
@@ -57,6 +58,18 @@ from .pipeline import (
     RiskStageSummary,
 )
 from .public_export import assert_public_projection
+from .publication import project_publication_card
+from .publication_contract import FIELD_PATHS as PUBLICATION_FIELD_PATHS
+from .publication_schema import PUBLICATION_SCHEMA, validate_publication_card
+from .publication_sources import (
+    assert_no_source_excerpt,
+    replay_publication_enrichment,
+)
+from .publication_validation import (
+    PublicationValidationReport,
+    remove_publication_fields,
+    replay_publication_validation,
+)
 from .risk_mapping import RISK_MAPPING_VERSION, UseContext
 from .run_ledger import UsageLedger
 from .run_summary import (
@@ -73,6 +86,7 @@ from .schema import (
     validate_public_card,
 )
 from .source_bundle import parse_target_request, replay_source_bundle
+from .source_documents import SourceDocumentCatalog
 from .source_state import SourceStateMode, load_source_state
 
 
@@ -143,6 +157,9 @@ _PIPELINE_ARTIFACT_FILENAMES = frozenset(
         "composition.json",
         "repairs.json",
         "risk-mapping.json",
+        "factreasoner-content.json",
+        "factreasoner-publication-original.json",
+        "publication-validation.json",
         "factreasoner.json",
         "omissions.json",
         "privacy.json",
@@ -676,8 +693,21 @@ def _load_successful_target(
     repair = _load_repair_chain(run_root, result)
     artifact, public_card = _load_exports(run_root, result)
     privacy = _load_privacy(run_root, result)
-    fact = _load_factreasoner(run_root, result)
-    omission = _load_omissions(run_root, result)
+    content_fact, original_publication_fact, publication_validation, fact = (
+        _load_publication_validation_chain(
+            run_root,
+            result,
+            artifact,
+            public_card,
+            source_state.hf_catalog,
+            source_catalog,
+        )
+    )
+    omission = _load_omissions(
+        run_root,
+        result,
+        publication_validation,
+    )
     risk_value, risk_metrics, risk_surface = _load_risk(
         run_root, result, artifact, repair
     )
@@ -695,12 +725,16 @@ def _load_successful_target(
     provider = _provider_metrics(run_root / "usage.jsonl")
     metrics = {
         "schema_export": _schema_export_metrics(result, artifact, public_card),
-        "fields": _field_metrics(omission),
+        "fields": _field_metrics(omission, publication_validation),
         "sources": _source_metrics(source_catalog.records),
         "claims": _claim_metrics(gates, result),
         "findings": _finding_metrics(_explicit_findings(gates)),
         "factreasoner": _fact_metrics(fact),
-        "omissions": _omission_metrics(omission, result.conflict_count),
+        "omissions": _omission_metrics(
+            omission,
+            publication_validation,
+            result.conflict_count,
+        ),
         "risk": risk_metrics,
         "privacy": _privacy_metrics(privacy, result),
         "provider": provider,
@@ -711,6 +745,9 @@ def _load_successful_target(
         artifact=artifact,
         gates=gates,
         fact=fact,
+        content_fact=content_fact,
+        original_publication_fact=original_publication_fact,
+        publication_validation=publication_validation,
         repair=repair,
         risk_surface=risk_surface,
         provider=provider,
@@ -998,19 +1035,22 @@ def _load_exports(
     run_root: Path, result: PipelineResult
 ) -> tuple[CardArtifact, dict[str, Any]]:
     artifact_value = _read_canonical_object(run_root / "card-artifact.json", "card artifact")
+    artifact_keys = {
+        "artifact_id",
+        "contract_version",
+        "target",
+        "lifecycle",
+        "card",
+        "bindings",
+        "reviews",
+        "validation_checks",
+        "derivations",
+    }
+    if "publication" in artifact_value:
+        artifact_keys.add("publication")
     _strict_object(
         artifact_value,
-        {
-            "artifact_id",
-            "contract_version",
-            "target",
-            "lifecycle",
-            "card",
-            "bindings",
-            "reviews",
-            "validation_checks",
-            "derivations",
-        },
+        artifact_keys,
         "card artifact",
     )
     try:
@@ -1019,7 +1059,7 @@ def _load_exports(
         raise QualityReportError("card artifact failed typed validation") from exc
     public_card = _read_canonical_object(run_root / "public-card.json", "public card")
     try:
-        validate_public_card(public_card)
+        validate_publication_card(public_card)
         assert_public_projection(public_card)
     except Exception as exc:
         raise QualityReportError("public card failed schema or privacy validation") from exc
@@ -1027,7 +1067,12 @@ def _load_exports(
         artifact.target != result.target
         or artifact.artifact_id != result.artifact_id
         or artifact.lifecycle_status != result.lifecycle_status
-        or project_card(artifact) != public_card
+        or (
+            artifact.publication_card
+            if artifact.publication_card is not None
+            else project_publication_card(project_card(artifact))
+        )
+        != public_card
         or hashlib.sha256((run_root / "card-artifact.json").read_bytes()).hexdigest()
         != result.artifact_sha256
         or hashlib.sha256((run_root / "public-card.json").read_bytes()).hexdigest()
@@ -1048,19 +1093,155 @@ def _load_privacy(run_root: Path, result: PipelineResult) -> PrivacyScanReport:
     return report
 
 
-def _load_factreasoner(run_root: Path, result: PipelineResult) -> FactReasonerRecord:
-    value = _read_canonical_object(run_root / "factreasoner.json", "FactReasoner artifact")
+def _load_factreasoner_file(
+    run_root: Path,
+    filename: str,
+    *,
+    label: str,
+    expected_sha256: str,
+    target: TargetIdentity,
+) -> FactReasonerRecord:
+    value = _read_canonical_object(run_root / filename, label)
     try:
         record = FactReasonerRecord.from_dict(value)
         record.validate_integrity()
     except Exception as exc:
-        raise QualityReportError("FactReasoner record failed typed validation") from exc
-    if record.content_sha256 != result.factreasoner_sha256 or record.target != result.target:
-        raise QualityReportError("FactReasoner record differs from pipeline result")
+        raise QualityReportError(f"{label} failed typed validation") from exc
+    if record.content_sha256 != expected_sha256 or record.target != target:
+        raise QualityReportError(f"{label} differs from pipeline result")
     return record
 
 
-def _load_omissions(run_root: Path, result: PipelineResult) -> OmissionAudit:
+def _load_publication_validation_chain(
+    run_root: Path,
+    result: PipelineResult,
+    artifact: CardArtifact,
+    public_card: Mapping[str, Any],
+    hf_catalog: SourceDocumentCatalog,
+    source_catalog: SourceDocumentCatalog | CombinedSourceDocumentCatalog,
+) -> tuple[
+    FactReasonerRecord,
+    FactReasonerRecord,
+    PublicationValidationReport,
+    FactReasonerRecord,
+]:
+    """Replay the deterministic bridge around the final public FactReasoner."""
+
+    content_fact = _load_factreasoner_file(
+        run_root,
+        "factreasoner-content.json",
+        label="content FactReasoner artifact",
+        expected_sha256=result.content_factreasoner_sha256,
+        target=result.target,
+    )
+    original_publication_fact = _load_factreasoner_file(
+        run_root,
+        "factreasoner-publication-original.json",
+        label="pre-withhold publication FactReasoner artifact",
+        expected_sha256=result.publication_original_factreasoner_sha256,
+        target=result.target,
+    )
+    final_fact = _load_factreasoner_file(
+        run_root,
+        "factreasoner.json",
+        label="final publication FactReasoner artifact",
+        expected_sha256=result.factreasoner_sha256,
+        target=result.target,
+    )
+    validation_value = _read_canonical_object(
+        run_root / "publication-validation.json",
+        "publication validation artifact",
+    )
+    try:
+        validation = PublicationValidationReport.from_dict(validation_value)
+    except Exception as exc:
+        raise QualityReportError(
+            "publication validation report failed typed validation"
+        ) from exc
+    if validation.content_sha256 != result.publication_validation_sha256:
+        raise QualityReportError(
+            "publication validation report differs from pipeline result"
+        )
+    if (
+        not isinstance(hf_catalog, SourceDocumentCatalog)
+        or not isinstance(
+            source_catalog,
+            (SourceDocumentCatalog, CombinedSourceDocumentCatalog),
+        )
+        or source_catalog.target != result.target
+        or artifact.publication_source_catalog_sha256
+        != source_catalog.catalog_sha256
+    ):
+        raise QualityReportError(
+            "publication snapshot differs from the active frozen source catalog"
+        )
+
+    base_card = project_publication_card(project_card(artifact))
+    try:
+        initial = replay_publication_enrichment(hf_catalog, base_card)
+        assert_no_source_excerpt(initial.card, source_catalog)
+        validated = replay_publication_validation(
+            validation,
+            initial.card,
+            original_publication_fact,
+        )
+    except Exception as exc:
+        raise QualityReportError(
+            "publication enrichment or validation replay failed"
+        ) from exc
+
+    initial_paths = {item.field_path for item in initial.provenance}
+    withheld_paths = set(validation.withheld_field_paths)
+    derived_withheld = tuple(sorted(withheld_paths.intersection(initial_paths)))
+    direct_withheld = tuple(sorted(withheld_paths - initial_paths))
+    try:
+        replayed_enrichment = replay_publication_enrichment(
+            hf_catalog,
+            base_card,
+            withheld_fields=derived_withheld,
+        )
+        replayed_public_card = remove_publication_fields(
+            replayed_enrichment.card,
+            direct_withheld,
+        )
+        assert_no_source_excerpt(replayed_public_card, source_catalog)
+    except Exception as exc:
+        raise QualityReportError("final publication replay failed") from exc
+    if (
+        replayed_public_card != public_card
+        or validated.final_card != public_card
+        or artifact.publication_card != public_card
+        or artifact.publication_provenance != replayed_enrichment.provenance
+        or artifact.publication_withheld_fields != direct_withheld
+    ):
+        raise QualityReportError(
+            "final public card or deterministic provenance does not replay"
+        )
+
+    publication_schema_sha256 = _digest(PUBLICATION_SCHEMA)
+    final_coverage = tuple(item.field_path for item in final_fact.field_coverage)
+    if (
+        original_publication_fact.schema_sha256 != publication_schema_sha256
+        or final_fact.schema_sha256 != publication_schema_sha256
+        or final_fact.card_sha256 != _digest(public_card)
+        or len(final_coverage) != len(PUBLICATION_FIELD_PATHS)
+        or set(final_coverage) != set(PUBLICATION_FIELD_PATHS)
+        or any(
+            item.action is FieldAction.REPAIR_OR_WITHHOLD
+            for item in final_fact.field_decisions
+        )
+    ):
+        raise QualityReportError(
+            "final FactReasoner is not bound to the complete publication card"
+        )
+    return content_fact, original_publication_fact, validation, final_fact
+
+
+def _load_omissions(
+    run_root: Path,
+    result: PipelineResult,
+    publication_validation: PublicationValidationReport,
+) -> OmissionAudit:
     value = _read_canonical_object(run_root / "omissions.json", "omission artifact")
     try:
         audit = OmissionAudit.from_dict(value)
@@ -1068,7 +1249,11 @@ def _load_omissions(run_root: Path, result: PipelineResult) -> OmissionAudit:
         raise QualityReportError("omission audit failed typed validation") from exc
     if (
         audit.content_sha256 != result.omission_audit_sha256
-        or len(audit.source_present_omissions) != result.source_present_omission_count
+        or (
+            len(audit.source_present_omissions)
+            + len(publication_validation.source_present_omissions)
+        )
+        != result.source_present_omission_count
     ):
         raise QualityReportError("omission audit differs from pipeline result")
     return audit
@@ -1255,25 +1440,41 @@ def _schema_export_metrics(
     return {
         "schema_valid": True,
         "public_projection_safe": True,
-        "contract_version": public_card["contract_version"],
+        "contract_version": artifact.contract_version,
         "lifecycle_status": result.lifecycle_status.value,
         "artifact_binding_count": len(artifact.bindings),
         "artifact_derivation_count": len(artifact.derivations),
     }
 
 
-def _field_metrics(audit: OmissionAudit) -> dict[str, Any]:
+def _field_metrics(
+    audit: OmissionAudit,
+    publication: PublicationValidationReport,
+) -> dict[str, Any]:
     present = sum(item.status is FieldAuditStatus.PRESENT for item in audit.records)
-    omitted = len(audit.records) - present
+    publication_present = sum(
+        item.reason.value == "present" for item in publication.records
+    )
+    present += publication_present
+    total = len(audit.records) + len(publication.records)
+    omitted = total - present
     reasons = Counter(
         item.reason.value for item in audit.records if item.reason is not None
     )
+    reasons.update(
+        item.reason.value
+        for item in publication.records
+        if item.reason.value != "present"
+    )
     return {
-        "total": len(audit.records),
+        "total": total,
         "present": present,
         "omitted": omitted,
-        "abstention_ppm": _rate_ppm(omitted, len(audit.records)),
-        "source_present_omissions": len(audit.source_present_omissions),
+        "abstention_ppm": _rate_ppm(omitted, total),
+        "source_present_omissions": (
+            len(audit.source_present_omissions)
+            + len(publication.source_present_omissions)
+        ),
         "omission_reasons": _distribution(reasons),
     }
 
@@ -1452,17 +1653,35 @@ def _fact_metrics(record: FactReasonerRecord) -> dict[str, Any]:
     }
 
 
-def _omission_metrics(audit: OmissionAudit, conflict_count: int) -> dict[str, Any]:
+def _omission_metrics(
+    audit: OmissionAudit,
+    publication: PublicationValidationReport,
+    conflict_count: int,
+) -> dict[str, Any]:
     conflict_fields = [
         item for item in audit.records if item.reason is OmissionReason.CONFLICTING
     ]
     return {
-        "source_present_count": len(audit.source_present_omissions),
+        "source_present_count": (
+            len(audit.source_present_omissions)
+            + len(publication.source_present_omissions)
+        ),
         "conflict_field_count": len(conflict_fields),
         "conflict_record_count": sum(len(item.conflict_sha256s) for item in conflict_fields),
         "composition_conflict_count": conflict_count,
         "reasons": _distribution(
-            Counter(item.reason.value for item in audit.records if item.reason is not None)
+            Counter(
+                [
+                    item.reason.value
+                    for item in audit.records
+                    if item.reason is not None
+                ]
+                + [
+                    item.reason.value
+                    for item in publication.records
+                    if item.reason.value != "present"
+                ]
+            )
         ),
     }
 
@@ -1537,24 +1756,33 @@ def _surface_digests(
     artifact: CardArtifact,
     gates: Sequence[ClaimGateRecord],
     fact: FactReasonerRecord,
+    content_fact: FactReasonerRecord,
+    original_publication_fact: FactReasonerRecord,
+    publication_validation: PublicationValidationReport,
     repair: PipelineRepairReport,
     risk_surface: str,
     provider: Mapping[str, Any],
     input_surface: str,
 ) -> dict[str, str]:
+    audit_card = project_card(artifact)
     values = {
-        field_path: get_field(public_card, field_path)
+        field_path: get_field(audit_card, field_path)
         for field_path in CONTENT_FIELD_PATHS
     }
     decisions = {
         "gates": [record.content_sha256 for record in gates],
-        "factreasoner": fact.content_sha256,
+        "content_factreasoner": content_fact.content_sha256,
+        "publication_factreasoner_original": (
+            original_publication_fact.content_sha256
+        ),
+        "publication_validation": publication_validation.content_sha256,
+        "publication_factreasoner_final": fact.content_sha256,
         "repair": repair.report_sha256,
     }
     validation = {
         "pipeline": result.validation.to_dict(),
-        "lifecycle": public_card["lifecycle"],
-        "validation": public_card["validation"],
+        "lifecycle": audit_card["lifecycle"],
+        "validation": audit_card["validation"],
     }
     return {
         "inputs": input_surface,
@@ -1564,7 +1792,12 @@ def _surface_digests(
         "decisions": _digest(decisions),
         "validation": _digest(validation),
         "risk": risk_surface,
-        "omission": result.omission_audit_sha256,
+        "omission": _digest(
+            {
+                "audit": result.omission_audit_sha256,
+                "publication": publication_validation.content_sha256,
+            }
+        ),
         "privacy": result.privacy.report_sha256,
         "cost_latency": _provider_surface(provider),
     }

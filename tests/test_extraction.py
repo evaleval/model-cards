@@ -445,6 +445,33 @@ class ExtractionTests(unittest.TestCase):
         with self.assertRaisesRegex(ExtractionError, "proposal count"):
             proposals_from_provider_value(too_many)
 
+    def test_provider_scalar_recovery_matches_the_live_together_shape(self) -> None:
+        raw = {
+            "proposals": [
+                {
+                    "source_id": self.readme.source_id,
+                    "field_path": "identity.summary",
+                    "value_json": (
+                        "The exact target is an instruction-following language model."
+                    ),
+                    "quote": (
+                        "The exact target is an instruction-following language model."
+                    ),
+                    "claim_entity": f"acme/Instruct@{REVISION}",
+                    "relation": "exact_target",
+                    "benchmark_scope_json": "not applicable",
+                    "origin": "source_stated",
+                }
+            ]
+        }
+        proposal = proposals_from_provider_value(raw)[0]
+        self.assertEqual(raw["proposals"][0]["value_json"], proposal.value)
+        self.assertIsNone(proposal.benchmark_scope)
+
+        raw["proposals"][0]["field_path"] = "evaluation.benchmark_scores[0]"
+        with self.assertRaisesRegex(ExtractionError, "invalid canonical JSON"):
+            proposals_from_provider_value(raw)
+
     def test_persisted_quote_batches_enforce_provider_bounds_and_absence_rules(self) -> None:
         cases = (
             {"source_id": "s" * 129},

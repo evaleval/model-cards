@@ -131,10 +131,10 @@ class FixtureChecker:
 
 
 class FactReasonerKernelTests(unittest.TestCase):
-    def test_public_contract_paths_and_projection_use_the_canonical_schema(self) -> None:
+    def test_audit_contract_paths_and_projection_use_the_canonical_schema(self) -> None:
         artifact = synthetic_artifact()
         result = atomize_card(project_card(artifact), CONTRACT_SCHEMA, artifact.target)
-        self.assertEqual(len(result.field_coverage), 44)
+        self.assertEqual(len(result.field_coverage), 47)
         relations = {item.hypothesis.relation for item in result.atoms}
         self.assertIn(RelationToTarget.EXACT_TARGET, relations)
         self.assertIn(RelationToTarget.BASE_MODEL, relations)
@@ -197,6 +197,26 @@ class FactReasonerKernelTests(unittest.TestCase):
             {item.atom_id for item in result.atoms},
             {atom_id for item in result.field_coverage for atom_id in item.atom_ids},
         )
+
+    def test_optional_schema_fields_are_accounted_for_as_absent(self) -> None:
+        schema = contract(
+            {
+                "present": {"type": "string"},
+                "optional": {"type": "string"},
+            }
+        )
+        schema["properties"]["details"]["required"] = ["present"]
+        value = card(present="Source-backed value.")
+
+        result = atomize_card(value, schema, TARGET)
+
+        optional = next(
+            item
+            for item in result.field_coverage
+            if item.field_path == "details.optional"
+        )
+        self.assertIs(optional.status, FieldCoverageStatus.ABSENCE)
+        self.assertEqual((), optional.atom_ids)
 
     def test_wrong_target_referent_is_rejected_and_wrong_scope_is_unavailable(self) -> None:
         schema = contract({"claim": {"type": "string"}})

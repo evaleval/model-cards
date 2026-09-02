@@ -1,4 +1,10 @@
-"""Runtime access to the packaged public Model Card contract."""
+"""Runtime access to the richer private audit-card contract.
+
+The seven-section publication contract lives in :mod:`publication_schema`.
+This module remains the internal evidence-pipeline dialect so validation,
+provenance, lifecycle, risk, and experimental fields do not leak into the
+public Model Card schema.
+"""
 
 from __future__ import annotations
 
@@ -20,13 +26,13 @@ from .contract import (
 
 
 class ContractValidationError(ValueError):
-    """A value does not conform to the public Model Card contract."""
+    """A value does not conform to the local Model Card audit contract."""
 
 
 def load_contract_schema() -> dict[str, Any]:
     """Load a fresh copy of the JSON Schema shipped inside the package."""
 
-    resource = files("model_cards").joinpath("resources", "model-card.schema.json")
+    resource = files("model_cards").joinpath("resources", "audit-card.schema.json")
     value = json.loads(resource.read_text(encoding="utf-8"))
     if not isinstance(value, dict):  # pragma: no cover - guarded by package tests
         raise RuntimeError("packaged Model Card contract must be a JSON object")
@@ -95,8 +101,8 @@ def _raise_validation(error: ValidationError, *, prefix: str = "card") -> None:
     ) from error
 
 
-def validate_public_card(card: Mapping[str, Any]) -> None:
-    """Validate one complete card with the actual Draft 2020-12 contract."""
+def validate_audit_card(card: Mapping[str, Any]) -> None:
+    """Validate one complete local audit card with the Draft 2020-12 contract."""
 
     errors = sorted(
         _CARD_VALIDATOR.iter_errors(card),
@@ -124,16 +130,26 @@ def validate_public_card(card: Mapping[str, Any]) -> None:
             )
 
 
-def validate_complete_card(card: Mapping[str, Any]) -> None:
-    """Backward-compatible name for complete public contract validation."""
+def validate_public_card(card: Mapping[str, Any]) -> None:
+    """Backward-compatible alias for :func:`validate_audit_card`.
 
-    validate_public_card(card)
+    Public seven-section cards must be validated with
+    :func:`model_cards.publication_schema.validate_publication_card`.
+    """
+
+    validate_audit_card(card)
+
+
+def validate_complete_card(card: Mapping[str, Any]) -> None:
+    """Backward-compatible name for complete local audit-card validation."""
+
+    validate_audit_card(card)
 
 
 def validate_core_card(card: Mapping[str, Any]) -> None:
-    """Validate a projected card against the same public contract."""
+    """Validate a projected local card against the same audit contract."""
 
-    validate_public_card(card)
+    validate_audit_card(card)
 
 
 def validate_field_path(field_path: str) -> str:

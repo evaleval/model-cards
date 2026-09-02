@@ -54,7 +54,7 @@ from .run_state import MANIFEST_FILENAME, RunStore, USAGE_LEDGER_FILENAME
 from .source_state import ImmutableSourceState, load_source_state
 
 
-ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v7"
+ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v8"
 ORCHESTRATION_SCOPE = "immutable_source_state_catalog"
 ORCHESTRATION_MANIFEST_FILENAME = "provider-orchestration.json"
 DEFAULT_MAX_RISKS = 5

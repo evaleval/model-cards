@@ -15,7 +15,7 @@ from model_cards.claim_gate import (
     GateName,
     ProseCheckerDecision,
 )
-from model_cards.artifact import CardArtifact
+from model_cards.artifact import CardArtifact, project_card
 from model_cards.composer import CompositionResult
 from model_cards.extraction import (
     ExtractionBatch,
@@ -42,6 +42,8 @@ from model_cards.official_sources import (
     collect_official_sources,
 )
 from model_cards.policy import decide_binding
+from model_cards.publication_contract import PUBLICATION_SECTIONS
+from model_cards.publication_schema import validate_publication_card
 from model_cards.pipeline import (
     CompositionStatus,
     PipelineError,
@@ -67,6 +69,7 @@ from model_cards.source_bundle import (
     replay_source_bundle,
 )
 from model_cards.source_documents import build_source_document_catalog
+from model_cards.source_state import load_source_state
 
 
 REVISION = "a" * 40
@@ -86,6 +89,10 @@ First exact summary. Second exact summary.
 
 /Users/alice/private-model-note
 """
+OFFICIAL_PASSAGE = (
+    "This official developer document states the exact target supports careful "
+    "multilingual instruction following for production assistants."
+)
 
 
 class Adapter:
@@ -157,9 +164,7 @@ class OfficialFixtureAdapter:
             )
         return OfficialRemoteObject(
             OfficialFetchStatus.OK,
-            content=(
-                "Official exact-target developer documentation for acme/Instruct."
-            ).encode("utf-8"),
+            content=OFFICIAL_PASSAGE.encode("utf-8"),
             final_url=url,
             redirect_chain=(url,),
             media_type="text/plain",
@@ -343,17 +348,39 @@ class PipelineTests(unittest.TestCase):
             **kwargs,
         )
 
+    def public_card(self, run: Path | None = None) -> dict:
+        card = json.loads(((run or self.run) / "public-card.json").read_text())
+        validate_publication_card(card)
+        self.assertEqual(set(PUBLICATION_SECTIONS), set(card))
+        for audit_only_section in (
+            "environmental_information",
+            "use_and_risk",
+            "provenance",
+            "validation",
+            "lifecycle",
+        ):
+            self.assertNotIn(audit_only_section, card)
+        return card
+
+    def audit_card(self, run: Path | None = None) -> dict:
+        payload = json.loads(((run or self.run) / "card-artifact.json").read_text())
+        artifact = CardArtifact.from_dict(payload)
+        card = project_card(artifact)
+        self.assertEqual(payload["card"], card)
+        return card
+
     def test_fixture_e2e_is_validated_source_clean_and_idempotent(self) -> None:
         checker = SupportingFactChecker()
         first = self.run_pipeline(fact_checker=checker)
         self.assertEqual(LifecycleStatus.GENERATED_VALIDATED, first.lifecycle_status)
         self.assertTrue(first.validation.all_passed)
         self.assertEqual(CompositionStatus.COMPLETED, first.composition_status)
-        card = json.loads((self.run / "public-card.json").read_text())
+        card = self.public_card()
         self.assertEqual("acme/Instruct", card["identity"]["model_id"])
-        self.assertEqual(REVISION, card["identity"]["revision"])
-        self.assertEqual("fixture-transformer", card["model_details"]["architecture_type"])
-        self.assertEqual("generated_validated", card["lifecycle"]["status"])
+        self.assertEqual(REVISION, card["identity"]["version"])
+        self.assertNotIn("architecture_type", card["specifications"])
+        audit_card = self.audit_card()
+        self.assertEqual("generated_validated", audit_card["lifecycle"]["status"])
         serialized = json.dumps(first.to_dict(), sort_keys=True)
         self.assertNotIn("instruction-following language model", serialized)
         self.assertNotIn("/Users/", serialized)
@@ -460,6 +487,30 @@ class PipelineTests(unittest.TestCase):
             "primary_src_",
             " ".join(catalog["official_catalog"]["document_ids"]),
         )
+        artifact = CardArtifact.from_dict(
+            json.loads((combined_run / "card-artifact.json").read_text())
+        )
+        self.assertEqual(
+            state["active_catalog_sha256"],
+            artifact.publication_source_catalog_sha256,
+        )
+        publication_events = {
+            (event["stage"], event["logical_id"]): event
+            for event in (
+                json.loads(line)
+                for line in (combined_run / "journal.jsonl").read_text().splitlines()
+            )
+        }
+        for key in (
+            ("factreasoner", "publication_pre_withhold_claims"),
+            ("publication_validate", "publication_fields"),
+            ("factreasoner", "publication_final_claims"),
+            ("privacy", "public_card"),
+        ):
+            self.assertIn(
+                state["active_catalog_sha256"],
+                publication_events[key]["input_sha256s"],
+            )
 
         journal_before = (combined_run / "journal.jsonl").read_bytes()
         replayed = verify_pipeline_result(
@@ -472,6 +523,78 @@ class PipelineTests(unittest.TestCase):
         )
         self.assertEqual(result.to_dict(), replayed.to_dict())
         self.assertEqual(journal_before, (combined_run / "journal.jsonl").read_bytes())
+
+    def test_official_source_excerpt_cannot_cross_the_public_boundary(self) -> None:
+        hf_bundle = self.root / "excerpt-hf-bundle"
+        official_bundle = self.root / "excerpt-official-bundle"
+        collect_hf_source_bundle(
+            "acme/Instruct", hf_bundle, OfficialLinkedAdapter()
+        )
+        discovery = discover_official_sources(replay_source_bundle(hf_bundle))
+        collect_official_sources(
+            discovery,
+            official_bundle,
+            OfficialFixtureAdapter(),
+        )
+        source_state = load_source_state(
+            hf_bundle,
+            official_bundle_directory=official_bundle,
+        )
+        official_document = next(
+            item
+            for item in source_state.documents
+            if item.text == OFFICIAL_PASSAGE
+        )
+        proposal = QuoteProposal(
+            source_id=official_document.source_id,
+            field_path="identity.summary",
+            value=OFFICIAL_PASSAGE,
+            quote=OFFICIAL_PASSAGE,
+            claim_entity=f"acme/Instruct@{REVISION}",
+            relation=RelationToTarget.EXACT_TARGET,
+        )
+        batch = ExtractionBatch.build(
+            target=source_state.target,
+            source_catalog_sha256=source_state.active_catalog_sha256,
+            provider="Together",
+            inference_config_sha256="b" * 64,
+            proposals=(proposal,),
+        )
+        candidate = materialize_quote_batch(batch, source_state.catalog).candidates[0]
+        decisions = tuple(
+            ProseCheckerDecision.for_candidate(
+                candidate,
+                gate=gate,
+                checker="tests/prose_checker",
+                method=method,
+                status=DecisionStatus.ACCEPTED,
+                reason=reason,
+            )
+            for gate, method, reason in (
+                (
+                    GateName.FIELD_FIT,
+                    "bounded_semantic_field_review",
+                    "fixture_field_fit",
+                ),
+                (
+                    GateName.VALUE_SUPPORT,
+                    "bounded_complete_value_review",
+                    "fixture_value_support",
+                ),
+            )
+        )
+        with self.assertRaisesRegex(
+            PipelineError, "prohibited frozen-source excerpt"
+        ):
+            run_offline_pipeline(
+                hf_bundle,
+                self.root / "excerpt-run",
+                official_bundle_directory=official_bundle,
+                quote_batches=(batch,),
+                prose_checker_decisions=decisions,
+                fact_checker=SupportingFactChecker(),
+                risk_catalog=RISK_CATALOG,
+            )
 
     def test_quote_claim_requires_supplied_checker_decisions(self) -> None:
         summary = "The exact target is an instruction-following language model."
@@ -486,8 +609,11 @@ class PipelineTests(unittest.TestCase):
             fact_checker=SupportingFactChecker(),
             risk_catalog=RISK_CATALOG,
         )
-        without_card = json.loads((without_run / "public-card.json").read_text())
-        self.assertEqual("Not specified", without_card["identity"]["summary"])
+        without_card = self.public_card(without_run)
+        self.assertNotIn("summary", without_card["identity"])
+        self.assertEqual(
+            "Not specified", self.audit_card(without_run)["identity"]["summary"]
+        )
         ref = next(item for item in without.claims if item.candidate_id == candidate.candidate_id)
         self.assertFalse(ref.projection_eligible)
         self.assertFalse(ref.included)
@@ -497,7 +623,7 @@ class PipelineTests(unittest.TestCase):
             prose_checker_decisions=decisions,
             fact_checker=SupportingFactChecker(),
         )
-        with_card = json.loads((self.run / "public-card.json").read_text())
+        with_card = self.public_card()
         self.assertEqual(summary, with_card["identity"]["summary"])
         ref = next(
             item for item in with_result.claims if item.candidate_id == candidate.candidate_id
@@ -521,8 +647,11 @@ class PipelineTests(unittest.TestCase):
             prose_checker_decisions=(*first[2], *second[2]),
             fact_checker=SupportingFactChecker(),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
-        self.assertEqual("Not specified", card["identity"]["summary"])
+        card = self.public_card()
+        self.assertNotIn("summary", card["identity"])
+        self.assertEqual(
+            "Not specified", self.audit_card()["identity"]["summary"]
+        )
         self.assertEqual(1, result.conflict_count)
         self.assertFalse(result.validation.conflicts_clear)
         self.assertEqual(LifecycleStatus.GENERATED_UNREVIEWED, result.lifecycle_status)
@@ -548,12 +677,15 @@ class PipelineTests(unittest.TestCase):
             risk_detector=FixtureRiskDetector(),
             risk_checker=FixtureRiskChecker(),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
-        risks = card["use_and_risk"]["identified_risks"]
+        card = self.public_card()
+        self.assertNotIn("use_and_risk", card)
+        local_artifact = json.loads((self.run / "card-artifact.json").read_text())
+        audit_card = self.audit_card()
+        risks = audit_card["use_and_risk"]["identified_risks"]
         self.assertEqual(1, len(risks))
         self.assertEqual("taxonomy_identified", risks[0]["identification_origin"])
         self.assertNotEqual("publisher_reported", risks[0]["identification_origin"])
-        derivation = card["provenance"]["derivations"][
+        derivation = audit_card["provenance"]["derivations"][
             "use_and_risk.identified_risks[0]"
         ][0]
         self.assertEqual("taxonomy-risk-derivation/v1", derivation["derivation_version"])
@@ -573,7 +705,6 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(
             risks[0]["source_refs"], derivation["supporting_source_refs"]
         )
-        local_artifact = json.loads((self.run / "card-artifact.json").read_text())
         self.assertEqual(1, len(local_artifact["derivations"]))
         self.assertEqual(
             derivation["applicability_decision_sha256"],
@@ -634,10 +765,14 @@ class PipelineTests(unittest.TestCase):
             prose_checker_decisions=decisions,
             fact_checker=SupportingFactChecker(),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
-        self.assertEqual("Not specified", card["use_and_risk"]["identified_risks"])
+        card = self.public_card()
+        self.assertNotIn("use_and_risk", card)
         self.assertEqual("unavailable", result.risk.status)
-        self.assertNotIn("derivations", card["provenance"])
+        audit_card = self.audit_card()
+        self.assertEqual(
+            "Not specified", audit_card["use_and_risk"]["identified_risks"]
+        )
+        self.assertNotIn("derivations", audit_card["provenance"])
         self.assertEqual(LifecycleStatus.GENERATED_UNREVIEWED, result.lifecycle_status)
 
     def test_withheld_taxonomy_candidate_never_projects_or_derives(self) -> None:
@@ -656,9 +791,13 @@ class PipelineTests(unittest.TestCase):
             risk_detector=FixtureRiskDetector(),
             risk_checker=WithholdingRiskChecker(),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
-        self.assertEqual("Not specified", card["use_and_risk"]["identified_risks"])
-        self.assertNotIn("derivations", card["provenance"])
+        card = self.public_card()
+        self.assertNotIn("use_and_risk", card)
+        audit_card = self.audit_card()
+        self.assertEqual(
+            "Not specified", audit_card["use_and_risk"]["identified_risks"]
+        )
+        self.assertNotIn("derivations", audit_card["provenance"])
         self.assertEqual(1, result.risk.taxonomy_candidate_count)
         self.assertEqual(0, result.risk.taxonomy_included_count)
         self.assertFalse(result.validation.risk_passed)
@@ -685,12 +824,15 @@ class PipelineTests(unittest.TestCase):
             risk_checker=FixtureRiskChecker(),
         )
 
-        card = json.loads((self.run / "public-card.json").read_text())
-        self.assertEqual("Not specified", card["identity"]["summary"])
+        card = self.public_card()
+        self.assertNotIn("summary", card["identity"])
+        self.assertNotIn("use_and_risk", card)
+        audit_card = self.audit_card()
+        self.assertEqual("Not specified", audit_card["identity"]["summary"])
         self.assertNotEqual(
-            "Not specified", card["use_and_risk"]["intended_uses"]
+            "Not specified", audit_card["use_and_risk"]["intended_uses"]
         )
-        self.assertEqual(1, len(card["use_and_risk"]["identified_risks"]))
+        self.assertEqual(1, len(audit_card["use_and_risk"]["identified_risks"]))
         references = {item.candidate_id: item for item in result.claims}
         self.assertFalse(references[summary_input[1].candidate_id].included)
         self.assertTrue(references[intended_input[1].candidate_id].included)
@@ -743,8 +885,9 @@ class PipelineTests(unittest.TestCase):
             prose_checker_decisions=decisions,
             fact_checker=SelectiveFactChecker("identity.summary", CheckOutcome.NEUTRAL),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
-        self.assertEqual("Not specified", card["identity"]["summary"])
+        card = self.public_card()
+        self.assertNotIn("summary", card["identity"])
+        self.assertEqual("Not specified", self.audit_card()["identity"]["summary"])
         self.assertFalse(
             next(item for item in result.claims if item.candidate_id == candidate.candidate_id).included
         )
@@ -775,7 +918,7 @@ class PipelineTests(unittest.TestCase):
                 "identity.summary", CheckOutcome.UNAVAILABLE
             ),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
+        card = self.public_card()
         self.assertEqual(summary, card["identity"]["summary"])
         self.assertTrue(
             next(item for item in result.claims if item.candidate_id == candidate.candidate_id).included
@@ -800,7 +943,9 @@ class PipelineTests(unittest.TestCase):
             for line in (self.run / "journal.jsonl").read_text().splitlines()
             if json.loads(line)["stage"] == "factreasoner"
         ]
-        self.assertEqual(2, len(fact_events))
+        # Original/final audit-card checks plus pre-/post-withholding checks of
+        # the exact 33-field publication card.
+        self.assertEqual(4, len(fact_events))
         self.assertTrue(all(item["status"] == "completed" for item in fact_events))
 
     def test_all_unavailable_fact_checks_mark_both_stages_unavailable(self) -> None:
@@ -820,7 +965,7 @@ class PipelineTests(unittest.TestCase):
             for line in (self.run / "journal.jsonl").read_text().splitlines()
             if json.loads(line)["stage"] == "factreasoner"
         ]
-        self.assertEqual(2, len(fact_events))
+        self.assertEqual(4, len(fact_events))
         self.assertTrue(all(item["status"] == "unavailable" for item in fact_events))
         self.assertTrue(
             all(item["reason"] == "fact_checks_unavailable" for item in fact_events)
@@ -931,9 +1076,15 @@ class PipelineTests(unittest.TestCase):
             risk_checker=FixtureRiskChecker(),
         )
         card_path = self.run / "public-card.json"
-        card = json.loads(card_path.read_text())
-        self.assertEqual("Not specified", card["use_and_risk"]["intended_uses"])
-        self.assertEqual("Not specified", card["use_and_risk"]["identified_risks"])
+        card = self.public_card()
+        self.assertNotIn("use_and_risk", card)
+        audit_card = self.audit_card()
+        self.assertEqual(
+            "Not specified", audit_card["use_and_risk"]["intended_uses"]
+        )
+        self.assertEqual(
+            "Not specified", audit_card["use_and_risk"]["identified_risks"]
+        )
         self.assertEqual(0, detector.calls)
         self.assertEqual((), result.risk.publisher_context_candidate_ids)
         self.assertEqual(0, result.risk.taxonomy_candidate_count)
@@ -975,9 +1126,13 @@ class PipelineTests(unittest.TestCase):
             risk_detector=FixtureRiskDetector(),
             risk_checker=FixtureRiskChecker(),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
-        self.assertEqual("Not specified", card["use_and_risk"]["identified_risks"])
-        self.assertNotIn("derivations", card["provenance"])
+        card = self.public_card()
+        self.assertNotIn("use_and_risk", card)
+        audit_card = self.audit_card()
+        self.assertEqual(
+            "Not specified", audit_card["use_and_risk"]["identified_risks"]
+        )
+        self.assertNotIn("derivations", audit_card["provenance"])
         repairs = PipelineRepairReport.from_dict(
             json.loads((self.run / "repairs.json").read_text())
         )
@@ -1004,9 +1159,10 @@ class PipelineTests(unittest.TestCase):
             prose_checker_decisions=decisions,
             fact_checker=SupportingFactChecker(),
         )
-        card = json.loads((self.run / "public-card.json").read_text())
+        card = self.public_card()
         self.assertNotIn("/Users/", json.dumps(card))
-        self.assertEqual("Not specified", card["identity"]["summary"])
+        self.assertNotIn("summary", card["identity"])
+        self.assertEqual("Not specified", self.audit_card()["identity"]["summary"])
         self.assertEqual((candidate.candidate_id,), result.privacy.withheld_candidate_ids)
         self.assertFalse(result.validation.privacy_passed)
         self.assertEqual(LifecycleStatus.GENERATED_UNREVIEWED, result.lifecycle_status)
@@ -1025,9 +1181,12 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual((), result.claims)
         self.assertEqual(LifecycleStatus.GENERATED_UNREVIEWED, result.lifecycle_status)
         self.assertFalse(result.validation.claim_support_passed)
-        card = json.loads((sparse_run / "public-card.json").read_text())
+        card = self.public_card(sparse_run)
         self.assertEqual("acme/Instruct", card["identity"]["model_id"])
-        self.assertEqual("Not specified", card["identity"]["summary"])
+        self.assertNotIn("summary", card["identity"])
+        self.assertEqual(
+            "Not specified", self.audit_card(sparse_run)["identity"]["summary"]
+        )
         fact = json.loads((sparse_run / "factreasoner.json").read_text())
         self.assertTrue(fact["atoms"])
         self.assertTrue(

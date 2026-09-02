@@ -32,14 +32,17 @@ BINDABLE_SECTIONS: dict[str, tuple[str, ...]] = {
         "num_parameters",
         "context_length",
         "precision",
+        "model_size",
         "modalities",
         "model_stage",
         "access_type",
         "downloads",
+        "likes",
         "model_card",
         "system_card",
         "technical_report",
         "code_repository",
+        "citation",
     ),
     "training": ("training_data", "training_data_size", "data_cutoff", "adaptations"),
     "evaluation": (
@@ -189,16 +192,19 @@ def build_contract_schema() -> dict[str, Any]:
             "num_parameters": _text(),
             "context_length": _text(),
             "precision": _text(),
+            "model_size": _text(),
             "modalities": _absence_or(
                 {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": True}
             ),
             "model_stage": _text(),
             "access_type": _text(),
             "downloads": _text(),
+            "likes": _text(),
             "model_card": _text(),
             "system_card": _text(),
             "technical_report": _text(),
             "code_repository": _text(),
+            "citation": _text(),
         },
     )
     training = _section(
@@ -735,9 +741,12 @@ def build_contract_schema() -> dict[str, Any]:
     )
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://raw.githubusercontent.com/evaleval/model-cards/main/schema/model-card.schema.json",
-        "title": "Model Card contract",
-        "description": "Neutral public contract for evidence-bound generated Model Card candidates.",
+        "$id": "urn:evaleval:model-cards:local-audit-card:v1",
+        "title": "Local Model Card audit contract",
+        "description": (
+            "Private evidence-pipeline contract for generated Model Card audit artifacts; "
+            "this is not the seven-section publication schema."
+        ),
         "$comment": (
             "Source bodies, evidence text, prompts, provider traces, review history, and local paths "
             "remain outside the public card. Application validators enforce cross-reference and privacy rules."

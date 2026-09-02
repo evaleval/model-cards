@@ -22,7 +22,7 @@ from model_cards.official_sources import OfficialFetchStatus, OfficialRemoteObje
 from model_cards.pipeline import PipelineResult
 from model_cards.provider import ProviderTerminalAttemptError, RetryExhaustedError
 from model_cards.quality_report import load_quality_report
-from model_cards.schema import validate_public_card
+from model_cards.publication_schema import validate_publication_card
 from model_cards.source_bundle import (
     FetchStatus,
     RemoteObject,
@@ -204,7 +204,9 @@ class E2ECommandLineTests(unittest.TestCase):
         usage = json.loads((output / "usage-summary.json").read_text())
         self.assertEqual(0, usage["metrics"]["paid_calls"])
         self.assertEqual("0", usage["metrics"]["committed_usd"])
-        validate_public_card(json.loads((output / "public-card.json").read_text()))
+        validate_publication_card(
+            json.loads((output / "public-card.json").read_text())
+        )
         expected = PipelineResult.from_dict(
             json.loads((output / "pipeline-result.json").read_text())
         )

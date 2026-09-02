@@ -26,7 +26,7 @@ class SchemaTests(unittest.TestCase):
         return card
 
     def test_contract_paths_are_derived_and_defaults_are_honest(self) -> None:
-        self.assertEqual(len(FIELD_PATHS), 44)
+        self.assertEqual(len(FIELD_PATHS), 47)
         self.assertIn("environmental_information.carbon_emissions", FIELD_PATHS)
         self.assertIn("use_and_risk.identified_risks", FIELD_PATHS)
         card = self._minimal_card()

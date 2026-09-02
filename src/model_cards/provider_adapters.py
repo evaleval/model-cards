@@ -60,7 +60,7 @@ from .run_ledger import json_sha256
 from .schema import CONTENT_FIELD_PATHS, CONTRACT_SCHEMA, LIST_FIELDS
 
 
-ADAPTER_VERSION = "model-card-openrouter-adapters/v13"
+ADAPTER_VERSION = "model-card-openrouter-adapters/v14"
 CLAIM_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 FACT_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 MAX_EXTRACTION_OUTPUT_TOKENS = 8192
@@ -308,9 +308,15 @@ class OpenRouterQuoteExtractor:
                 ],
                 "maximum_proposals": MAX_PROVIDER_PROPOSALS,
                 "proposal_selection": (
-                    "Return only the highest-value nonredundant facts, up to the "
-                    "maximum. Prefer exact-target identity, model details, training, "
-                    "evaluation, intended uses, limitations, risks, and mitigations."
+                    "Scan every supplied window before selecting proposals. If the "
+                    "source explicitly states an intended use or out-of-scope use, "
+                    "reserve at least one proposal slot for that use context. If it "
+                    "explicitly states a limitation, risk, or mitigation, reserve at "
+                    "least one additional proposal slot for that material. Fill the "
+                    "remaining slots with the highest-value nonredundant exact-target "
+                    "identity, model-detail, training, and evaluation facts, up to the "
+                    "maximum. Never invent a required category when the source does "
+                    "not state it."
                 ),
                 "publisher_reported_risk": {
                     "field_path": PUBLISHER_RISK_FIELD + "[INDEX]",
@@ -341,7 +347,9 @@ class OpenRouterQuoteExtractor:
             json_schema=response["schema"],
             system_prompt=(
                 "Extract only verbatim, fully supported Model Card evidence from the "
-                "provided frozen public-source windows. Return the strict JSON object."
+                "provided frozen public-source windows. Inspect all windows and obey "
+                "the category-reservation rule before filling remaining proposal "
+                "slots. Return the strict JSON object."
             ),
             user_prompt=_canonical(payload),
             max_output_tokens=MAX_EXTRACTION_OUTPUT_TOKENS,

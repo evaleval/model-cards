@@ -1,15 +1,40 @@
 # Model Cards
 
-`modelcards` generates one evidence-bound JSON Model Card for one exact Hugging
-Face model revision. It freezes bounded source inputs, extracts only replayable
-claims, composes from claims that pass field-scoped gates, runs post-composition
-checks, and writes a source-clean public card plus an auditable run record.
+`modelcards` generates one evidence-bound Model Card for one exact Hugging Face
+model revision. It freezes bounded source inputs, extracts only replayable claims,
+composes from claims that pass field-scoped gates, and retains the evidence and
+checks in a local audit record. The public result is the agreed seven-section card
+as JSON; repository publication also creates a deterministic Markdown companion
+from that exact JSON.
 
-The package is deliberately conservative. Unsupported fields remain
-`Not specified`; evidence about a base model, sibling checkpoint, family, or
-comparison model cannot silently populate an exact-target field. Automated output
-uses only `generated_unreviewed` or `generated_validated`. Neither status means that
-a person reviewed, approved, or released the card.
+The public contract is deliberately closed. It has exactly these 33 allowed fields:
+
+| Section | Fields |
+| --- | --- |
+| `identity` | `model_id`, `name`, `developed_by`, `model_type`, `license`, `release_date`, `version`, `summary` |
+| `lineage` | `base_models`, `model_family`, `derivatives` |
+| `specifications` | `architecture_type`, `num_parameters`, `context_length`, `precision`, `model_size`, `input_output` |
+| `training_context` | `training_data`, `training_data_size`, `data_cutoff`, `adaptations` |
+| `access_and_adoption` | `access_type`, `downloads`, `likes` |
+| `evaluation` | `results_summary`, `benchmark_scores`, `human_evals`, `safety_evals` |
+| `links` | `model_card`, `system_card`, `tech_report`, `code_repository`, `citation` |
+
+All seven section objects are present. Generated projections omit an agreed field
+when the retained sources do not support a value; they do not invent one. Evidence,
+provenance, risk, environmental information, validation results, lifecycle state,
+and other operational metadata remain in local audit artifacts and are never public
+card fields.
+
+Public prose is concise derived content, not an evidence-quotation channel. The
+frozen-source enrichment stage rejects a candidate if any guarded prose field copies
+12 consecutive normalized words from a retained source. Exact source spans remain
+only in the ignored local run artifacts; links, identifiers, citations, and structured
+score rows retain their publication-specific forms.
+
+Evidence about a base model, sibling checkpoint, family, or comparison model cannot
+silently populate an exact-target field. Local automated lifecycle state uses only
+`generated_unreviewed` or `generated_validated`; neither means that a person reviewed,
+approved, or released the card, and neither value appears in the public card.
 
 ![Model Card generation pipeline](assets/model-card-pipeline.png)
 
@@ -117,10 +142,12 @@ files are:
 | `official-source-bundle/manifest.json` | Ancestry-bound official collection inventory, when used |
 | `source-state.json`, `source-catalog.json` | Immutable combined source identity and extractable document catalog |
 | `extraction.json`, `claim-gates.json` | Candidate claims and the four-part support gate |
-| `composition-original.json`, `factreasoner-original.json`, `omissions-original.json` | Pre-repair projection and audits |
-| `repairs.json`, `composition.json` | Field-targeted repair/withholding record and post-repair projection |
-| `risk-mapping.json`, `factreasoner.json`, `omissions.json`, `privacy.json` | Final risk, factuality, omission, and privacy checks |
-| `card-artifact.json`, `public-card.json` | Full typed artifact and source-clean public projection |
+| `composition-original.json`, `factreasoner-original.json`, `omissions-original.json` | Pre-repair audit projection and checks |
+| `repairs.json`, `composition.json`, `factreasoner-content.json`, `omissions.json` | Field-targeted repair/withholding and post-repair audit-content checks |
+| `risk-mapping.json` | Local publisher-use and taxonomy-risk audit; never a public-card section |
+| `factreasoner-publication-original.json`, `publication-validation.json` | Enriched 33-field pre-withhold check and deletion-only public-field decisions |
+| `factreasoner.json`, `privacy.json` | Final public-card FactReasoner record and privacy scan |
+| `card-artifact.json`, `public-card.json` | Full typed local audit artifact and exact seven-section public projection |
 | `pipeline-result.json`, `run-manifest.json`, `journal.jsonl` | Run identity, artifact hashes, and append-only stage history |
 | `audit-view.json`, `usage-summary.json` | Body-free audit and cost/latency summaries |
 
@@ -135,11 +162,22 @@ content.
 modelcards validate RUN_DIR/public-card.json
 modelcards inspect RUN_DIR/card-artifact.json
 modelcards inspect RUN_DIR/card-artifact.json --field training.training_data
+modelcards export RUN_DIR/card-artifact.json \
+  --source-bundle FROZEN/source-bundle \
+  --output exported-card.json
 ```
 
-Generation performs targeted repair and withholding before export and records the
-result in `repairs.json`. The `repair` command validates and summarizes one extracted
-machine `FieldRepairRecord`; it does not turn that record into human review:
+`export` does not reconstruct a card from the legacy audit projection. It requires
+the pipeline's publication snapshot and replays it against the supplied frozen
+bundle; add `--official-bundle` when the artifact binds combined official sources.
+
+Generation first performs targeted repair and withholding on audit-contract fields
+and records the result in `repairs.json`. After frozen-source publication enrichment,
+`publication-validation.json` separately records deletion-only withholding of any
+public field that receives a terminal FactReasoner repair/withhold action. Neither
+stage silently rewrites a failed value. The `repair` command validates and summarizes
+one extracted machine `FieldRepairRecord`; it does not turn that record into human
+review:
 
 ```sh
 modelcards repair FIELD_REPAIR_RECORD.json
@@ -181,31 +219,64 @@ modelcards batch targets.json --output BATCH_A \
 
 The quality report verifies each typed artifact before aggregating claim outcomes,
 withholding, omissions, risk-stage status, usage, cost/latency, and paired replay
-stability. It contains hashes and closed counters, not source bodies or provider
-payloads. These are engineering validation measures, not human quality judgments or
-evidence that this generator is better than another system.
+stability. It also replays the frozen-source publication enrichment and provenance,
+replays deletion-only publication validation, and verifies that the final
+FactReasoner record accounts for all 33 public fields. It contains hashes and closed
+counters, not source bodies or provider payloads. These are engineering validation
+measures, not human quality judgments or evidence that this generator is better than
+another system.
 
-## Example cards
+## Published cards
 
-The repository contains three real public projections produced by the current
-pipeline from exact-revision canary bundles. All three passed schema, claim-support,
-conflict, omission, risk-stage, and privacy checks. Their FactReasoner gates were
-unavailable, so they correctly remain `generated_unreviewed` and intentionally sparse.
+The repository publication path writes each card into `cards/` as a pair:
 
-| Card | Exact revision | Lifecycle |
+- `NAME.json` is the canonical seven-section public card.
+- `NAME.md` is a deterministic, human-readable rendering of that JSON. It links to
+  the paired JSON and records the SHA-256 of its exact bytes.
+
+The checked-in cohort contains twelve source-backed cards:
+
+| Family | Base / pretrained | Instruction / post-trained |
 | --- | --- | --- |
-| [OLMo-2-1124-7B](cards/olmo-2-1124-7b.json) | `7df9a82518afdecae4e8c026b27adccc8c1f0032` | `generated_unreviewed` |
-| [OLMo-2-1124-7B-Instruct](cards/olmo-2-1124-7b-instruct.json) | `470b1fba1ae01581f270116362ee4aa1b97f4c84` | `generated_unreviewed` |
-| [Mistral-7B-v0.3](cards/mistral-7b-v0.3.json) | `caa1feb0e54d415e2df31207e5f4e273e33509b1` | `generated_unreviewed` |
+| OLMo 2 | [OLMo-2-1124-7B](cards/olmo-2-1124-7b.md) | [OLMo-2-1124-7B-Instruct](cards/olmo-2-1124-7b-instruct.md) |
+| Gemma 3 | [gemma-3-4b-pt](cards/gemma-3-4b-pt.md) | [gemma-3-4b-it](cards/gemma-3-4b-it.md) |
+| Mistral | [Mistral-7B-v0.3](cards/mistral-7b-v0.3.md) | [Mistral-7B-Instruct-v0.3](cards/mistral-7b-instruct-v0.3.md) |
+| DeepSeek V3 | [DeepSeek-V3-Base](cards/deepseek-v3-base.md) | [DeepSeek-V3](cards/deepseek-v3.md) |
+| Qwen 3 | [Qwen3-8B-Base](cards/qwen3-8b-base.md) | [Qwen3-8B](cards/qwen3-8b.md) |
+| Llama 3.1 | [Llama-3.1-8B](cards/llama-3.1-8b.md) | [Llama-3.1-8B-Instruct](cards/llama-3.1-8b-instruct.md) |
 
-The examples are published mechanically, without factual hand edits. The publishing
-script validates the packaged schema and privacy boundary, then copies each generated
-card byte-for-byte:
+The regenerated cohort populates 287 of 396 possible fields: 19–28 of 33 per card,
+23.92 on average, with 80 structured benchmark-score rows. The publishing command's
+default substantive-card floor is 15 populated fields; honest source-limited
+missingness is still omitted rather than filled with placeholders.
+
+The Markdown is not a second factual source and is not hand-edited. The publishing
+script requires each pipeline card's integrity-checked `card-artifact.json` sibling
+and its frozen source bundle. It replays the publication snapshot, checks it against
+all active source text, validates the JSON against the packaged public schema and
+privacy boundary, copies its bytes, derives the Markdown only from the validated
+card, and audits the pair before writing either destination. Repeat
+`--source-bundle` in the same order as the mappings:
 
 ```sh
 PYTHONPATH=src python3 scripts/publish_examples.py --force \
-  GENERATED_A/public-card.json=cards/example-a.json \
-  GENERATED_B/public-card.json=cards/example-b.json
+  --source-bundle FROZEN_A/source-bundle \
+  --source-bundle FROZEN_B/source-bundle \
+  RUN_A/public-card.json=cards/model-a.json \
+  RUN_B/public-card.json=cards/model-b.json
+```
+
+The complete checked-in cohort can be regenerated without network or provider calls
+from verified frozen bundles. This command runs the pipeline, immediately verifies
+each replay, enforces a substantive-card coverage floor, and publishes the full batch
+only after every JSON/Markdown pair passes:
+
+```sh
+PYTHONPATH=src python3 scripts/regenerate_frozen_examples.py \
+  --pilot-root FROZEN_TARGETS \
+  --run-output PRIVATE_RUN \
+  --repo-root . \
+  --force
 ```
 
 ## Scope and current limitations
@@ -220,9 +291,10 @@ PYTHONPATH=src python3 scripts/publish_examples.py --force \
 - The example cards are automated candidates. This repository reports no human study,
   human annotation result, released card, independent-model comparison result, or
   demonstrated quality improvement over another generator.
-- Empty or `Not specified` risk fields mean that no eligible entry was produced from
-  the retained source state and available checks. They do not establish absence of
-  risk.
+- Risk mappings, environmental claims, evidence/provenance, validation results, and
+  lifecycle state are local audit material. Their absence from the public schema is
+  a publication-boundary decision, not evidence that a model has no risks or
+  environmental effects.
 
 The [JSON Schema](schema/model-card.schema.json) is the public contract. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for the typed stages, replay invariants, provider

@@ -84,18 +84,33 @@ class PublicTreeTests(unittest.TestCase):
         )
         self.assertEqual(allowed.returncode, 1)
 
-    def test_cards_directory_contains_only_canonical_json_examples(self):
+    def test_cards_directory_contains_only_canonical_json_markdown_pairs(self):
         cards = self.ROOT / "cards"
+        json_paths = {path.stem for path in cards.iterdir() if path.suffix == ".json"}
+        markdown_paths = {path.stem for path in cards.iterdir() if path.suffix == ".md"}
         self.assertEqual(
-            {path.name for path in cards.iterdir()},
+            json_paths,
             {
-                "mistral-7b-v0.3.json",
-                "olmo-2-1124-7b.json",
-                "olmo-2-1124-7b-instruct.json",
+                "deepseek-v3",
+                "deepseek-v3-base",
+                "gemma-3-4b-it",
+                "gemma-3-4b-pt",
+                "llama-3.1-8b",
+                "llama-3.1-8b-instruct",
+                "mistral-7b-instruct-v0.3",
+                "mistral-7b-v0.3",
+                "olmo-2-1124-7b",
+                "olmo-2-1124-7b-instruct",
+                "qwen3-8b",
+                "qwen3-8b-base",
             },
         )
+        self.assertEqual(json_paths, markdown_paths)
         self.assertTrue(
-            all(path.is_file() and path.suffix == ".json" for path in cards.iterdir())
+            all(
+                path.is_file() and path.suffix in {".json", ".md"}
+                for path in cards.iterdir()
+            )
         )
 
 

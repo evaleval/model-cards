@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from copy import deepcopy
+from dataclasses import dataclass, field, replace
 import hashlib
 import json
+import re
 from typing import Any
 
 from .bindings import binding_id_for
@@ -21,6 +23,7 @@ from .models import (
     ValidationCheckStatus,
 )
 from .policy import decide_binding
+from .publication_sources import PublicationFieldProvenance, SourcePointer
 from .schema import (
     CONTENT_FIELD_PATHS,
     CONTRACT_VERSION,
@@ -33,6 +36,9 @@ from .schema import (
     set_field,
     validate_public_card,
 )
+
+
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _canonical(value: Any) -> str:
@@ -114,12 +120,36 @@ class CardArtifact:
     validated_at: str = NOT_SPECIFIED
     contract_version: str = CONTRACT_VERSION
     derivations: tuple[TaxonomyRiskDerivation, ...] = ()
+    publication_card: dict[str, Any] | None = field(default=None, repr=False)
+    publication_provenance: tuple[PublicationFieldProvenance, ...] = ()
+    publication_withheld_fields: tuple[str, ...] = ()
+    publication_source_catalog_sha256: str | None = None
+    _publication_integrity_sha256: str = field(
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "bindings", tuple(self.bindings))
         object.__setattr__(self, "reviews", tuple(self.reviews))
         object.__setattr__(self, "validation_checks", tuple(self.validation_checks))
         object.__setattr__(self, "derivations", tuple(self.derivations))
+        object.__setattr__(
+            self,
+            "publication_card",
+            None if self.publication_card is None else deepcopy(self.publication_card),
+        )
+        object.__setattr__(
+            self,
+            "publication_provenance",
+            tuple(self.publication_provenance),
+        )
+        object.__setattr__(
+            self,
+            "publication_withheld_fields",
+            tuple(self.publication_withheld_fields),
+        )
         try:
             object.__setattr__(self, "lifecycle_status", LifecycleStatus(self.lifecycle_status))
         except (TypeError, ValueError) as exc:
@@ -276,6 +306,14 @@ class CardArtifact:
 
         # Validate timestamps/status through the exact public schema immediately.
         project_card(self, _skip_integrity=True)
+        _validate_publication_snapshot(self)
+        object.__setattr__(
+            self,
+            "_publication_integrity_sha256",
+            hashlib.sha256(
+                _canonical(_publication_snapshot_payload(self)).encode("utf-8")
+            ).hexdigest(),
+        )
 
     @property
     def artifact_id(self) -> str:
@@ -292,6 +330,8 @@ class CardArtifact:
             "validation_checks": [item.to_dict() for item in self.validation_checks],
             "derivations": [item.to_dict() for item in self.derivations],
         }
+        if self.publication_card is not None:
+            payload["publication"] = _publication_snapshot_payload(self)
         return "card_" + hashlib.sha256(_canonical(payload).encode("utf-8")).hexdigest()[:24]
 
     def binding(self, binding_id: str) -> Binding:
@@ -352,9 +392,15 @@ class CardArtifact:
             derivation.validate_integrity()
             if derivation.target != self.target:
                 raise ValueError("artifact derivation target integrity failed")
+        _validate_publication_snapshot(self)
+        current_publication_sha256 = hashlib.sha256(
+            _canonical(_publication_snapshot_payload(self)).encode("utf-8")
+        ).hexdigest()
+        if current_publication_sha256 != self._publication_integrity_sha256:
+            raise ValueError("artifact publication snapshot integrity failed")
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "artifact_id": self.artifact_id,
             "contract_version": self.contract_version,
             "target": self.target.to_dict(),
@@ -369,10 +415,23 @@ class CardArtifact:
             "validation_checks": [item.to_dict() for item in self.validation_checks],
             "derivations": [item.to_dict() for item in self.derivations],
         }
+        if self.publication_card is not None:
+            payload["publication"] = _publication_snapshot_payload(self)
+        return payload
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "CardArtifact":
         lifecycle = value["lifecycle"]
+        publication = value.get("publication")
+        if publication is not None and not isinstance(publication, dict):
+            raise ValueError("serialized publication snapshot must be an object")
+        if publication is not None and set(publication) != {
+            "card",
+            "provenance",
+            "source_catalog_sha256",
+            "withheld_fields",
+        }:
+            raise ValueError("serialized publication snapshot has invalid keys")
         artifact = cls(
             contract_version=value["contract_version"],
             target=TargetIdentity.from_dict(value["target"]),
@@ -388,6 +447,27 @@ class CardArtifact:
             lifecycle_status=lifecycle["status"],
             generated_at=lifecycle["generated_at"],
             validated_at=lifecycle["validated_at"],
+            publication_card=(
+                None if publication is None else publication.get("card")
+            ),
+            publication_provenance=(
+                ()
+                if publication is None
+                else tuple(
+                    _publication_provenance_from_dict(item)
+                    for item in publication.get("provenance", [])
+                )
+            ),
+            publication_withheld_fields=(
+                ()
+                if publication is None
+                else tuple(publication.get("withheld_fields", []))
+            ),
+            publication_source_catalog_sha256=(
+                None
+                if publication is None
+                else publication.get("source_catalog_sha256")
+            ),
         )
         if value.get("artifact_id") != artifact.artifact_id:
             raise ValueError("serialized artifact_id does not match artifact content")
@@ -396,6 +476,125 @@ class CardArtifact:
             if value["card"] != project_card(artifact):
                 raise ValueError("serialized card does not match its binding projection")
         return artifact
+
+
+def _publication_provenance_from_dict(value: Any) -> PublicationFieldProvenance:
+    if not isinstance(value, dict) or set(value) != {
+        "field_path",
+        "rule_name",
+        "sources",
+    }:
+        raise ValueError("serialized publication provenance is malformed")
+    sources = value["sources"]
+    if not isinstance(sources, list):
+        raise ValueError("serialized publication provenance sources are malformed")
+    parsed_sources = []
+    for source in sources:
+        if not isinstance(source, dict) or set(source) != {"source_id", "pointer"}:
+            raise ValueError("serialized publication source pointer is malformed")
+        parsed_sources.append(
+            SourcePointer(source_id=source["source_id"], pointer=source["pointer"])
+        )
+    return PublicationFieldProvenance(
+        field_path=value["field_path"],
+        rule_name=value["rule_name"],
+        sources=tuple(parsed_sources),
+    )
+
+
+def _publication_snapshot_payload(artifact: CardArtifact) -> dict[str, Any]:
+    return {
+        "card": (
+            None
+            if artifact.publication_card is None
+            else deepcopy(artifact.publication_card)
+        ),
+        "provenance": [
+            item.to_dict() for item in artifact.publication_provenance
+        ],
+        "source_catalog_sha256": artifact.publication_source_catalog_sha256,
+        "withheld_fields": list(artifact.publication_withheld_fields),
+    }
+
+
+def _validate_publication_snapshot(artifact: CardArtifact) -> None:
+    from .publication import project_publication_card
+    from .publication_contract import FIELD_PATHS as PUBLICATION_FIELD_PATHS
+    from .publication_schema import (
+        get_field as get_publication_field,
+        validate_publication_card,
+    )
+
+    if artifact.publication_card is None:
+        if (
+            artifact.publication_provenance
+            or artifact.publication_withheld_fields
+            or artifact.publication_source_catalog_sha256 is not None
+        ):
+            raise ValueError("publication provenance requires a publication card")
+        return
+    if (
+        not isinstance(artifact.publication_source_catalog_sha256, str)
+        or _SHA256_RE.fullmatch(artifact.publication_source_catalog_sha256) is None
+    ):
+        raise ValueError("publication snapshot requires a source catalog digest")
+    if not all(
+        isinstance(item, PublicationFieldProvenance)
+        for item in artifact.publication_provenance
+    ):
+        raise ValueError("publication provenance records must be typed")
+    ordered = tuple(
+        sorted(artifact.publication_provenance, key=lambda item: item.field_path)
+    )
+    paths = tuple(item.field_path for item in ordered)
+    if (
+        artifact.publication_provenance != ordered
+        or len(paths) != len(set(paths))
+    ):
+        raise ValueError("publication provenance must be sorted and unique")
+    withheld = tuple(artifact.publication_withheld_fields)
+    if (
+        withheld != tuple(sorted(set(withheld)))
+        or any(item not in PUBLICATION_FIELD_PATHS for item in withheld)
+    ):
+        raise ValueError(
+            "publication withheld fields must be sorted, unique public fields"
+        )
+    if set(paths).intersection(withheld):
+        raise ValueError("publication provenance and withholding must be disjoint")
+    if {"identity.model_id", "identity.version"}.intersection(withheld):
+        raise ValueError("publication target identity cannot be withheld")
+
+    validate_publication_card(artifact.publication_card)
+    identity = artifact.publication_card["identity"]
+    if (
+        identity.get("model_id") != artifact.target.model_id
+        or identity.get("version") != artifact.target.revision
+    ):
+        raise ValueError("publication snapshot identity differs from artifact target")
+    base = project_publication_card(project_card(artifact, _skip_integrity=True))
+    changed_paths = {
+        field_path
+        for field_path in PUBLICATION_FIELD_PATHS
+        if get_publication_field(artifact.publication_card, field_path, NOT_SPECIFIED)
+        != get_publication_field(base, field_path, NOT_SPECIFIED)
+    }
+    for field_path in withheld:
+        if get_publication_field(base, field_path, NOT_SPECIFIED) in (
+            NOT_SPECIFIED,
+            NOT_APPLICABLE,
+        ):
+            raise ValueError(
+                "publication withholding must remove a specified base field"
+            )
+        if get_publication_field(
+            artifact.publication_card, field_path, NOT_SPECIFIED
+        ) not in (NOT_SPECIFIED, NOT_APPLICABLE):
+            raise ValueError("publication withheld field remains specified")
+    if set(paths).union(withheld) != changed_paths:
+        raise ValueError(
+            "publication provenance and withholding do not cover changed public fields"
+        )
 
 
 def _field_reference(binding: Binding, evidence: Any) -> dict[str, Any]:

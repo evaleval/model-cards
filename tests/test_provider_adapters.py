@@ -190,7 +190,11 @@ class ProviderAdapterTests(unittest.TestCase):
             "7B",
             payload["rules"]["text_values_preserve_units_and_qualifiers"],
         )
-        self.assertIn("highest-value", payload["rules"]["proposal_selection"])
+        selection_rule = payload["rules"]["proposal_selection"]
+        self.assertIn("highest-value", selection_rule)
+        self.assertIn("reserve at least one proposal slot", selection_rule)
+        self.assertIn("Never invent", selection_rule)
+        self.assertIn("category-reservation rule", spec.system_prompt)
         self.assertEqual("quote_extraction", spec.context_metadata["stage"])
         self.assertNotIn("excerpt", spec.context_metadata)
 
