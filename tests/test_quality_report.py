@@ -32,6 +32,7 @@ from model_cards.quality_report import (
     QUALITY_REPORT_VERSION,
     QualityReportError,
     _assert_body_free,
+    _digest,
     _explicit_findings,
     _load_exports,
     build_quality_report,
@@ -288,7 +289,14 @@ class QualityReportTests(unittest.TestCase):
         )
         self.assertTrue(value["replay_stability"]["all_targets_stable"])
         self.assertTrue(
-            {"inputs", "values", "bindings", "artifact", "decisions"}
+            {
+                "source_inputs",
+                "treatment",
+                "values",
+                "bindings",
+                "artifact",
+                "decisions",
+            }
             <= set(value["targets"][0]["surfaces"])
         )
         encoded = serialize_quality_report(report)
@@ -302,6 +310,62 @@ class QualityReportTests(unittest.TestCase):
             b'"raw_ledger_rows"',
         ):
             self.assertNotIn(forbidden_key, encoded)
+
+    def test_source_and_treatment_surfaces_have_separate_canonical_inputs(self) -> None:
+        report = build_quality_report(self.primary).to_dict()
+        target = report["targets"][0]
+        run_root = next(self.primary.glob("targets/*"))
+        result = json.loads((run_root / "pipeline-result.json").read_text())
+        source_state = json.loads((run_root / "source-state.json").read_text())
+        run_manifest = json.loads((run_root / "run-manifest.json").read_text())
+
+        expected_source = _digest(
+            {
+                "surface_version": "model-card-source-input-surface/v1",
+                "target": result["target"],
+                "source_bundle_id": result["source_bundle_id"],
+                "source_manifest_sha256": result["source_manifest_sha256"],
+                "source_catalog_sha256": result["source_catalog_sha256"],
+                "source_state_sha256": _digest(source_state),
+                "source_state_snapshot_sha256": source_state["snapshot_sha256"],
+                "hf_bundle_id": source_state["hf_bundle_id"],
+                "hf_manifest_sha256": source_state["hf_manifest_sha256"],
+                "hf_catalog_sha256": source_state["hf_catalog_sha256"],
+                "official_bundle_id": source_state["official_bundle_id"],
+                "official_manifest_sha256": source_state[
+                    "official_manifest_sha256"
+                ],
+                "official_catalog_sha256": source_state[
+                    "official_catalog_sha256"
+                ],
+            }
+        )
+        expected_treatment = _digest(
+            {
+                "surface_version": "model-card-treatment-surface/v1",
+                "configuration": run_manifest["configuration"],
+            }
+        )
+        self.assertEqual(target["surfaces"]["source_inputs"], expected_source)
+        self.assertEqual(target["surfaces"]["treatment"], expected_treatment)
+
+        changed_configuration = deepcopy(run_manifest["configuration"])
+        changed_configuration["evaluation_treatment"] = "comparison"
+        self.assertNotEqual(
+            expected_treatment,
+            _digest(
+                {
+                    "surface_version": "model-card-treatment-surface/v1",
+                    "configuration": changed_configuration,
+                }
+            ),
+        )
+        self.assertEqual(
+            target["surfaces"]["source_inputs"],
+            build_quality_report(self.replay).to_dict()["targets"][0]["surfaces"][
+                "source_inputs"
+            ],
+        )
 
     def test_combined_official_source_state_is_replayed_without_bodies(self) -> None:
         hf_only = build_quality_report(self.primary).to_dict()["targets"][0]
@@ -349,7 +413,7 @@ class QualityReportTests(unittest.TestCase):
     ) -> None:
         report = build_quality_report(self.conflict)
         value = report.to_dict()
-        self.assertEqual("model-card-quality-report/v4", QUALITY_REPORT_VERSION)
+        self.assertEqual("model-card-quality-report/v6", QUALITY_REPORT_VERSION)
         omissions = value["targets"][0]["metrics"]["omissions"]
         self.assertEqual(1, omissions["publication_conflict_count"])
         self.assertEqual(1, omissions["publication_conflict_field_count"])
@@ -401,7 +465,8 @@ class QualityReportTests(unittest.TestCase):
     def test_paired_report_separates_value_and_cost_latency_stability(self) -> None:
         report = build_quality_report(self.primary, self.changed).to_dict()
         comparison = report["replay_stability"]["targets"][0]
-        self.assertFalse(comparison["inputs"])
+        self.assertFalse(comparison["source_inputs"])
+        self.assertFalse(comparison["treatment"])
         self.assertFalse(comparison["values"])
         self.assertFalse(comparison["bindings"])
         self.assertFalse(comparison["artifact"])

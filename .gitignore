@@ -39,6 +39,7 @@ tmp/
 **/official-source-bundles/
 **/source-bundle.json
 **/source_bundle.json
+**/family-risk-authorizations.json
 **/source-freeze/
 **/private-candidate-evidence/
 **/provider-traces/

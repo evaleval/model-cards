@@ -27,10 +27,14 @@ from .publication_schema import (
     set_field,
     validate_publication_card,
 )
+from .model_family import (
+    ModelFamilyDerivationError,
+    select_config_model_family_derivation,
+)
 from .source_documents import SourceDocumentCatalog
 
 
-PUBLICATION_SOURCE_RULESET = "publication-source-enrichment/v12"
+PUBLICATION_SOURCE_RULESET = "publication-source-enrichment/v13"
 PUBLICATION_CONFLICT_VERSION = "publication-conflict-record/v1"
 
 _PUBLICATION_CONFLICT_REASONS = frozenset(
@@ -114,7 +118,7 @@ _PUBLICATION_SOURCE_RULE_SUFFIXES = frozenset(
         "license_from_explicit_readme_statement",
         "likes_from_frozen_metadata",
         "model_card_from_pinned_readme_source",
-        "model_family_from_config_model_type",
+        "model_family_from_registered_config_model_type",
         "model_type_from_pipeline_and_config",
         "moe_parameter_counts_from_safetensors_and_exact_readme_row",
         "name_from_exact_target_basename",
@@ -1349,13 +1353,21 @@ def _lineage_candidates(inputs: _Inputs) -> Iterable[_Candidate]:
             ),
             sources,
         )
-    model_type = _string((inputs.config or {}).get("model_type"))
-    if model_type is not None:
+    try:
+        selected_family = select_config_model_family_derivation(
+            inputs.catalog.target, inputs.catalog.documents
+        )
+    except ModelFamilyDerivationError as exc:
+        raise PublicationSourceError(
+            "config model-family derivation failed closed"
+        ) from exc
+    if selected_family is not None:
+        family_source, family_derivation = selected_family
         yield _Candidate(
             "lineage.model_family",
-            model_type,
-            "model_family_from_config_model_type",
-            _pointer(inputs.config_source_id, "/model_type"),
+            family_derivation.family_id,
+            "model_family_from_registered_config_model_type",
+            _pointer(family_source.source_id, family_derivation.pointer),
         )
 
     if (

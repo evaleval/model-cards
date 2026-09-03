@@ -23,7 +23,12 @@ from model_cards.factreasoner import (
     CheckerResponse,
     run_factreasoner,
 )
-from model_cards.pipeline import PrivacyScanReport, RiskStageSummary
+from model_cards.family_risk import build_family_risk_authorization_report
+from model_cards.pipeline import (
+    PrivacyScanReport,
+    RiskStageSummary,
+    _taxonomy_risk_derivations,
+)
 from model_cards.publication import project_publication_card
 from model_cards.publication_schema import PUBLICATION_SCHEMA
 from model_cards.publication_sources import enrich_publication_card
@@ -31,13 +36,21 @@ from model_cards.publication_validation import run_publication_validation
 from model_cards.review import reassign_binding, withhold_binding
 from model_cards.review_audit import (
     ReviewClosureEvidence,
+    ReviewAuditError,
     ReviewedCandidateAudit,
+    _verify_taxonomy_derivation_chain,
     audit_reviewed_candidate,
     verify_reviewed_candidate_audit,
 )
 from model_cards.risk_mapping import (
+    ApplicabilityDecision,
+    ApplicabilityStatus,
+    INFERENCE_MODEL,
+    NEXUS_PACKAGE_VERSION,
+    NexusSelection,
     RiskCatalog,
     TaxonomyRisk,
+    UseContext,
     map_candidate_risks,
 )
 from model_cards.source_bundle import (
@@ -78,6 +91,36 @@ class PinnedIdentitySupportingChecker(SupportingChecker):
 
     checker_id = "ibm/factreasoner-fr1"
     checker_revision = IBM_FACTREASONER_UPSTREAM_REVISION
+
+
+class _DerivationDetector:
+    detector_name = "ai_atlas_nexus.generic_usecase"
+    detector_version = NEXUS_PACKAGE_VERSION
+    inference_model = INFERENCE_MODEL
+    inference_config_sha256 = "d" * 64
+
+    def detect(self, contexts, catalog):
+        return (
+            NexusSelection(
+                risk_id=catalog.risks[0].risk_id,
+                context_ids=(contexts[0].context_id,),
+            ),
+        )
+
+
+class _DerivationChecker:
+    def assess(self, candidate, contexts):
+        return ApplicabilityDecision.for_candidate(
+            candidate,
+            status=ApplicabilityStatus.ACCEPTED,
+            checker="tests/review-audit-risk-checker-v1",
+            method="bounded_fixture_applicability",
+            reason="specific_context_supported",
+            rationale=(
+                "The synthetic exact-target context provides a specific and "
+                "traceable basis for retaining this fixture taxonomy risk."
+            ),
+        )
 
 
 RISK_CATALOG = RiskCatalog.build(
@@ -195,6 +238,7 @@ class ReviewedCandidateAuditTests(unittest.TestCase):
 
     def closure(self, artifact, checker=None):
         checker = checker or SupportingChecker()
+        claim_gates = self.claim_gates()
         pre = enrich_publication_card(
             self.publication_catalog,
             artifact.publication_card
@@ -247,11 +291,15 @@ class ReviewedCandidateAuditTests(unittest.TestCase):
             reason="privacy_safe_projection",
         )
         return ReviewClosureEvidence(
-            claim_gate_records=self.claim_gates(),
+            claim_gate_records=claim_gates,
             publication_catalog=self.publication_catalog,
             publication_factreasoner=publication_fact,
             publication_validation=publication.report,
             final_factreasoner=final_fact,
+            family_authorization=build_family_risk_authorization_report(
+                claim_gates,
+                target=artifact.target,
+            ),
             risk_catalog=RISK_CATALOG,
             risk_mapping=risk_mapping,
             privacy=privacy,
@@ -303,6 +351,115 @@ class ReviewedCandidateAuditTests(unittest.TestCase):
                 )
             )
         return tuple(records)
+
+    def test_taxonomy_derivation_replay_rejects_same_count_unrelated_inputs(
+        self,
+    ) -> None:
+        gate = self.claim_gates()[0]
+        candidate = gate.candidate
+        context = UseContext(
+            context_id="context:exact_target_fixture",
+            description=(
+                "The synthetic exact checkpoint is used as a deterministic "
+                "fixture for taxonomy derivation replay."
+            ),
+            supporting_fields=(candidate.field_path,),
+            supporting_candidate_ids=(candidate.candidate_id,),
+            source_refs=tuple(
+                sorted({item.source_id for item in candidate.evidence})
+            ),
+        )
+        mapping = map_candidate_risks(
+            (context,),
+            RISK_CATALOG,
+            _DerivationDetector(),
+            _DerivationChecker(),
+        )
+        family_authorization = build_family_risk_authorization_report(
+            (gate,),
+            target=self.artifact.target,
+        )
+        expected = _taxonomy_risk_derivations(
+            report=mapping,
+            contexts=(context,),
+            candidates=(candidate,),
+            gate_records=(gate,),
+            included_ids={candidate.candidate_id},
+            family_authorization=family_authorization,
+            target=self.artifact.target,
+            first_index=0,
+        )
+        self.assertEqual(1, len(expected))
+        self.assertEqual(
+            expected,
+            _verify_taxonomy_derivation_chain(
+                report=mapping,
+                contexts=(context,),
+                candidates=(candidate,),
+                gate_records=(gate,),
+                included_ids={candidate.candidate_id},
+                family_authorization=family_authorization,
+                target=self.artifact.target,
+                factreasoner_withheld_derivation_ids=(),
+                retained_derivations=expected,
+                exported_derivations=expected,
+            ),
+        )
+
+        unrelated_claim = replace(
+            expected[0].input_claims[0],
+            gate_record_sha256="0" * 64,
+        )
+        same_count_unrelated = (
+            replace(expected[0], input_claims=(unrelated_claim,)),
+        )
+        self.assertEqual(len(expected), len(same_count_unrelated))
+        with self.assertRaises(ReviewAuditError):
+            _verify_taxonomy_derivation_chain(
+                report=mapping,
+                contexts=(context,),
+                candidates=(candidate,),
+                gate_records=(gate,),
+                included_ids={candidate.candidate_id},
+                family_authorization=family_authorization,
+                target=self.artifact.target,
+                factreasoner_withheld_derivation_ids=(),
+                retained_derivations=same_count_unrelated,
+                exported_derivations=same_count_unrelated,
+            )
+
+        self.assertEqual(
+            (),
+            _verify_taxonomy_derivation_chain(
+                report=mapping,
+                contexts=(context,),
+                candidates=(candidate,),
+                gate_records=(gate,),
+                included_ids={candidate.candidate_id},
+                family_authorization=family_authorization,
+                target=self.artifact.target,
+                factreasoner_withheld_derivation_ids=(
+                    expected[0].derivation_id,
+                ),
+                retained_derivations=(),
+                exported_derivations=(),
+            ),
+        )
+        with self.assertRaises(ReviewAuditError):
+            _verify_taxonomy_derivation_chain(
+                report=mapping,
+                contexts=(context,),
+                candidates=(candidate,),
+                gate_records=(gate,),
+                included_ids={candidate.candidate_id},
+                family_authorization=family_authorization,
+                target=self.artifact.target,
+                factreasoner_withheld_derivation_ids=(
+                    expected[0].derivation_id,
+                ),
+                retained_derivations=(),
+                exported_derivations=expected,
+            )
 
     def test_replays_review_gate_and_recomputes_effective_omissions(self) -> None:
         reviewed = self.reviewed()
@@ -384,6 +541,7 @@ class ReviewedCandidateAuditTests(unittest.TestCase):
             publication_factreasoner=closure.publication_factreasoner,
             publication_validation=closure.publication_validation,
             final_factreasoner=closure.final_factreasoner,
+            family_authorization=closure.family_authorization,
             risk_catalog=closure.risk_catalog,
             risk_mapping=closure.risk_mapping,
             privacy=replace(closure.privacy, scanned_card_sha256="0" * 64),
@@ -454,6 +612,7 @@ class ReviewedCandidateAuditTests(unittest.TestCase):
             publication_factreasoner=closure.publication_factreasoner,
             publication_validation=closure.publication_validation,
             final_factreasoner=closure.final_factreasoner,
+            family_authorization=closure.family_authorization,
             risk_catalog=closure.risk_catalog,
             risk_mapping=risk_mapping,
             privacy=closure.privacy,

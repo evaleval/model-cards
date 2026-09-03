@@ -1,5 +1,6 @@
 {
-  "labels_version": "model-card-paired-audit-labels/v1",
+  "labels_version": "model-card-paired-audit-labels/v2",
+  "item_manifest_sha256": null,
   "study_status": "design_only_no_human_results",
   "blinded": false,
   "items": [],

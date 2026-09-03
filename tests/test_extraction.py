@@ -136,6 +136,31 @@ The base model is intended for unrestricted text completion.
 Do not use acme/Instruct-Large for autonomous medical decisions.
 """
 
+DEEPSEEK_LICENSE_MODEL = """DEEPSEEK LICENSE AGREEMENT
+
+Version 1.0, 23 October 2023
+
+This License governs the use of the model (and its derivatives).
+
+Attachment A
+
+Use Restrictions
+
+You agree not to use the Model or Derivatives of the Model:
+
+-	In any way that violates any applicable national or international law or regulation or infringes upon the lawful rights and interests of any third party;
+- For military use in any way;
+- For the purpose of exploiting, harming or attempting to exploit or harm minors in any way;
+- To generate or disseminate verifiably false information and/or content with the purpose of harming others;
+- To generate or disseminate inappropriate content subject to applicable regulatory requirements;
+- To generate or disseminate personal identifiable information without due authorization or for unreasonable use;
+- To defame, disparage or otherwise harass others;
+- For fully automated decision making that adversely impacts an individual's legal rights or otherwise creates or modifies a binding, enforceable obligation;
+- For any use intended to or which has the effect of discriminating against or harming individuals or groups based on online or offline social behavior or known or predicted personal or personality characteristics;
+- To exploit any of the vulnerabilities of a specific group of persons based on their age, social, physical or mental characteristics, in order to materially distort the behavior of a person pertaining to that group in a manner that causes or is likely to cause that person or another person physical or psychological harm;
+- For any use intended to or which has the effect of discriminating against individuals or groups based on legally protected characteristics or categories.
+"""
+
 
 class Adapter:
     def resolve_revision(self, model_id, requested_revision):
@@ -197,6 +222,31 @@ class ExtractionTests(unittest.TestCase):
         return SimpleNamespace(
             target=self.catalog.target,
             catalog_sha256="c" * 64,
+            documents=(source,),
+            by_id={source.source_id: source},
+        )
+
+    def license_catalog(self, text: str = DEEPSEEK_LICENSE_MODEL, **changes):
+        target = TargetIdentity("deepseek-ai/DeepSeek-V3", REVISION)
+        values = {
+            "source_id": "deepseek_model_license",
+            "source_uri": (
+                f"https://huggingface.co/{target.model_id}/resolve/"
+                f"{target.revision}/LICENSE-MODEL"
+            ),
+            "role": SourceRole.HUGGING_FACE_SNAPSHOT,
+            "source_revision": target.revision,
+            "target": target,
+            "text": text,
+            "synthetic": False,
+            "content_sha256": None,
+        }
+        catalog_target = changes.pop("catalog_target", target)
+        values.update(changes)
+        source = replace(self.readme, **values)
+        return SimpleNamespace(
+            target=catalog_target,
+            catalog_sha256=hashlib.sha256(source.sha256.encode()).hexdigest(),
             documents=(source,),
             by_id={source.source_id: source},
         )
@@ -296,6 +346,44 @@ class ExtractionTests(unittest.TestCase):
                 ExtractionError, "no normalized text"
             ):
                 build_source_windows(source)
+
+    def test_use_risk_routing_replays_normalized_window_coordinates(self) -> None:
+        neutral_body = " ".join(
+            "Ordinary capability statement." for _ in range(360)
+        )
+        text = (
+            "# Exact target\n"
+            + ("\n \t" * 2_000)
+            + "\n## Limitations\n"
+            + neutral_body
+        )
+        source = replace(self.readme, text=text, content_sha256=None)
+        windows = build_source_windows(
+            source, window_chars=500, overlap=0, max_windows=32
+        )
+        selected = build_use_risk_windows(source, windows=windows)
+
+        # The heading is far away in raw coordinates but near the beginning of
+        # the whitespace-normalized view. Later neutral windows are retained
+        # solely because they overlap that normalized structural section.
+        self.assertGreater(len(windows), 2)
+        self.assertEqual(windows, selected)
+        self.assertNotIn("limitations", windows[1].excerpt.casefold())
+        self.assertLess(windows[1].normalized_start, text.index("## Limitations"))
+
+        other_source = replace(
+            source,
+            source_id="other_source",
+            text="# Other\n\n## Limitations\nOther neutral content. " * 30,
+            content_sha256=None,
+        )
+        with self.assertRaisesRegex(ExtractionError, "does not belong"):
+            build_use_risk_windows(
+                source,
+                windows=build_source_windows(
+                    other_source, window_chars=500, overlap=0
+                ),
+            )
 
     def test_quote_materialization_recomputes_coordinates_and_section_context(self) -> None:
         proposal = self.proposal()
@@ -552,6 +640,496 @@ class ExtractionTests(unittest.TestCase):
                 self.accepting_checks(candidate),
             )
             self.assertTrue(gate.projection_eligible, candidate.field_path)
+
+    def test_exact_bundled_deepseek_license_materializes_all_restrictions(self) -> None:
+        catalog = self.license_catalog()
+        result = deterministic_publisher_context_candidates(catalog)
+
+        self.assertEqual(11, len(result.candidates))
+        self.assertEqual(
+            {f"use_and_risk.out_of_scope_uses[{index}]" for index in range(11)},
+            {item.field_path for item in result.candidates},
+        )
+        descriptions = {
+            item.field_path: item.value["description"] for item in result.candidates
+        }
+        self.assertEqual(
+            "For military use in any way;",
+            descriptions["use_and_risk.out_of_scope_uses[1]"],
+        )
+        self.assertTrue(
+            descriptions["use_and_risk.out_of_scope_uses[10]"].endswith(
+                "legally protected characteristics or categories."
+            )
+        )
+        normalized_source = normalize_ws(catalog.documents[0].text)
+        for candidate in result.candidates:
+            evidence = candidate.evidence[0]
+            self.assertEqual(RelationToTarget.EXACT_TARGET, candidate.relation)
+            self.assertEqual(
+                f"{catalog.target.model_id}@{catalog.target.revision}",
+                candidate.claim_entity,
+            )
+            self.assertEqual(SourceRole.HUGGING_FACE_SNAPSHOT, evidence.source_role)
+            self.assertEqual(catalog.target, evidence.source_target)
+            self.assertEqual(catalog.target.revision, evidence.source_revision)
+            self.assertTrue(evidence.verified)
+            self.assertEqual(
+                candidate.value["description"],
+                normalized_source[evidence.char_start : evidence.char_end],
+            )
+            gate = evaluate_claim_gate(
+                candidate,
+                catalog.documents,
+                self.accepting_checks(candidate),
+            )
+            self.assertTrue(gate.projection_eligible, candidate.field_path)
+
+    def test_bundled_license_extractor_fails_closed_on_source_scope(self) -> None:
+        target = TargetIdentity("deepseek-ai/DeepSeek-V3", REVISION)
+        other_target = TargetIdentity("deepseek-ai/DeepSeek-V3-Other", REVISION)
+        wrong_revision = "b" * 40
+        cases = {
+            "wrong_file": {
+                "source_uri": (
+                    f"https://huggingface.co/{target.model_id}/resolve/"
+                    f"{REVISION}/LICENSE"
+                )
+            },
+            "wrong_host": {
+                "source_uri": (
+                    f"https://example.com/{target.model_id}/resolve/"
+                    f"{REVISION}/LICENSE-MODEL"
+                )
+            },
+            "query": {
+                "source_uri": (
+                    f"https://huggingface.co/{target.model_id}/resolve/"
+                    f"{REVISION}/LICENSE-MODEL?download=true"
+                )
+            },
+            "wrong_role": {"role": SourceRole.DEVELOPER_REPORT},
+            "synthetic": {"synthetic": True},
+            "wrong_source_target": {"target": other_target},
+            "wrong_source_revision": {"source_revision": wrong_revision},
+            "wrong_uri_revision": {
+                "source_uri": (
+                    f"https://huggingface.co/{target.model_id}/resolve/"
+                    f"{wrong_revision}/LICENSE-MODEL"
+                )
+            },
+            "wrong_catalog_target": {"catalog_target": other_target},
+        }
+        for name, changes in cases.items():
+            with self.subTest(name=name):
+                self.assertEqual(
+                    (),
+                    deterministic_publisher_context_candidates(
+                        self.license_catalog(**changes)
+                    ).candidates,
+                )
+
+    def test_bundled_license_extractor_requires_unambiguous_complete_block(self) -> None:
+        mutations = {
+            "missing_title": DEEPSEEK_LICENSE_MODEL.replace(
+                "DEEPSEEK LICENSE AGREEMENT", "DEEPSEEK MODEL LICENSE", 1
+            ),
+            "missing_attachment": DEEPSEEK_LICENSE_MODEL.replace(
+                "Attachment A", "Appendix A", 1
+            ),
+            "missing_section": DEEPSEEK_LICENSE_MODEL.replace(
+                "Use Restrictions", "Restricted Uses", 1
+            ),
+            "derivative_only_scope": DEEPSEEK_LICENSE_MODEL.replace(
+                "You agree not to use the Model or Derivatives of the Model:",
+                "You agree not to use Derivatives of the Model:",
+                1,
+            ),
+            "duplicate_scope": DEEPSEEK_LICENSE_MODEL.replace(
+                "You agree not to use the Model or Derivatives of the Model:",
+                "You agree not to use the Model or Derivatives of the Model:\n"
+                "You agree not to use the Model or Derivatives of the Model:",
+                1,
+            ),
+            "intervening_scope": DEEPSEEK_LICENSE_MODEL.replace(
+                "Use Restrictions\n\nYou agree",
+                "Use Restrictions\n\nFor derivatives only\n\nYou agree",
+                1,
+            ),
+            "incomplete_bullet": DEEPSEEK_LICENSE_MODEL.replace(
+                "- For military use in any way;",
+                "- For military use in any way",
+                1,
+            ),
+            "non_list_tail": DEEPSEEK_LICENSE_MODEL + "Unscoped trailing text.\n",
+        }
+        for name, text in mutations.items():
+            with self.subTest(name=name):
+                self.assertEqual(
+                    (),
+                    deterministic_publisher_context_candidates(
+                        self.license_catalog(text)
+                    ).candidates,
+                )
+
+        # The legal allowlist is filename- and grammar-specific. Putting the
+        # same license prose in README must not weaken generic legal exclusion.
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(
+                self.official_catalog(DEEPSEEK_LICENSE_MODEL)
+            ).candidates,
+        )
+
+    def test_safe_use_and_risk_heading_aliases_preserve_exact_scope(self) -> None:
+        cases = (
+            (
+                "Intended Usage",
+                "The exact target is intended for research question answering.",
+                "use_and_risk.intended_uses[0]",
+            ),
+            (
+                "Ethical Considerations & Risks",
+                "The model may produce inaccurate statements about recent events.",
+                "use_and_risk.limitations[0]",
+            ),
+            (
+                "Safety, Risks, and Limitations",
+                "The exact target may produce unsafe responses to ambiguous prompts.",
+                "use_and_risk.limitations[0]",
+            ),
+        )
+        for heading, statement, field_path in cases:
+            with self.subTest(heading=heading):
+                catalog = self.official_catalog(
+                    f"# Exact Target\n\n## {heading}\n\n{statement}\n"
+                )
+                candidates = deterministic_publisher_context_candidates(
+                    catalog
+                ).candidates
+                windows = build_source_windows(catalog.documents[0])
+                self.assertEqual(
+                    windows,
+                    build_use_risk_windows(
+                        catalog.documents[0], windows=windows
+                    ),
+                )
+                self.assertEqual(1, len(candidates))
+                self.assertEqual(field_path, candidates[0].field_path)
+                self.assertEqual(RelationToTarget.EXACT_TARGET, candidates[0].relation)
+                self.assertTrue(candidates[0].evidence[0].verified)
+
+                sibling = self.official_catalog(
+                    f"# Exact Target\n\n## {heading}\n\n### Sibling Checkpoint\n\n"
+                    f"{statement}\n"
+                )
+                self.assertEqual(
+                    (),
+                    deterministic_publisher_context_candidates(sibling).candidates,
+                )
+
+        family_scoped = self.official_catalog(
+            "# Exact Target\n\n## Intended Usage\n\n"
+            "The Acme model family is intended for research and education.\n"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(family_scoped).candidates,
+        )
+        family_heading = self.official_catalog(
+            "# Exact Target\n\n## Instruct model family\n\n"
+            "### Intended Usage\n\n"
+            "The model is intended for research and education.\n"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(family_heading).candidates,
+        )
+        wrong_checkpoint = self.official_catalog(
+            "# Exact Target\n\n## Ethical Considerations & Risks\n\n"
+            "acme/Other-Checkpoint may produce unsafe responses to ambiguous prompts.\n"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(wrong_checkpoint).candidates,
+        )
+
+        olmo_target = TargetIdentity(
+            "allenai/OLMo-2-1124-7B-Instruct", REVISION
+        )
+        for root_heading, expected_count in (
+            ("OLMo 2", 0),
+            ("OLMo 2 1124 7B Instruct", 1),
+        ):
+            with self.subTest(root_heading=root_heading):
+                source = replace(
+                    self.readme,
+                    source_id="olmo_publisher_readme",
+                    source_uri=(
+                        f"https://huggingface.co/{olmo_target.model_id}/resolve/"
+                        f"{REVISION}/README.md"
+                    ),
+                    target=olmo_target,
+                    text=(
+                        f"# {root_heading}\n\n## Intended Usage\n\n"
+                        "The model is intended for research and education.\n"
+                    ),
+                    content_sha256=None,
+                )
+                catalog = SimpleNamespace(
+                    target=olmo_target,
+                    catalog_sha256=hashlib.sha256(
+                        root_heading.encode("utf-8")
+                    ).hexdigest(),
+                    documents=(source,),
+                    by_id={source.source_id: source},
+                )
+                self.assertEqual(
+                    expected_count,
+                    len(
+                        deterministic_publisher_context_candidates(
+                            catalog
+                        ).candidates
+                    ),
+                )
+
+    def test_olmo_bias_risk_heading_keeps_family_and_checkpoint_scope_distinct(
+        self,
+    ) -> None:
+        target = TargetIdentity(
+            "allenai/OLMo-2-1124-7B-Instruct", REVISION
+        )
+
+        def candidates_for(statement: str):
+            source = replace(
+                self.readme,
+                source_id="olmo_instruct_publisher_readme",
+                source_uri=(
+                    f"https://huggingface.co/{target.model_id}/resolve/"
+                    f"{REVISION}/README.md"
+                ),
+                target=target,
+                text=(
+                    "# OLMo-2-1124-7B-Instruct\n\n"
+                    "## Bias, Risks, and Limitations\n\n"
+                    f"{statement}\n"
+                ),
+                content_sha256=None,
+            )
+            catalog = SimpleNamespace(
+                target=target,
+                catalog_sha256=hashlib.sha256(statement.encode()).hexdigest(),
+                documents=(source,),
+                by_id={source.source_id: source},
+            )
+            return deterministic_publisher_context_candidates(catalog).candidates
+
+        family_statement = (
+            "The OLMo-2 models have limited safety training, but are not deployed "
+            "automatically with in-the-loop filtering of responses like ChatGPT, "
+            "so the model can produce problematic outputs (especially when "
+            "prompted to do so)."
+        )
+        self.assertEqual((), candidates_for(family_statement))
+
+        exact_statement = (
+            "The model can produce problematic outputs, especially when prompted "
+            "to do so."
+        )
+        candidates = candidates_for(exact_statement)
+        self.assertEqual(1, len(candidates))
+        self.assertEqual("use_and_risk.limitations[0]", candidates[0].field_path)
+        self.assertEqual(exact_statement, candidates[0].value["description"])
+        self.assertEqual(RelationToTarget.EXACT_TARGET, candidates[0].relation)
+
+    def test_olmo_frozen_family_use_and_risk_prose_is_not_exact_checkpoint_evidence(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "allenai/OLMo-2-1124-7B",
+                "Model Card for OLMo 2 7B",
+                "Like any base language model or fine-tuned model without safety "
+                "filtering, these models can easily be prompted by users to "
+                "generate harmful and sensitive content.",
+            ),
+            (
+                "allenai/OLMo-2-1124-7B-Instruct",
+                "OLMo-2-1124-7B-Instruct",
+                "The OLMo-2 models have limited safety training, but are not "
+                "deployed automatically with in-the-loop filtering of responses "
+                "like ChatGPT, so the model can produce problematic outputs "
+                "(especially when prompted to do so).",
+            ),
+        )
+        for model_id, heading, statement in cases:
+            with self.subTest(model_id=model_id):
+                target = TargetIdentity(model_id, REVISION)
+                source = replace(
+                    self.readme,
+                    source_id="olmo_publisher_readme",
+                    source_uri=(
+                        f"https://huggingface.co/{model_id}/resolve/"
+                        f"{REVISION}/README.md"
+                    ),
+                    target=target,
+                    text=(
+                        f"# {heading}\n\n## Bias, Risks, and Limitations\n\n"
+                        f"{statement}\n"
+                    ),
+                    content_sha256=None,
+                )
+                catalog = SimpleNamespace(
+                    target=target,
+                    catalog_sha256=hashlib.sha256(statement.encode()).hexdigest(),
+                    documents=(source,),
+                    by_id={source.source_id: source},
+                )
+                self.assertEqual(
+                    (),
+                    deterministic_publisher_context_candidates(catalog).candidates,
+                )
+
+    def test_deterministic_context_rejects_bare_sibling_checkpoint_heading(self) -> None:
+        target = TargetIdentity("mistralai/Mistral-7B-v0.3", REVISION)
+        for root_heading, expected_count in (
+            ("Mistral 7B Instruct v0.3", 0),
+            ("Mistral 7B v0.3", 1),
+        ):
+            with self.subTest(root_heading=root_heading):
+                source = replace(
+                    self.readme,
+                    source_id="mistral_publisher_readme",
+                    source_uri=(
+                        f"https://huggingface.co/{target.model_id}/resolve/"
+                        f"{REVISION}/README.md"
+                    ),
+                    target=target,
+                    text=(
+                        f"# {root_heading}\n\n## Limitations\n\n"
+                        "The model may produce inaccurate factual statements.\n"
+                    ),
+                    content_sha256=None,
+                )
+                catalog = SimpleNamespace(
+                    target=target,
+                    catalog_sha256=hashlib.sha256(
+                        root_heading.encode("utf-8")
+                    ).hexdigest(),
+                    documents=(source,),
+                    by_id={source.source_id: source},
+                )
+                self.assertEqual(
+                    expected_count,
+                    len(
+                        deterministic_publisher_context_candidates(
+                            catalog
+                        ).candidates
+                    ),
+                )
+
+    def test_exact_heading_and_local_antecedent_bind_anaphoric_limitation(self) -> None:
+        limitation = "It does not have any moderation mechanisms."
+        paragraph = (
+            "The Mistral 7B Instruct model is a quick demonstration that the "
+            "base model can be fine-tuned. "
+            f"{limitation}\n"
+        )
+        cases = (
+            ("mistralai/Mistral-7B-Instruct-v0.3", 1),
+            ("mistralai/Mistral-7B-v0.3", 0),
+        )
+        for model_id, expected_count in cases:
+            with self.subTest(model_id=model_id):
+                target = TargetIdentity(model_id, REVISION)
+                title = model_id.split("/", 1)[1]
+                source = replace(
+                    self.readme,
+                    source_id="mistral_publisher_readme",
+                    source_uri=(
+                        f"https://huggingface.co/{model_id}/resolve/"
+                        f"{REVISION}/README.md"
+                    ),
+                    target=target,
+                    text=f"# Model Card for {title}\n\n## Limitations\n\n{paragraph}",
+                    content_sha256=None,
+                )
+                catalog = SimpleNamespace(
+                    target=target,
+                    catalog_sha256=hashlib.sha256(model_id.encode()).hexdigest(),
+                    documents=(source,),
+                    by_id={source.source_id: source},
+                )
+                candidates = deterministic_publisher_context_candidates(
+                    catalog
+                ).candidates
+                self.assertEqual(expected_count, len(candidates))
+                if candidates:
+                    self.assertEqual(
+                        "use_and_risk.limitations[0]",
+                        candidates[0].field_path,
+                    )
+                    self.assertEqual(limitation, candidates[0].value["description"])
+
+        generic_scope = self.official_catalog(
+            f"# System Card\n\n## Limitations\n\n{paragraph}"
+        )
+        self.assertEqual(
+            (),
+            deterministic_publisher_context_candidates(generic_scope).candidates,
+        )
+
+    def test_gemma_family_card_does_not_promote_shared_context_to_exact_checkpoints(
+        self,
+    ) -> None:
+        shared_family_context = """# Gemma 3 model card
+
+Gemma is a family of open models with pre-trained and instruction-tuned variants.
+
+## Usage and Limitations
+
+### Intended Usage
+
+Text Generation: These models can be used to generate creative text formats.
+
+### Limitations
+
+Models may generate incorrect or outdated factual statements.
+
+### Ethical Considerations and Risks
+
+VLMs can reflect socio-cultural biases embedded in the training material.
+"""
+        for model_id in ("google/gemma-3-4b-pt", "google/gemma-3-4b-it"):
+            with self.subTest(model_id=model_id):
+                target = TargetIdentity(model_id, REVISION)
+                source = replace(
+                    self.readme,
+                    source_id="gemma_publisher_readme",
+                    source_uri=(
+                        f"https://huggingface.co/{model_id}/resolve/"
+                        f"{REVISION}/README.md"
+                    ),
+                    role=SourceRole.HUGGING_FACE_SNAPSHOT,
+                    target=target,
+                    text=shared_family_context,
+                    content_sha256=None,
+                )
+                catalog = SimpleNamespace(
+                    target=target,
+                    catalog_sha256=hashlib.sha256(model_id.encode()).hexdigest(),
+                    documents=(source,),
+                    by_id={source.source_id: source},
+                )
+
+                # The content is routed to the dedicated use/risk pass, but
+                # every statement is explicitly family/plural scoped. The
+                # exact Hub repository alone must not upgrade that relation.
+                self.assertEqual(1, len(build_use_risk_windows(source)))
+                self.assertEqual(
+                    (),
+                    deterministic_publisher_context_candidates(catalog).candidates,
+                )
 
     def test_mixed_llama_use_sentence_is_split_by_exact_checkpoint_stage(self) -> None:
         mixed = (
@@ -866,6 +1444,12 @@ class ExtractionTests(unittest.TestCase):
             ),
         }
         expected = {
+            "mistralai/Mistral-7B-Instruct-v0.3": {
+                (
+                    "use_and_risk.limitations[0]",
+                    "It does not have any moderation mechanisms.",
+                )
+            },
             "meta-llama/Llama-3.1-8B": llama_values
             | {
                 (
@@ -942,7 +1526,7 @@ class ExtractionTests(unittest.TestCase):
             )
 
         self.assertEqual(expected, {key: value for key, value in observed.items() if value})
-        self.assertEqual(10, sum(len(value) for value in observed.values()))
+        self.assertEqual(11, sum(len(value) for value in observed.values()))
         joined = "\n".join(serialized_candidates)
         for denied in (
             "greedy decoding",

@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": [
     "labels_version",
+    "item_manifest_sha256",
     "study_status",
     "blinded",
     "items",
@@ -13,7 +14,13 @@
   ],
   "properties": {
     "labels_version": {
-      "const": "model-card-paired-audit-labels/v1"
+      "const": "model-card-paired-audit-labels/v2"
+    },
+    "item_manifest_sha256": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      ]
     },
     "study_status": {
       "enum": [
@@ -88,7 +95,12 @@
         ]
       },
       "then": {
+        "required": ["item_manifest_sha256"],
         "properties": {
+          "item_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
           "blinded": {
             "const": true
           },
@@ -127,7 +139,6 @@
         "conflict_visibility",
         "risk_grounding",
         "risk_applicability",
-        "warning_present",
         "actionable_error"
       ],
       "properties": {
@@ -238,15 +249,13 @@
             "not_applicable"
           ]
         },
-        "warning_present": {
-          "type": "boolean"
-        },
         "actionable_error": {
           "enum": [
             "yes",
             "no",
             "unclear",
-            "unavailable"
+            "unavailable",
+            "not_applicable"
           ]
         }
       }

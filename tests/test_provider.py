@@ -14,6 +14,8 @@ from model_cards.provider import (
     OPENROUTER_API_URL,
     OPENROUTER_ROUTE_URL,
     MissingCredentialError,
+    ProviderError,
+    ProviderExecutionBinding,
     ProviderHttpRequest,
     ProviderHttpResponse,
     ProviderResponseError,
@@ -22,7 +24,9 @@ from model_cards.provider import (
     ProviderUncertainError,
     RetryExhaustedError,
     StructuredCallSpec,
+    replay_structured_json_call,
     structured_json_call,
+    verify_provider_execution,
 )
 from model_cards.run_ledger import (
     BudgetCapError,
@@ -249,6 +253,72 @@ class ProviderRuntimeTests(unittest.TestCase):
         self.assertNotIn(KEY, persisted)
         self.assertNotIn("PRIVATE PROMPT SENTINEL", persisted)
         self.assertNotIn("System instruction", persisted)
+
+    def test_execution_binding_round_trips_and_replays_without_mutation(self) -> None:
+        first = self.call(FixtureTransport([(200, success_payload())]))
+        serialized = first.execution.to_dict()
+        self.assertEqual(
+            serialized,
+            ProviderExecutionBinding.from_dict(serialized).to_dict(),
+        )
+        ledger_before = self.ledger_path.read_bytes()
+        decision_before = self.decision_path.read_bytes()
+        ledger_stat_before = self.ledger_path.stat()
+        decision_stat_before = self.decision_path.stat()
+
+        replayed = replay_structured_json_call(
+            self.spec(),
+            ledger_path=self.ledger_path,
+            decision_path=self.decision_path,
+            validator=validator,
+        )
+
+        self.assertTrue(replayed.resumed)
+        self.assertEqual(first.decision, replayed.decision)
+        self.assertEqual(serialized, replayed.execution.to_dict())
+        self.assertEqual(ledger_before, self.ledger_path.read_bytes())
+        self.assertEqual(decision_before, self.decision_path.read_bytes())
+        self.assertEqual(ledger_stat_before.st_mode, self.ledger_path.stat().st_mode)
+        self.assertEqual(
+            ledger_stat_before.st_mtime_ns,
+            self.ledger_path.stat().st_mtime_ns,
+        )
+        self.assertEqual(
+            decision_stat_before.st_mtime_ns,
+            self.decision_path.stat().st_mtime_ns,
+        )
+
+    def test_replay_missing_ledger_does_not_create_one(self) -> None:
+        missing = self.root / "missing-usage.jsonl"
+        with self.assertRaisesRegex(ProviderError, "ledger is invalid"):
+            replay_structured_json_call(
+                self.spec(),
+                ledger_path=missing,
+                decision_path=self.decision_path,
+                validator=validator,
+            )
+        self.assertFalse(missing.exists())
+
+    def test_execution_verifier_rejects_copied_sidecar_at_another_path(self) -> None:
+        first = self.call(FixtureTransport([(200, success_payload())]))
+        copied_dir = self.root / "copied-decisions"
+        copied_dir.mkdir()
+        copied = copied_dir / self.decision_path.name
+        copied.write_bytes(self.decision_path.read_bytes())
+        with self.assertRaisesRegex(ProviderError, "path differs"):
+            verify_provider_execution(
+                first.execution,
+                ledger_path=self.ledger_path,
+                decision_dir=copied_dir,
+                validator=validator,
+            )
+
+    def test_execution_binding_detects_manifest_tampering(self) -> None:
+        first = self.call(FixtureTransport([(200, success_payload())]))
+        tampered = first.execution.to_dict()
+        tampered["decision_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ProviderError, "digest is inconsistent"):
+            ProviderExecutionBinding.from_dict(tampered)
 
     def test_absent_key_fails_before_route_reservation_or_send(self) -> None:
         transport = FixtureTransport([])

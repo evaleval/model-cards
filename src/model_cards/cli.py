@@ -20,6 +20,7 @@ from .claim_gate import ClaimGateRecord, verify_claim_gate_record
 from .models import RelationToTarget, ReviewAction
 from .field_repair import FieldRepairRecord
 from .findings import OmissionAudit
+from .family_risk import FamilyRiskAuthorizationReport
 from .hf_adapter import HuggingFaceHubAdapter
 from .official_discovery import (
     discover_official_sources,
@@ -56,6 +57,10 @@ from .provider import (
     TransportUncertainError,
 )
 from .provider_adapters import summarize_aggregate_budget
+from .provider_execution import (
+    PROVIDER_EXECUTION_MANIFEST_FILENAME,
+    ProviderExecutionRunEvidence,
+)
 from .quality_report import (
     QualityReportError,
     build_quality_report,
@@ -532,6 +537,8 @@ def _pipeline_summary(result: PipelineResult, run_directory: Path) -> dict[str, 
         names.add(SCHOLARLY_DISCOVERY_FILENAME)
     if (run_directory / ORCHESTRATION_MANIFEST_FILENAME).is_file():
         names.add(ORCHESTRATION_MANIFEST_FILENAME)
+    if (run_directory / PROVIDER_EXECUTION_MANIFEST_FILENAME).is_file():
+        names.add(PROVIDER_EXECUTION_MANIFEST_FILENAME)
     for name in (AUDIT_VIEW_FILENAME, USAGE_SUMMARY_FILENAME, "provider-result.json"):
         if (run_directory / name).is_file():
             names.add(name)
@@ -1127,8 +1134,10 @@ def _cmd_audit_review(args: argparse.Namespace) -> int:
         "publication_factreasoner",
         "publication_validation",
         "final_factreasoner",
+        "family_risk_authorizations",
         "risk_mapping",
         "privacy",
+        "provider_run",
     )
     closure_values = tuple(getattr(args, name) for name in closure_names)
     if any(item is not None for item in closure_values) and not all(
@@ -1174,11 +1183,15 @@ def _cmd_audit_review(args: argparse.Namespace) -> int:
             final_factreasoner=FactReasonerRecord.from_dict(
                 _read_object(Path(args.final_factreasoner))
             ),
+            family_authorization=FamilyRiskAuthorizationReport.from_dict(
+                _read_object(Path(args.family_risk_authorizations))
+            ),
             risk_catalog=load_pinned_nexus_catalog(),
             risk_mapping=_read_object(Path(args.risk_mapping)),
             privacy=PrivacyScanReport.from_dict(
                 _read_object(Path(args.privacy))
             ),
+            provider_execution=ProviderExecutionRunEvidence.load(args.provider_run),
         )
     audit = audit_reviewed_candidate(
         artifact,
@@ -1401,8 +1414,16 @@ def build_parser() -> argparse.ArgumentParser:
     audit_review.add_argument("--publication-factreasoner")
     audit_review.add_argument("--publication-validation")
     audit_review.add_argument("--final-factreasoner")
+    audit_review.add_argument("--family-risk-authorizations")
     audit_review.add_argument("--risk-mapping")
     audit_review.add_argument("--privacy")
+    audit_review.add_argument(
+        "--provider-run",
+        help=(
+            "provider-assisted run root containing the exact execution manifest, "
+            "pipeline result, usage ledger, and normalized decisions"
+        ),
+    )
     audit_review.add_argument("--output", required=True)
     audit_review.set_defaults(handler=_cmd_audit_review)
 

@@ -29,10 +29,23 @@ from model_cards.quality_report import (
     QualityReportError,
 )
 
+try:  # Supports both ``python -m evaluation.paired_audit`` and direct execution.
+    from .item_manifest import (
+        ItemManifestError,
+        manifest_warning_presence,
+        validate_labels_against_manifest,
+    )
+except ImportError:  # pragma: no cover - exercised by the documented script form
+    from item_manifest import (
+        ItemManifestError,
+        manifest_warning_presence,
+        validate_labels_against_manifest,
+    )
 
-AUDIT_VERSION = "model-card-paired-failure-audit/v1"
+
+AUDIT_VERSION = "model-card-paired-failure-audit/v2"
 ENGINEERING_READ_VERSION = "baseline-full-engineering-read/v1"
-LABELS_VERSION = "model-card-paired-audit-labels/v1"
+LABELS_VERSION = "model-card-paired-audit-labels/v2"
 TARGET_MAP_VERSION = "model-card-paired-audit-target-map/v1"
 AUTO_BENCHMARKCARDS_SUMMARY_SHA256 = (
     "dcd4d976566278e1a6872daf3d1dcb87af731c8c95af3796459f278a95af2317"
@@ -253,7 +266,13 @@ _LABEL_ENUMS = {
         "unavailable",
         "not_applicable",
     },
-    "actionable_error": {"yes", "no", "unclear", "unavailable"},
+    "actionable_error": {
+        "yes",
+        "no",
+        "unclear",
+        "unavailable",
+        "not_applicable",
+    },
 }
 
 
@@ -587,7 +606,12 @@ def _quality_metrics(report: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _target_input_surfaces(report: Mapping[str, Any]) -> dict[str, str | None]:
+def _target_named_surfaces(
+    report: Mapping[str, Any],
+    *,
+    key: str,
+    label: str,
+) -> dict[str, str | None]:
     output: dict[str, str | None] = {}
     for index, raw in enumerate(_array(report.get("targets"), "quality targets")):
         target = _object(raw, f"quality targets[{index}]")
@@ -596,14 +620,59 @@ def _target_input_surfaces(report: Mapping[str, Any]) -> dict[str, str | None]:
             raise AuditError("quality target request is invalid or duplicated")
         if target.get("status") == "failed":
             if target.get("surfaces") is not None:
-                raise AuditError("failed quality target claims an input surface")
+                raise AuditError(f"failed quality target claims a {label} surface")
             output[request] = None
             continue
         surfaces = _object(target.get("surfaces"), "target surfaces")
-        digest = surfaces.get("inputs")
+        digest = surfaces.get(key)
         if not isinstance(digest, str) or not _DIGEST_RE.fullmatch(digest):
-            raise AuditError("quality target input surface is invalid")
+            raise AuditError(f"quality target {label} surface is invalid")
         output[request] = digest
+    return output
+
+
+def _target_source_surfaces(report: Mapping[str, Any]) -> dict[str, str | None]:
+    return _target_named_surfaces(
+        report,
+        key="source_inputs",
+        label="source-input",
+    )
+
+
+def _target_treatment_surfaces(report: Mapping[str, Any]) -> dict[str, str | None]:
+    return _target_named_surfaces(
+        report,
+        key="treatment",
+        label="treatment",
+    )
+
+
+def _target_condition_receipts(
+    report: Mapping[str, Any],
+) -> dict[str, dict[str, str] | None]:
+    """Return exact run/source/treatment receipts for each report target."""
+
+    output: dict[str, dict[str, str] | None] = {}
+    for index, raw in enumerate(_array(report.get("targets"), "quality targets")):
+        target = _object(raw, f"quality targets[{index}]")
+        request = target.get("request")
+        if not isinstance(request, str) or not request or request in output:
+            raise AuditError("quality target request is invalid or duplicated")
+        if target.get("status") == "failed":
+            output[request] = None
+            continue
+        surfaces = _object(target.get("surfaces"), "target surfaces")
+        receipt = {
+            "pipeline_result_sha256": target.get("run_sha256"),
+            "source_input_surface_sha256": surfaces.get("source_inputs"),
+            "treatment_surface_sha256": surfaces.get("treatment"),
+        }
+        if any(
+            not isinstance(value, str) or not _DIGEST_RE.fullmatch(value)
+            for value in receipt.values()
+        ):
+            raise AuditError("quality target condition receipt is invalid")
+        output[request] = receipt
     return output
 
 
@@ -611,38 +680,69 @@ def _pairing(conditions: Sequence[tuple[str, Mapping[str, Any]]]) -> dict[str, A
     if len(conditions) == 2:
         name_a, report_a = conditions[0]
         name_b, report_b = conditions[1]
-        surfaces_a = _target_input_surfaces(report_a)
-        surfaces_b = _target_input_surfaces(report_b)
-        if set(surfaces_a) != set(surfaces_b):
+        sources_a = _target_source_surfaces(report_a)
+        sources_b = _target_source_surfaces(report_b)
+        treatments_a = _target_treatment_surfaces(report_a)
+        treatments_b = _target_treatment_surfaces(report_b)
+        if (
+            set(sources_a) != set(sources_b)
+            or set(treatments_a) != set(treatments_b)
+            or set(sources_a) != set(treatments_a)
+        ):
             raise AuditError("paired conditions do not contain the same target requests")
         mismatches = [
             request
-            for request in sorted(surfaces_a)
-            if surfaces_a[request] is not None
-            and surfaces_b[request] is not None
-            and surfaces_a[request] != surfaces_b[request]
+            for request in sorted(sources_a)
+            if sources_a[request] is not None
+            and sources_b[request] is not None
+            and sources_a[request] != sources_b[request]
         ]
         if mismatches:
-            raise AuditError("paired conditions do not share identical frozen input surfaces")
+            raise AuditError(
+                "paired conditions do not share identical frozen source surfaces"
+            )
         unavailable = [
             request
-            for request in sorted(surfaces_a)
-            if surfaces_a[request] is None or surfaces_b[request] is None
+            for request in sorted(sources_a)
+            if sources_a[request] is None or sources_b[request] is None
+        ]
+        treatment_unavailable = [
+            request
+            for request in sorted(treatments_a)
+            if treatments_a[request] is None or treatments_b[request] is None
+        ]
+        treatment_differences = [
+            request
+            for request in sorted(treatments_a)
+            if treatments_a[request] is not None
+            and treatments_b[request] is not None
+            and treatments_a[request] != treatments_b[request]
         ]
         return {
             "status": (
-                "paired_conditions_with_unavailable_input_surfaces"
+                "paired_conditions_with_unavailable_source_surfaces"
                 if unavailable
-                else "paired_identical_frozen_inputs"
+                else "paired_identical_frozen_sources"
             ),
             "conditions": [name_a, name_b],
-            "targets": len(surfaces_a),
-            "input_surface_matches": len(surfaces_a) - len(unavailable),
-            "input_surfaces_unavailable": len(unavailable),
+            "targets": len(sources_a),
+            "source_surface_matches": len(sources_a) - len(unavailable),
+            "source_surfaces_unavailable": len(unavailable),
+            "treatment_surface_matches": (
+                len(treatments_a)
+                - len(treatment_unavailable)
+                - len(treatment_differences)
+            ),
+            "treatment_surface_differences": len(treatment_differences),
+            "treatment_surfaces_unavailable": len(treatment_unavailable),
             "interpretation": (
-                "Unavailable input surfaces prevent paired deltas."
+                "Unavailable source surfaces prevent paired deltas."
                 if unavailable
-                else "Input identity permits paired engineering deltas; it does not provide truth labels."
+                else (
+                    "Frozen-source identity permits paired engineering deltas across explicit treatment differences; it does not provide truth labels."
+                    if treatment_differences
+                    else "Frozen-source identity permits paired engineering deltas; it does not provide truth labels."
+                )
             ),
         }
 
@@ -652,38 +752,56 @@ def _pairing(conditions: Sequence[tuple[str, Mapping[str, Any]]]) -> dict[str, A
         return {
             "status": "single_condition_no_verified_replay",
             "conditions": [name],
-            "targets": len(_target_input_surfaces(report)),
-            "input_surface_matches": 0,
+            "targets": len(_target_source_surfaces(report)),
+            "source_surface_matches": 0,
+            "treatment_surface_matches": 0,
             "interpretation": "No paired condition or verified replay was supplied.",
         }
     entries = _array(stability.get("targets"), "replay stability targets")
-    input_matches = sum(
-        isinstance(entry, dict) and entry.get("inputs") is True for entry in entries
+    source_matches = sum(
+        isinstance(entry, dict) and entry.get("source_inputs") is True
+        for entry in entries
     )
-    unavailable = sum(
-        isinstance(entry, dict) and entry.get("inputs") is None for entry in entries
+    source_unavailable = sum(
+        isinstance(entry, dict) and entry.get("source_inputs") is None
+        for entry in entries
+    )
+    treatment_matches = sum(
+        isinstance(entry, dict) and entry.get("treatment") is True
+        for entry in entries
+    )
+    treatment_differences = sum(
+        isinstance(entry, dict) and entry.get("treatment") is False
+        for entry in entries
+    )
+    treatment_unavailable = sum(
+        isinstance(entry, dict) and entry.get("treatment") is None
+        for entry in entries
     )
     all_stable = (
         stability.get("all_targets_stable") is True
         and stability.get("request_order_stable") is True
-        and input_matches + unavailable == len(entries)
+        and source_matches + source_unavailable == len(entries)
     )
     return {
         "status": (
-            "paired_replay_with_unavailable_input_surfaces"
-            if all_stable and unavailable
-            else "paired_replay_identical_frozen_inputs"
+            "paired_replay_with_unavailable_source_surfaces"
+            if all_stable and source_unavailable
+            else "paired_replay_identical_frozen_sources"
             if all_stable
             else "paired_replay_not_fully_stable"
         ),
         "conditions": [name],
         "targets": len(entries),
-        "input_surface_matches": input_matches,
-        "input_surfaces_unavailable": unavailable,
+        "source_surface_matches": source_matches,
+        "source_surfaces_unavailable": source_unavailable,
+        "treatment_surface_matches": treatment_matches,
+        "treatment_surface_differences": treatment_differences,
+        "treatment_surfaces_unavailable": treatment_unavailable,
         "all_output_surfaces_stable": bool(stability.get("all_targets_stable")),
         "interpretation": (
-            "Replay includes failed targets without frozen input surfaces; no paired delta is inferred."
-            if unavailable
+            "Replay includes failed targets without frozen source surfaces; no paired delta is inferred."
+            if source_unavailable
             else "Replay stability measures determinism over frozen inputs, not factual accuracy."
         ),
     }
@@ -724,7 +842,7 @@ def _paired_deltas(
     if any(
         digest is None
         for _, report in conditions
-        for digest in _target_input_surfaces(report).values()
+        for digest in _target_source_surfaces(report).values()
     ):
         return None
     name_a, _ = conditions[0]
@@ -1134,12 +1252,21 @@ def _target_map_lookup(
 
 def _labels_metrics(
     labels: Mapping[str, Any] | None,
-    condition_targets: Mapping[str, set[str]],
+    condition_receipts: Mapping[
+        str, Mapping[str, Mapping[str, str] | None]
+    ],
     target_map: Mapping[str, Any] | None = None,
+    item_manifest: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    condition_targets = {
+        condition: set(receipts)
+        for condition, receipts in condition_receipts.items()
+    }
     if labels is None:
-        if target_map is not None:
-            raise AuditError("paired-audit target map requires a labels record")
+        if target_map is not None or item_manifest is not None:
+            raise AuditError(
+                "paired-audit target map or item manifest requires a labels record"
+            )
         return {
             "status": "not_supplied",
             "human_results_present": False,
@@ -1191,6 +1318,8 @@ def _labels_metrics(
         raise AuditError("complete paired labels contain no items")
     if target_lookup is None:
         raise AuditError("complete paired labels require a private target map")
+    if item_manifest is None:
+        raise AuditError("complete paired labels require a private item manifest")
 
     required = {
         "item_id",
@@ -1206,7 +1335,6 @@ def _labels_metrics(
         "conflict_visibility",
         "risk_grounding",
         "risk_applicability",
-        "warning_present",
         "actionable_error",
     }
     seen: set[tuple[str, str, str]] = set()
@@ -1242,8 +1370,6 @@ def _labels_metrics(
         for key, allowed in _LABEL_ENUMS.items():
             if item[key] not in allowed:
                 raise AuditError(f"paired-audit {key} label is invalid")
-        if not isinstance(item["warning_present"], bool):
-            raise AuditError("paired-audit warning_present must be boolean")
         by_condition[condition].append(item)
         by_condition_target[condition][blind_id].append(item)
 
@@ -1252,43 +1378,79 @@ def _labels_metrics(
             raise AuditError(
                 f"complete paired labels do not cover every target in condition {condition}"
             )
-    condition_names = tuple(by_condition_target)
-    if len(condition_names) == 2:
-        left, right = condition_names
-        for blind_id in target_lookup:
-            left_ids = {
-                item["item_id"] for item in by_condition_target[left][blind_id]
-            }
-            right_ids = {
-                item["item_id"] for item in by_condition_target[right][blind_id]
-            }
-            if left_ids != right_ids:
-                raise AuditError(
-                    "complete paired labels do not share a matching item universe"
-                )
+    try:
+        validate_labels_against_manifest(
+            item_manifest,
+            labels,
+            target_lookup=target_lookup,
+            condition_receipts=condition_receipts,
+        )
+    except ItemManifestError as exc:
+        raise AuditError(f"paired-audit item manifest is invalid: {exc}") from exc
+    warning_presence = manifest_warning_presence(item_manifest)
+    manifest_items = {
+        (item["target_blind_id"], item["item_id"]): item
+        for item in item_manifest["items"]
+    }
 
     condition_metrics: dict[str, Any] = {}
     warning_precision_recall_available = False
     for condition, condition_items in by_condition.items():
+        def items_of_kind(kind: str) -> list[dict[str, Any]]:
+            return [
+                item
+                for item in condition_items
+                if manifest_items[(item["target_blind_id"], item["item_id"])][
+                    "item_kind"
+                ]
+                == kind
+            ]
+
+        claim_items = items_of_kind("claim")
+        field_items = items_of_kind("field")
+        risk_items = items_of_kind("risk")
+        warning_items = items_of_kind("warning")
+        score_items = [
+            item
+            for item in claim_items
+            if (
+                manifest_items[(item["target_blind_id"], item["item_id"])][
+                    "subject"
+                ]["field_path"]
+                or ""
+            ).startswith("evaluation.benchmark_scores")
+        ]
         decided_warning = [
             item
-            for item in condition_items
+            for item in warning_items
             if item["actionable_error"] in {"yes", "no"}
         ]
         tp = sum(
-            item["warning_present"] and item["actionable_error"] == "yes"
+            warning_presence[
+                (item["condition"], item["target_blind_id"], item["item_id"])
+            ]
+            and item["actionable_error"] == "yes"
             for item in decided_warning
         )
         fp = sum(
-            item["warning_present"] and item["actionable_error"] == "no"
+            warning_presence[
+                (item["condition"], item["target_blind_id"], item["item_id"])
+            ]
+            and item["actionable_error"] == "no"
             for item in decided_warning
         )
         fn = sum(
-            not item["warning_present"] and item["actionable_error"] == "yes"
+            not warning_presence[
+                (item["condition"], item["target_blind_id"], item["item_id"])
+            ]
+            and item["actionable_error"] == "yes"
             for item in decided_warning
         )
         tn = sum(
-            not item["warning_present"] and item["actionable_error"] == "no"
+            not warning_presence[
+                (item["condition"], item["target_blind_id"], item["item_id"])
+            ]
+            and item["actionable_error"] == "no"
             for item in decided_warning
         )
         precision_denominator = tp + fp
@@ -1301,23 +1463,28 @@ def _labels_metrics(
         )
         condition_metrics[condition] = {
             "items": len(condition_items),
-            "support": _label_distribution(condition_items, "support"),
-            "source_binding": _label_distribution(
-                condition_items, "source_binding"
-            ),
+            "eligible_items": {
+                "claims": len(claim_items),
+                "score_rows": len(score_items),
+                "fields": len(field_items),
+                "risks": len(risk_items),
+                "warnings": len(warning_items),
+            },
+            "support": _label_distribution(claim_items, "support"),
+            "source_binding": _label_distribution(claim_items, "source_binding"),
             "entity_checkpoint": _label_distribution(
-                condition_items, "entity_checkpoint"
+                claim_items, "entity_checkpoint"
             ),
-            "relation": _label_distribution(condition_items, "relation"),
-            "field_fit": _label_distribution(condition_items, "field_fit"),
-            "score_row": _label_distribution(condition_items, "score_row"),
-            "omission": _label_distribution(condition_items, "omission"),
+            "relation": _label_distribution(claim_items, "relation"),
+            "field_fit": _label_distribution(claim_items, "field_fit"),
+            "score_row": _label_distribution(score_items, "score_row"),
+            "omission": _label_distribution(field_items, "omission"),
             "conflict_visibility": _label_distribution(
-                condition_items, "conflict_visibility"
+                field_items, "conflict_visibility"
             ),
-            "risk_grounding": _label_distribution(condition_items, "risk_grounding"),
+            "risk_grounding": _label_distribution(risk_items, "risk_grounding"),
             "risk_applicability": _label_distribution(
-                condition_items, "risk_applicability"
+                risk_items, "risk_applicability"
             ),
             "warning": {
                 "labelled_universe": len(decided_warning),
@@ -1334,6 +1501,8 @@ def _labels_metrics(
     return {
         "status": "completed_blinded_annotations",
         "human_results_present": True,
+        "artifact_bound_item_universe": True,
+        "item_manifest_sha256": labels["item_manifest_sha256"],
         "warning_precision_recall_available": warning_precision_recall_available,
         "targets": len(target_lookup),
         "conditions": condition_metrics,
@@ -1398,6 +1567,7 @@ def build_audit(
     engineering_read: Mapping[str, Any] | None = None,
     labels: Mapping[str, Any] | None = None,
     target_map: Mapping[str, Any] | None = None,
+    item_manifest: Mapping[str, Any] | None = None,
     input_receipts: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not 1 <= len(conditions) <= 2:
@@ -1415,10 +1585,15 @@ def build_audit(
     conditions = tuple(canonical_conditions)
     condition_metrics = {name: _quality_metrics(report) for name, report in conditions}
     pairing = _pairing(conditions)
-    condition_targets = {
-        name: set(_target_input_surfaces(report)) for name, report in conditions
+    condition_receipts = {
+        name: _target_condition_receipts(report) for name, report in conditions
     }
-    label_metrics = _labels_metrics(labels, condition_targets, target_map)
+    label_metrics = _labels_metrics(
+        labels,
+        condition_receipts,
+        target_map,
+        item_manifest,
+    )
     payload: dict[str, Any] = {
         "report_version": AUDIT_VERSION,
         "status": (
@@ -1532,6 +1707,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--target-map",
         help="private opaque target-ID to quality-report request mapping",
     )
+    parser.add_argument(
+        "--item-manifest",
+        help="private artifact-bound item manifest required by completed labels",
+    )
     parser.add_argument("--output", required=True)
     return parser
 
@@ -1587,6 +1766,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             receipts["paired_audit_target_map"] = {"sha256": digest}
 
+        item_manifest = None
+        if args.item_manifest:
+            item_manifest, digest = _strict_load(
+                Path(args.item_manifest), "paired-audit item manifest"
+            )
+            receipts["paired_audit_item_manifest"] = {"sha256": digest}
+
         result = build_audit(
             conditions,
             auto_benchmarkcards_summary=abc_summary,
@@ -1594,6 +1780,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             engineering_read=engineering,
             labels=labels,
             target_map=target_map,
+            item_manifest=item_manifest,
             input_receipts=receipts,
         )
         _write_new(Path(args.output), result)

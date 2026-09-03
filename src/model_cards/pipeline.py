@@ -61,6 +61,14 @@ from .factreasoner import (
     SourceAvailability,
     run_factreasoner,
 )
+from .family_risk import (
+    FAMILY_RISK_AUTHORIZATION_REPORT_VERSION,
+    FAMILY_RISK_BRIDGE_VERSION,
+    FamilyContextApplicabilityDecision,
+    FamilyRiskAuthorizationReport,
+    FamilyRiskBridgeError,
+    build_family_risk_authorization_report,
+)
 from .field_repair import (
     FieldRepairRecord,
     RepairOutcome,
@@ -132,9 +140,9 @@ from .schema import (
 from .source_state import SourceStateMode, load_source_state
 
 
-PIPELINE_VERSION = "offline-model-card-pipeline/v19"
+PIPELINE_VERSION = "offline-model-card-pipeline/v21"
 PRIVACY_SCAN_VERSION = "public-card-privacy-scan/v1"
-RISK_STAGE_VERSION = "pipeline-risk-stage/v2"
+RISK_STAGE_VERSION = "pipeline-risk-stage/v3"
 REPAIR_STAGE_VERSION = "pipeline-fact-withholding/v1"
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -1118,7 +1126,7 @@ def _candidate_inventory(
     return tuple(sorted(by_id.values(), key=lambda item: item.candidate_id))
 
 
-def _deterministic_publisher_context_decisions(
+def deterministic_publisher_context_decisions(
     result: ExtractionResult,
 ) -> tuple[ProseCheckerDecision, ...]:
     """Attest only the closed local classifications produced by this pipeline."""
@@ -1389,6 +1397,7 @@ def derive_model_use_contexts(
             if statement is None:
                 continue
             _context_id, text, refs = statement
+            linkage = "source_local_statement"
         elif base in _CONTEXT_PROPERTY_QUALIFIER_LABELS:
             if not isinstance(candidate.value, str):
                 raise PipelineError("included model context property is not text")
@@ -1397,6 +1406,7 @@ def derive_model_use_contexts(
                 continue
             text = f"{_CONTEXT_PROPERTY_QUALIFIER_LABELS[base]}: {value}"
             refs = _candidate_source_refs(candidate)
+            linkage = "exact_target_property"
         else:
             continue
         key = (candidate.field_path, text)
@@ -1407,13 +1417,39 @@ def derive_model_use_contexts(
                 "fields": set(),
                 "candidate_ids": set(),
                 "source_refs": set(),
+                "linkage": linkage,
             },
         )
+        if slot["linkage"] != linkage:
+            raise PipelineError("model use-context qualifier linkage collision")
         slot["fields"].add(candidate.field_path)
         slot["candidate_ids"].add(candidate.candidate_id)
         slot["source_refs"].update(refs)
 
-    qualifier_values = tuple(value for _key, value in sorted(qualifiers.items()))
+    qualifier_values: list[dict[str, Any]] = []
+    for _key, qualifier in sorted(qualifiers.items()):
+        if qualifier["linkage"] == "exact_target_property":
+            linked_context_ids = frozenset(cores)
+        else:
+            # A limitation/bias statement is not automatically a qualifier for
+            # every publisher use.  With one core there is no ambiguity.  With
+            # several cores, source overlap is admitted only when it identifies
+            # exactly one core; otherwise the statement remains in the card but
+            # is withheld from the Nexus use-case prompt.
+            overlapping = tuple(
+                context_id
+                for context_id, core in sorted(cores.items())
+                if qualifier["source_refs"] & core["source_refs"]
+            )
+            if len(cores) == 1:
+                linked_context_ids = frozenset(cores)
+            elif len(overlapping) == 1:
+                linked_context_ids = frozenset(overlapping)
+            else:
+                linked_context_ids = frozenset()
+        qualifier_values.append(
+            {**qualifier, "linked_context_ids": linked_context_ids}
+        )
     result: list[UseContext] = []
     for context_id, core in sorted(cores.items()):
         descriptions = [core["description"]]
@@ -1421,6 +1457,8 @@ def derive_model_use_contexts(
         candidate_ids = set(core["candidate_ids"])
         source_refs = set(core["source_refs"])
         for qualifier in qualifier_values:
+            if context_id not in qualifier["linked_context_ids"]:
+                continue
             descriptions.append(qualifier["description"])
             fields.update(qualifier["fields"])
             candidate_ids.update(qualifier["candidate_ids"])
@@ -1449,8 +1487,17 @@ def _risk_stage(
     catalog: RiskCatalog | None,
     detector: RiskDetector | None,
     checker: ApplicabilityChecker | None,
+    family_contexts: Sequence[UseContext] = (),
 ) -> tuple[RiskStageSummary, RiskMappingReport | None, tuple[UseContext, ...]]:
-    contexts = derive_model_use_contexts(candidates, included_ids)
+    exact_contexts = derive_model_use_contexts(candidates, included_ids)
+    family_values = tuple(family_contexts)
+    if not all(isinstance(item, UseContext) for item in family_values):
+        raise PipelineError("family risk contexts must be typed UseContext records")
+    contexts = tuple(
+        sorted((*exact_contexts, *family_values), key=lambda item: item.context_id)
+    )
+    if len({item.context_id for item in contexts}) != len(contexts):
+        raise PipelineError("exact and family risk contexts collide")
     context_digest = _digest([item.to_dict() for item in contexts])
     core_candidate_ids = {
         candidate.candidate_id
@@ -1526,6 +1573,7 @@ def _taxonomy_risk_derivations(
     candidates: Sequence[ClaimCandidate],
     gate_records: Sequence[ClaimGateRecord],
     included_ids: set[str],
+    family_authorization: FamilyRiskAuthorizationReport,
     target: TargetIdentity,
     first_index: int,
 ) -> tuple[TaxonomyRiskDerivation, ...]:
@@ -1543,6 +1591,13 @@ def _taxonomy_risk_derivations(
     context_by_id = {item.context_id: item for item in contexts}
     candidate_by_id = {item.candidate_id: item for item in candidates}
     gate_by_id = {item.candidate.candidate_id: item for item in gate_records}
+    family_context_by_id = {
+        item.context.context_id: item for item in family_authorization.use_contexts
+    }
+    authorization_by_sha = {
+        item.authorization_sha256: item
+        for item in family_authorization.authorizations
+    }
     output: list[TaxonomyRiskDerivation] = []
     for offset, ((risk_candidate, decision), public_value) in enumerate(
         zip(accepted_pairs, report.included_risks)
@@ -1564,18 +1619,46 @@ def _taxonomy_risk_derivations(
                 }
             )
         )
+        authorized_family_ids: set[str] = set()
+        for selected_context in selected_contexts:
+            family_context = family_context_by_id.get(selected_context.context_id)
+            if family_context is None:
+                continue
+            if family_context.context != selected_context:
+                raise PipelineError(
+                    "family risk context differs from its authorization record"
+                )
+            for authorization_sha256 in family_context.authorization_sha256s:
+                authorization = authorization_by_sha.get(authorization_sha256)
+                if authorization is None:
+                    raise PipelineError(
+                        "family risk context references an unavailable authorization"
+                    )
+                authorized_family_ids.add(
+                    authorization.candidate.candidate_id
+                )
         inputs: list[DerivationClaimInput] = []
         for candidate_id in input_ids:
             candidate = candidate_by_id.get(candidate_id)
             gate = gate_by_id.get(candidate_id)
-            if (
-                candidate is None
-                or gate is None
-                or candidate_id not in included_ids
-                or not gate.projection_eligible
-            ):
+            exact_input = (
+                candidate is not None
+                and gate is not None
+                and candidate_id in included_ids
+                and gate.projection_eligible
+                and candidate.relation is RelationToTarget.EXACT_TARGET
+            )
+            family_input = (
+                candidate is not None
+                and gate is not None
+                and candidate_id in authorized_family_ids
+                and candidate.relation is RelationToTarget.MODEL_FAMILY
+                and not gate.projection_eligible
+            )
+            if not (exact_input or family_input):
                 raise PipelineError(
-                    "taxonomy risk derivation input is not an included accepted claim"
+                    "taxonomy risk derivation input is neither an accepted exact claim "
+                    "nor an authorized family-context claim"
                 )
             source_refs = tuple(sorted({item.source_id for item in candidate.evidence}))
             inputs.append(
@@ -2032,6 +2115,9 @@ def run_offline_pipeline(
     risk_catalog: RiskCatalog | None = None,
     risk_detector: RiskDetector | None = None,
     risk_checker: ApplicabilityChecker | None = None,
+    family_applicability_decisions: Iterable[
+        FamilyContextApplicabilityDecision
+    ] = (),
     availability_hints: Iterable[FieldAvailabilityHint] = (),
     writer: EvidenceOnlyWriter | None = None,
 ) -> PipelineResult:
@@ -2061,6 +2147,24 @@ def run_offline_pipeline(
         raise PipelineError("availability hints are duplicated")
     if risk_catalog is not None and not isinstance(risk_catalog, RiskCatalog):
         raise PipelineError("risk_catalog must be a typed RiskCatalog")
+    family_applicability_values = tuple(family_applicability_decisions)
+    if not all(
+        isinstance(item, FamilyContextApplicabilityDecision)
+        for item in family_applicability_values
+    ):
+        raise PipelineError(
+            "family applicability decisions must be typed records"
+        )
+    family_applicability_values = tuple(
+        sorted(
+            family_applicability_values,
+            key=lambda item: item.family_candidate_id,
+        )
+    )
+    if len(
+        {item.family_candidate_id for item in family_applicability_values}
+    ) != len(family_applicability_values):
+        raise PipelineError("family applicability decisions are duplicated")
     if risk_catalog is None:
         try:
             risk_catalog = load_pinned_nexus_catalog()
@@ -2086,7 +2190,7 @@ def run_offline_pipeline(
     publisher_context = deterministic_publisher_context_candidates(
         catalog, existing_gate_records=quote_gate_records
     )
-    deterministic_prose_values = _deterministic_publisher_context_decisions(
+    deterministic_prose_values = deterministic_publisher_context_decisions(
         publisher_context
     )
     all_prose_values = tuple(
@@ -2139,6 +2243,16 @@ def run_offline_pipeline(
             ),
             "risk_detector": _object_identity(risk_detector),
             "risk_checker": _object_identity(risk_checker),
+            "family_risk_bridge_version": FAMILY_RISK_BRIDGE_VERSION,
+            "family_risk_record_version": (
+                FAMILY_RISK_AUTHORIZATION_REPORT_VERSION
+            ),
+            "family_applicability_decision_count": len(
+                family_applicability_values
+            ),
+            "family_applicability_decision_set_sha256": _digest(
+                [item.decision_sha256 for item in family_applicability_values]
+            ),
             "writer": _object_identity(writer or SelectAllEvidenceWriter()),
             "availability_sha256": _digest([item.to_dict() for item in hint_values]),
         },
@@ -2253,6 +2367,43 @@ def run_offline_pipeline(
             metrics={
                 "checked_count": len(gate_records),
                 "eligible_count": sum(item.projection_eligible for item in gate_records),
+            },
+        )
+    )
+
+    try:
+        family_authorization = build_family_risk_authorization_report(
+            gate_records,
+            family_applicability_values,
+            target=catalog.target,
+        )
+    except FamilyRiskBridgeError as exc:
+        raise PipelineError(
+            "family risk authorization failed closed"
+        ) from exc
+    artifact_refs.append(
+        _record_artifact(
+            store,
+            stage="risk_map",
+            logical_id="family_authorization",
+            status="completed",
+            reason="family_context_authorization_replayed",
+            filename="family-risk-authorizations.json",
+            value=family_authorization.to_dict(),
+            input_sha256s=(gate_sha256,),
+            metrics={
+                "family_candidate_count": len(
+                    family_authorization.family_gates
+                ),
+                "applicability_decision_count": len(
+                    family_authorization.applicability_decisions
+                ),
+                "authorized_statement_count": len(
+                    family_authorization.authorizations
+                ),
+                "family_context_count": len(
+                    family_authorization.use_contexts
+                ),
             },
         )
     )
@@ -2478,6 +2629,7 @@ def run_offline_pipeline(
         catalog=risk_catalog,
         detector=risk_detector,
         checker=risk_checker,
+        family_contexts=family_authorization.nexus_inputs,
     )
     composed_risks = get_field(composition_card, "use_and_risk.identified_risks")
     publisher_risk_count = len(composed_risks) if isinstance(composed_risks, list) else 0
@@ -2487,6 +2639,7 @@ def run_offline_pipeline(
         candidates=candidates,
         gate_records=gate_records,
         included_ids=included_ids,
+        family_authorization=family_authorization,
         target=catalog.target,
         first_index=publisher_risk_count,
     )
@@ -2633,7 +2786,11 @@ def run_offline_pipeline(
             reason=risk_summary.reason,
             filename="risk-mapping.json",
             value=risk_payload,
-            input_sha256s=(composition_sha256, repair_report.report_sha256),
+            input_sha256s=(
+                composition_sha256,
+                repair_report.report_sha256,
+                family_authorization.report_sha256,
+            ),
             metrics={
                 "context_count": len(use_contexts),
                 "taxonomy_candidate_count": risk_summary.taxonomy_candidate_count,
@@ -3197,6 +3354,7 @@ __all__ = [
     "PipelineValidationSummary",
     "PrivacyScanReport",
     "RiskStageSummary",
+    "deterministic_publisher_context_decisions",
     "derive_model_use_contexts",
     "run_offline_pipeline",
     "verify_pipeline_result",

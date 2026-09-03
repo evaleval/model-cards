@@ -394,6 +394,23 @@ class UsageLedger:
         _assert_binding(attempt["binding"], binding)
         return _snapshot(attempt)
 
+    def inspect_read_only(self, binding: AttemptBinding) -> AttemptSnapshot | None:
+        """Inspect an existing ledger without creating or chmod'ing the file.
+
+        Audit replay must not turn a missing ledger into an empty one or mutate
+        filesystem metadata.  The normal writer-facing ``inspect`` retains its
+        create-and-lock behavior for crash recovery; this variant requires an
+        already-existing regular file and takes only a shared read lock.
+        """
+
+        with _locked_file_read_only(self.path) as handle:
+            state = _replay(_read_events(handle))
+        attempt = state["attempts"].get(_attempt_key(binding))
+        if attempt is None:
+            return None
+        _assert_binding(attempt["binding"], binding)
+        return _snapshot(attempt)
+
     def begin_attempt(self, binding: AttemptBinding) -> AttemptSnapshot:
         with _locked_file(self.path) as handle:
             state = _replay(_read_events(handle))
@@ -561,10 +578,11 @@ class UsageLedger:
             "event_count": state["event_count"],
         }
 
-    def audit_metrics(self) -> Mapping[str, Any]:
+    def audit_metrics(self, *, read_only: bool = False) -> Mapping[str, Any]:
         """Return a privacy-safe aggregate of every validated ledger receipt."""
 
-        with _locked_file(self.path) as handle:
+        lock = _locked_file_read_only if read_only else _locked_file
+        with lock(self.path) as handle:
             state = _replay(_read_events(handle))
         prompt_tokens = completion_tokens = total_tokens = 0
         latency_ms = 0
@@ -1030,6 +1048,41 @@ def _locked_file(path: Path) -> Iterator[Any]:
         handle = os.fdopen(descriptor, "r+b", buffering=0)
         descriptor = -1
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield handle
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            handle.close()
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+@contextmanager
+def _locked_file_read_only(path: Path) -> Iterator[Any]:
+    """Open one existing regular ledger without following symlinks or writing."""
+
+    if path.is_symlink() or not path.is_file():
+        raise LedgerIntegrityError("usage ledger is missing or unsafe")
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except (FileNotFoundError, NotADirectoryError, OSError) as exc:
+        raise LedgerIntegrityError("usage ledger is missing or unsafe") from exc
+    try:
+        opened = os.fstat(descriptor)
+        current = path.stat()
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_dev != current.st_dev
+            or opened.st_ino != current.st_ino
+        ):
+            raise LedgerIntegrityError("usage ledger changed while opening")
+        handle = os.fdopen(descriptor, "rb", buffering=0)
+        descriptor = -1
+        fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
         try:
             yield handle
         finally:

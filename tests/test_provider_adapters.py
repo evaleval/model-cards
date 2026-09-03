@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 import hashlib
 import json
@@ -45,6 +46,7 @@ from model_cards.provider_adapters import (
     build_nexus_openrouter_inference_engine,
     summarize_aggregate_budget,
 )
+from model_cards.provider_execution import ProviderExecutionCollector
 from model_cards.quality_report import QualityReportError, _provider_metrics
 from model_cards.run_ledger import AttemptBinding, BudgetCapError, UsageLedger
 from model_cards.risk_mapping import (
@@ -860,6 +862,7 @@ class ProviderAdapterTests(unittest.TestCase):
                 route_payload(provider="Together"),
             ],
         )
+        collector = ProviderExecutionCollector()
         runtime = _Runtime.build(
             provider="Together",
             ledger_path=self.ledger,
@@ -868,6 +871,7 @@ class ProviderAdapterTests(unittest.TestCase):
             environment={"OPENROUTER_API_KEY": "fixture-key"},
             transport=transport,
             call=structured_json_call,
+            execution_collector=collector,
         )
 
         initial = runtime.invoke(
@@ -882,6 +886,10 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertFalse((self.decisions / "semantic-retry.attempt1.json").exists())
         self.assertTrue((self.decisions / "semantic-retry.attempt2.json").is_file())
         self.assertEqual(2, transport.paid_count)
+        self.assertEqual(1, len(collector.bindings))
+        self.assertEqual(
+            "semantic.retry.fixture.attempt2", collector.bindings[0].attempt_id
+        )
         aggregate_before_replay = (self.root / "aggregate-budget.jsonl").read_bytes()
 
         forbidden = FixtureTransport([])
@@ -893,6 +901,7 @@ class ProviderAdapterTests(unittest.TestCase):
             environment={},
             transport=forbidden,
             call=structured_json_call,
+            execution_collector=collector,
         ).invoke(
             spec,
             decision_name="semantic-retry.json",
@@ -903,11 +912,95 @@ class ProviderAdapterTests(unittest.TestCase):
         self.assertTrue(replay.resumed)
         self.assertEqual(initial.decision, replay.decision)
         self.assertEqual([], forbidden.requests)
+        self.assertEqual(1, len(collector.bindings))
+        self.assertEqual(initial.execution, replay.execution)
         self.assertEqual(2, UsageLedger(self.ledger).audit_state()["paid_calls"])
         self.assertEqual(
             aggregate_before_replay,
             (self.root / "aggregate-budget.jsonl").read_bytes(),
         )
+
+    def test_collector_rejects_result_without_typed_execution_binding(self) -> None:
+        from tests.test_provider import SCHEMA, validator
+
+        spec = StructuredCallSpec(
+            logical_call_id="collector.missing.binding",
+            attempt_id="collector.missing.binding.attempt1",
+            provider="Together",
+            schema_name="collector_missing_binding",
+            json_schema=SCHEMA,
+            system_prompt="Return one fixture value.",
+            user_prompt="Return the normalized fixture value.",
+            max_output_tokens=32,
+            context_metadata={"stage": "fixture"},
+        )
+        runtime = _Runtime.build(
+            provider="Together",
+            ledger_path=self.ledger,
+            decision_dir=self.decisions,
+            environment={},
+            transport=None,
+            call=FakeCalls({"value": "normalized"}),
+            execution_collector=ProviderExecutionCollector(),
+        )
+
+        with self.assertRaisesRegex(
+            ProviderAdapterError, "no typed execution binding"
+        ):
+            runtime.invoke(
+                spec,
+                decision_name="collector-missing-binding.json",
+                validator=validator,
+            )
+
+    def test_collector_rejects_decision_changed_after_settled_call(self) -> None:
+        from tests.test_provider import (
+            FixtureTransport,
+            SCHEMA,
+            route_payload,
+            success_payload,
+            validator,
+        )
+
+        spec = StructuredCallSpec(
+            logical_call_id="collector.changed.decision",
+            attempt_id="collector.changed.decision.attempt1",
+            provider="Together",
+            schema_name="collector_changed_decision",
+            json_schema=SCHEMA,
+            system_prompt="Return one fixture value.",
+            user_prompt="Return the normalized fixture value.",
+            max_output_tokens=32,
+            context_metadata={"stage": "fixture"},
+        )
+
+        def changed_call(call_spec, **kwargs):
+            settled = structured_json_call(call_spec, **kwargs)
+            return replace(settled, decision={"value": "changed after settlement"})
+
+        collector = ProviderExecutionCollector()
+        runtime = _Runtime.build(
+            provider="Together",
+            ledger_path=self.ledger,
+            decision_dir=self.decisions,
+            environment={"OPENROUTER_API_KEY": "fixture-key"},
+            transport=FixtureTransport(
+                [(200, success_payload(provider="Together"))],
+                routes=[route_payload(provider="Together")],
+            ),
+            call=changed_call,
+            execution_collector=collector,
+        )
+
+        with self.assertRaisesRegex(
+            ProviderAdapterError, "differs from its settled execution"
+        ):
+            runtime.invoke(
+                spec,
+                decision_name="collector-changed-decision.json",
+                validator=validator,
+            )
+        self.assertEqual((), collector.bindings)
 
     def test_risk_applicability_keeps_taxonomy_inference_distinct(self) -> None:
         use_context = UseContext(

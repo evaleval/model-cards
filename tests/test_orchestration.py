@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -18,9 +17,12 @@ from model_cards.provider import (
     PINNED_PROVIDER,
     PROVIDER_RUNTIME_VERSION,
     ProviderResponseError,
+    structured_json_call,
 )
 from model_cards.provider_adapters import ADAPTER_VERSION
+from model_cards.provider_execution import ProviderExecutionCollector
 from model_cards.run_ledger import AttemptBinding, UsageLedger
+from tests.test_provider import FixtureTransport, route_payload, success_payload
 from model_cards.orchestration import (
     ORCHESTRATION_MANIFEST_FILENAME,
     OrchestrationError,
@@ -95,6 +97,31 @@ class BundleAdapter:
                 b'{"model_type":"fixture-transformer"}',
             )
         return RemoteObject(FetchStatus.MISSING, reason_code="not_found")
+
+
+class StructuredOnlyBundleAdapter(BundleAdapter):
+    def fetch_model_metadata(self, model_id, revision, *, max_bytes):
+        return RemoteObject(
+            FetchStatus.OK,
+            json.dumps(
+                {
+                    "id": model_id,
+                    "sha": revision,
+                    "pipeline_tag": "text-generation",
+                    "config": {"model_type": "fixture-transformer"},
+                    "siblings": [{"rfilename": "config.json"}],
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8"),
+        )
+
+    def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
+        if repo_path == "README.md":
+            return RemoteObject(FetchStatus.MISSING, reason_code="not_found")
+        return super().fetch_file(
+            model_id, revision, repo_path, max_bytes=max_bytes
+        )
 
 
 class OfficialLinkedBundleAdapter(BundleAdapter):
@@ -220,19 +247,24 @@ class ResumableFakeCall:
         self.specs.append(spec)
         self.kwargs.append(kwargs)
         self.invocations.append((spec.context_metadata["stage"], spec.logical_call_id, key))
-        resumed = key in self.cached
-        if not resumed:
-            decision = self._decision(spec)
-            kwargs["validator"](decision)
-            self.cached[key] = decision
-            self.paid_paths.append(key)
-        decision = self.cached[key]
-        kwargs["validator"](decision)
-        return SimpleNamespace(
-            decision=decision,
-            receipt=SimpleNamespace(prompt_tokens=7, completion_tokens=3),
-            resumed=resumed,
+        decision = self._decision(spec)
+        result = structured_json_call(
+            spec,
+            ledger_path=kwargs["ledger_path"],
+            decision_path=decision_path,
+            validator=kwargs["validator"],
+            environment={"OPENROUTER_API_KEY": "synthetic-test-key"},
+            transport=FixtureTransport(
+                [(200, success_payload(decision=decision, provider=PINNED_PROVIDER))],
+                routes=[route_payload(provider=PINNED_PROVIDER)],
+            ),
+            sleeper=lambda _seconds: None,
+            paid_send_budget=kwargs.get("paid_send_budget"),
         )
+        self.cached[key] = result.decision
+        if not result.resumed:
+            self.paid_paths.append(key)
+        return result
 
 
 class CombinedSourceFakeCall(ResumableFakeCall):
@@ -314,11 +346,64 @@ class OneCheckerFailureFakeCall(ResumableFakeCall):
                     str(kwargs["decision_path"]),
                 )
             )
-            raise ProviderResponseError(
-                "synthetic closed provider response failure",
-                reason_code=self.reason_code,
+            decision_path = Path(kwargs["decision_path"])
+            response = (
+                success_payload(decision={"invalid": True}, provider="OtherProvider")
+                if self.reason_code == "returned_provider_mismatch"
+                else b'{}'
+            )
+            status = 200 if self.reason_code == "returned_provider_mismatch" else 400
+            return structured_json_call(
+                spec,
+                ledger_path=kwargs["ledger_path"],
+                decision_path=decision_path,
+                validator=kwargs["validator"],
+                environment={"OPENROUTER_API_KEY": "synthetic-test-key"},
+                transport=FixtureTransport(
+                    [(status, response)],
+                    routes=[route_payload(provider=PINNED_PROVIDER)],
+                ),
+                sleeper=lambda _seconds: None,
+                paid_send_budget=kwargs.get("paid_send_budget"),
             )
         return super().__call__(spec, **kwargs)
+
+
+class AllFactReasonerFailureFakeCall:
+    def __init__(self, *, semantic_invalid=False):
+        self.invocations = []
+        self.paid_calls = 0
+        self.semantic_invalid = semantic_invalid
+
+    def __call__(self, spec, **kwargs):
+        stage = spec.context_metadata["stage"]
+        if stage != "factreasoner_batch":
+            raise AssertionError(f"unexpected fake provider stage: {stage}")
+        self.invocations.append((stage, spec.logical_call_id, spec.attempt_id))
+        response = (
+            success_payload(
+                decision={"wrong": "shape"}, provider=PINNED_PROVIDER
+            )
+            if self.semantic_invalid
+            else b"{}"
+        )
+        transport = FixtureTransport(
+            [(200 if self.semantic_invalid else 400, response)],
+            routes=[route_payload(provider=PINNED_PROVIDER)],
+        )
+        try:
+            return structured_json_call(
+                spec,
+                ledger_path=kwargs["ledger_path"],
+                decision_path=kwargs["decision_path"],
+                validator=kwargs["validator"],
+                environment={"OPENROUTER_API_KEY": "synthetic-test-key"},
+                transport=transport,
+                sleeper=lambda _seconds: None,
+                paid_send_budget=kwargs.get("paid_send_budget"),
+            )
+        finally:
+            self.paid_calls += transport.paid_count
 
 
 class OrchestrationTests(unittest.TestCase):
@@ -620,6 +705,7 @@ class OrchestrationTests(unittest.TestCase):
     def test_one_checker_response_failure_withholds_candidate_and_continues(self):
         result = self.invoke(OneCheckerFailureFakeCall())
         self.assertTrue((self.run / "public-card.json").is_file())
+        self.assertIsNotNone(result.provider_execution_sha256)
         self.assertEqual(3, len(result.prose_decision_sha256s))
         gates = json.loads((self.run / "claim-gates.json").read_text())
         reasons = {
@@ -628,6 +714,71 @@ class OrchestrationTests(unittest.TestCase):
             for decision in record["decisions"]
         }
         self.assertIn("provider_response_unavailable", reasons)
+        execution = json.loads((self.run / "provider-execution.json").read_text())
+        self.assertEqual(1, len(execution["failed_executions"]))
+        self.assertEqual(
+            "value_support",
+            execution["failed_executions"][0]["attempt"]["context_metadata"][
+                "stage"
+            ],
+        )
+        self.assertEqual(
+            "http_bad_request", execution["failed_executions"][0]["reason_code"]
+        )
+
+        ledger_before = self.ledger.read_bytes()
+        replay_fake = OneCheckerFailureFakeCall()
+        replay = self.invoke(replay_fake)
+        self.assertEqual(result.result_sha256, replay.result_sha256)
+        self.assertEqual(ledger_before, self.ledger.read_bytes())
+        self.assertEqual([], replay_fake.paid_paths)
+
+    def test_all_failed_factreasoner_calls_are_manifest_bound_and_replay_free(self):
+        self.bundle = self.root / "structured-only-bundle"
+        collect_hf_source_bundle(
+            "acme/Exact", self.bundle, StructuredOnlyBundleAdapter()
+        )
+        fake = AllFactReasonerFailureFakeCall(semantic_invalid=True)
+
+        first = self.invoke(fake)
+
+        self.assertEqual((), first.eligible_text_source_ids)
+        self.assertEqual((), first.quote_candidate_ids)
+        self.assertGreater(fake.paid_calls, 0)
+        self.assertIsNotNone(first.provider_execution_sha256)
+        execution = json.loads(
+            (self.run / "provider-execution.json").read_text()
+        )
+        self.assertEqual([], execution["executions"])
+        self.assertTrue(execution["failed_executions"])
+        self.assertEqual(
+            {"factreasoner_batch"},
+            {
+                item["attempt"]["context_metadata"]["stage"]
+                for item in execution["failed_executions"]
+            },
+        )
+        attempts_by_logical = {}
+        for item in execution["failed_executions"]:
+            attempt = item["attempt"]
+            attempts_by_logical.setdefault(attempt["logical_call_id"], []).append(
+                attempt["attempt_id"]
+            )
+        self.assertTrue(attempts_by_logical)
+        self.assertTrue(
+            all(
+                sorted(attempts)
+                == [f"{logical}.attempt1", f"{logical}.attempt2"]
+                for logical, attempts in attempts_by_logical.items()
+            )
+        )
+
+        ledger_before = self.ledger.read_bytes()
+        replay_fake = AllFactReasonerFailureFakeCall(semantic_invalid=True)
+        replay = self.invoke(replay_fake)
+        self.assertEqual(first.result_sha256, replay.result_sha256)
+        self.assertEqual(0, replay_fake.paid_calls)
+        self.assertEqual(ledger_before, self.ledger.read_bytes())
 
     def test_route_identity_failure_remains_fatal(self):
         with self.assertRaises(ProviderResponseError):
@@ -822,6 +973,7 @@ class OrchestrationTests(unittest.TestCase):
         environment = {"OPENROUTER_API_KEY": "fixture-only"}
         transport = object()
         fake = ResumableFakeCall()
+        collector = ProviderExecutionCollector()
         with (
             patch(
                 "model_cards.orchestration.load_pinned_nexus_catalog",
@@ -849,6 +1001,7 @@ class OrchestrationTests(unittest.TestCase):
                 transport=transport,
                 call=fake,
                 max_risks=4,
+                execution_collector=collector,
             )
 
         self.assertEqual((detector, checker, "nexus_provider_enabled"), actual)
@@ -860,6 +1013,7 @@ class OrchestrationTests(unittest.TestCase):
             transport=transport,
             call=fake,
             aggregate_budget_path=None,
+            execution_collector=collector,
         )
         build_detector.assert_called_once_with(engine, max_risks=4)
         build_checker.assert_called_once_with(
@@ -870,6 +1024,7 @@ class OrchestrationTests(unittest.TestCase):
             transport=transport,
             call=fake,
             aggregate_budget_path=None,
+            execution_collector=collector,
         )
 
 

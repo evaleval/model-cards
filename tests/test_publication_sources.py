@@ -25,6 +25,9 @@ from model_cards.publication_sources import (
     enrich_publication_card,
     replay_publication_enrichment,
 )
+from model_cards.claim_gate import evaluate_claim_gate
+from model_cards.extraction import deterministic_structured_candidates
+from model_cards.family_risk import select_config_family_membership
 from model_cards.source_bundle import (
     FetchStatus,
     RemoteObject,
@@ -74,6 +77,9 @@ def synthetic_catalog(
     base_model_tag_override: str | None = None,
     pipeline_tag: str | None = "text-generation",
     include_default_context: bool = True,
+    config_model_type: str = "example",
+    metadata_config_model_type: str | None = None,
+    config_fetch_status: FetchStatus = FetchStatus.OK,
 ):
     tags = [
         "safetensors",
@@ -93,8 +99,7 @@ def synthetic_catalog(
             )
         )
         card_data["base_model"] = base_model
-    metadata = json.dumps(
-        {
+    metadata_value: dict[str, object] = {
             "id": model_id,
             "modelId": model_id,
             "sha": COMMIT,
@@ -118,7 +123,11 @@ def synthetic_catalog(
                 {"rfilename": "config.json"},
                 {"rfilename": "model.safetensors"},
             ],
-        },
+        }
+    if metadata_config_model_type is not None:
+        metadata_value["config"] = {"model_type": metadata_config_model_type}
+    metadata = json.dumps(
+        metadata_value,
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
@@ -145,7 +154,7 @@ Example Instruct documentation contains this deliberately long sentence that mus
     config = json.dumps(
         {
             "architectures": ["ExampleForCausalLM"],
-            "model_type": "example",
+            "model_type": config_model_type,
             "max_position_embeddings": 4096,
             "n_routed_experts": 8,
             "num_experts_per_tok": 2,
@@ -163,7 +172,13 @@ Example Instruct documentation contains this deliberately long sentence that mus
             metadata,
             {
                 "README.md": RemoteObject(FetchStatus.OK, readme),
-                "config.json": RemoteObject(FetchStatus.OK, config),
+                "config.json": (
+                    RemoteObject(FetchStatus.OK, config)
+                    if config_fetch_status is FetchStatus.OK
+                    else RemoteObject(
+                        config_fetch_status, reason_code=config_fetch_status.value
+                    )
+                ),
             },
         ),
     )
@@ -949,13 +964,84 @@ Example-v0.3 has the following changes compared to [Example-v0.2](https://huggin
             card["identity"]["summary"],
         )
 
-    def test_model_type_uses_task_semantics_not_config_family_identifier(self) -> None:
+    def test_unknown_config_model_type_is_not_promoted_to_model_family(self) -> None:
         catalog = synthetic_catalog(self, pipeline_tag=None)
 
         card = enrich_publication_card(catalog).card
 
         self.assertEqual("text-generation", card["identity"]["model_type"])
-        self.assertEqual("example", card["lineage"]["model_family"])
+        self.assertNotIn("model_family", card["lineage"])
+
+    def test_registered_publisher_config_derives_model_family(self) -> None:
+        catalog = synthetic_catalog(
+            self,
+            model_id="google/gemma-3-4b-pt",
+            base_model=None,
+            config_model_type="gemma3",
+            metadata_config_model_type="gemma3",
+        )
+
+        result = enrich_publication_card(catalog)
+
+        self.assertEqual("gemma3", result.card["lineage"]["model_family"])
+        provenance = next(
+            item
+            for item in result.provenance
+            if item.field_path == "lineage.model_family"
+        )
+        self.assertTrue(
+            provenance.rule_name.endswith(
+                "/model_family_from_registered_config_model_type"
+            )
+        )
+        self.assertEqual("/model_type", provenance.sources[0].pointer)
+
+    def test_gated_config_uses_exact_metadata_family_evidence(self) -> None:
+        catalog = synthetic_catalog(
+            self,
+            model_id="google/gemma-3-4b-pt",
+            base_model=None,
+            config_model_type="gemma3",
+            metadata_config_model_type="gemma3",
+            config_fetch_status=FetchStatus.GATED,
+        )
+
+        result = enrich_publication_card(catalog)
+
+        self.assertEqual("gemma3", result.card["lineage"]["model_family"])
+        provenance = next(
+            item
+            for item in result.provenance
+            if item.field_path == "lineage.model_family"
+        )
+        self.assertEqual("/config/model_type", provenance.sources[0].pointer)
+
+        extracted = deterministic_structured_candidates(catalog)
+        candidates = tuple(
+            item
+            for item in extracted.candidates
+            if item.field_path == "lineage.model_family"
+        )
+        self.assertEqual(1, len(candidates))
+        self.assertEqual("/config/model_type", candidates[0].evidence[0].pointer)
+        gate = evaluate_claim_gate(candidates[0], catalog.by_id)
+        self.assertTrue(gate.projection_eligible)
+        selected = select_config_family_membership((gate,))
+        self.assertIsNotNone(selected)
+        assert selected is not None
+        self.assertEqual("gemma3", selected[1].family_id)
+
+    def test_known_architecture_in_unregistered_namespace_is_not_family_membership(self) -> None:
+        catalog = synthetic_catalog(
+            self,
+            model_id="acme/Gemma-Compatible",
+            base_model=None,
+            config_model_type="gemma3",
+        )
+
+        card = enrich_publication_card(catalog).card
+
+        self.assertNotIn("model_family", card["lineage"])
 
     def test_model_information_modalities_and_languages_override_generic_mapping(self) -> None:
         catalog = synthetic_catalog(

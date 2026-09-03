@@ -49,6 +49,11 @@ from .factreasoner import (
     FactReasonerRecord,
     FieldAction,
 )
+from .family_risk import (
+    FAMILY_RISK_BRIDGE_VERSION,
+    FamilyRiskAuthorizationReport,
+    build_family_risk_authorization_report,
+)
 from .findings import FieldAuditStatus, OmissionAudit, OmissionReason
 from .models import (
     EvidenceKind,
@@ -67,6 +72,10 @@ from .orchestration import (
     ORCHESTRATION_SCOPE,
     ORCHESTRATION_VERSION,
     ProviderOrchestrationResult,
+)
+from .provider_execution import (
+    PROVIDER_EXECUTION_MANIFEST_FILENAME,
+    ProviderExecutionRunEvidence,
 )
 from .pipeline import (
     PIPELINE_VERSION,
@@ -108,6 +117,7 @@ from .risk_mapping import (
     load_pinned_nexus_catalog,
     replay_risk_mapping,
 )
+from .review_audit import _verify_taxonomy_derivation_chain
 from .run_ledger import GLOBAL_PAID_CALL_CAP, GLOBAL_USD_CAP, UsageLedger
 from .run_summary import (
     AUDIT_VIEW_FILENAME,
@@ -124,14 +134,17 @@ from .schema import (
 )
 from .source_bundle import parse_target_request, replay_source_bundle
 from .source_documents import SourceDocumentCatalog
-from .source_state import SourceStateMode, load_source_state
+from .source_state import ImmutableSourceState, SourceStateMode, load_source_state
 from .scholarly_discovery import (
     SCHOLARLY_DISCOVERY_FILENAME,
     load_scholarly_discovery,
 )
 
 
-QUALITY_REPORT_VERSION = "model-card-quality-report/v4"
+QUALITY_REPORT_VERSION = "model-card-quality-report/v6"
+
+_SOURCE_INPUT_SURFACE_VERSION = "model-card-source-input-surface/v1"
+_TREATMENT_SURFACE_VERSION = "model-card-treatment-surface/v1"
 
 _AGGREGATE_BUDGET_FILENAME = "aggregate-budget.jsonl"
 _AGGREGATE_BUDGET_SUMMARY_FILENAME = "aggregate-budget-summary.json"
@@ -181,7 +194,8 @@ _FINDING_CODES = frozenset(
     }
 )
 _SURFACE_KEYS = (
-    "inputs",
+    "source_inputs",
+    "treatment",
     "values",
     "bindings",
     "artifact",
@@ -198,6 +212,7 @@ _PIPELINE_ARTIFACT_FILENAMES = frozenset(
         "source-catalog.json",
         "extraction.json",
         "claim-gates.json",
+        "family-risk-authorizations.json",
         "composition-original.json",
         "factreasoner-original.json",
         "omissions-original.json",
@@ -452,6 +467,7 @@ _PROVIDER_ADMISSION_KEYS = {
     "risk_catalog_sha256",
     "risk_catalog_status",
     "risk_interface_status",
+    "family_risk_bridge_version",
     "factreasoner_interface_status",
     "factreasoner_checker_id",
     "factreasoner_checker_revision",
@@ -479,6 +495,7 @@ _PROVIDER_RESULT_KEYS = {
     "risk_catalog_sha256",
     "risk_interface_status",
     "factreasoner_interface_status",
+    "provider_execution_sha256",
     "pipeline_result_sha256",
     "result_sha256",
 }
@@ -545,6 +562,7 @@ def _load_provider_admission(
         or item["factreasoner_kernel_version"] != FACTREASONER_KERNEL_VERSION
         or item["pipeline_version"] != PIPELINE_VERSION
         or item["provider_runtime_version"] != PROVIDER_RUNTIME_VERSION
+        or item["family_risk_bridge_version"] != FAMILY_RISK_BRIDGE_VERSION
         or item["scope"] != ORCHESTRATION_SCOPE
         or item["model"] != MODEL_ID
         or item["provider"] != PINNED_PROVIDER
@@ -710,6 +728,7 @@ def _load_provider_run_artifacts(
             risk_catalog_sha256=item["risk_catalog_sha256"],
             risk_interface_status=item["risk_interface_status"],
             factreasoner_interface_status=item["factreasoner_interface_status"],
+            provider_execution_sha256=item["provider_execution_sha256"],
             pipeline_result=result,
             orchestration_version=item["orchestration_version"],
         )
@@ -726,8 +745,44 @@ def _load_provider_run_artifacts(
         != _digest(item["eligible_text_source_ids"])
     ):
         raise QualityReportError("provider result differs from its admission")
+    execution_path = run_root / PROVIDER_EXECUTION_MANIFEST_FILENAME
+    if item["provider_execution_sha256"] is None:
+        ledger_path = run_root / USAGE_LEDGER_FILENAME
+        try:
+            ledger_has_events = ledger_path.is_file() and bool(
+                ledger_path.read_bytes().strip()
+            )
+        except OSError as exc:
+            raise QualityReportError(
+                "provider usage ledger could not be read"
+            ) from exc
+        if (
+            execution_path.exists()
+            or execution_path.is_symlink()
+            or ledger_has_events
+        ):
+            raise QualityReportError(
+                "provider execution manifest lacks a result binding"
+            )
+        execution_artifacts: tuple[str, ...] = ()
+    else:
+        try:
+            execution = ProviderExecutionRunEvidence.load(run_root)
+        except Exception as exc:
+            raise QualityReportError(
+                "provider execution manifest failed replay"
+            ) from exc
+        if execution.manifest.manifest_sha256 != item["provider_execution_sha256"]:
+            raise QualityReportError(
+                "provider execution manifest differs from the provider result"
+            )
+        execution_artifacts = (PROVIDER_EXECUTION_MANIFEST_FILENAME,)
     return (
-        (ORCHESTRATION_MANIFEST_FILENAME, "provider-result.json"),
+        (
+            ORCHESTRATION_MANIFEST_FILENAME,
+            "provider-result.json",
+            *execution_artifacts,
+        ),
         budget_path_sha256,
         admission,
         item,
@@ -1294,6 +1349,7 @@ def _load_successful_target(
 
     extraction = _load_extraction(run_root, result)
     gates, gate_value = _load_gates(run_root, result, extraction, source_catalog.documents)
+    family_authorization = _load_family_authorization(run_root, result, gates)
     composition = _load_composition(run_root, result)
     repair = _load_repair_chain(run_root, result)
     artifact, public_card = _load_exports(run_root, result)
@@ -1326,6 +1382,8 @@ def _load_successful_target(
         repair,
         extraction,
         provider_admission,
+        family_authorization,
+        gate_records=gates,
     )
 
     included_ids = {item.candidate_id for item in result.claims if item.included}
@@ -1368,7 +1426,11 @@ def _load_successful_target(
         repair=repair,
         risk_surface=risk_surface,
         provider=provider,
-        input_surface=store.manifest.manifest_sha256,
+        source_input_surface=_source_input_surface(
+            result=result,
+            source_state=source_state,
+        ),
+        treatment_surface=_treatment_surface(store.manifest.configuration),
     )
     record = {
         "request": request,
@@ -1541,6 +1603,33 @@ def _load_gates(
         except Exception as exc:
             raise QualityReportError("claim-gate source replay failed") from exc
     return records, value
+
+
+def _load_family_authorization(
+    run_root: Path,
+    result: PipelineResult,
+    gates: Sequence[ClaimGateRecord],
+) -> FamilyRiskAuthorizationReport:
+    value = _read_canonical_object(
+        run_root / "family-risk-authorizations.json",
+        "family risk authorization",
+    )
+    try:
+        report = FamilyRiskAuthorizationReport.from_dict(value)
+        replayed = build_family_risk_authorization_report(
+            gates,
+            report.applicability_decisions,
+            target=result.target,
+        )
+    except Exception as exc:
+        raise QualityReportError(
+            "family risk authorization failed typed replay"
+        ) from exc
+    if report != replayed or report.target != result.target:
+        raise QualityReportError(
+            "family risk authorization differs from accepted claim gates"
+        )
+    return report
 
 
 def _load_composition(run_root: Path, result: PipelineResult) -> CompositionResult | None:
@@ -1946,6 +2035,9 @@ def _load_risk(
     repair: PipelineRepairReport,
     candidates: Sequence[ClaimCandidate],
     provider_admission: Mapping[str, Any] | None,
+    family_authorization: FamilyRiskAuthorizationReport | None = None,
+    *,
+    gate_records: Sequence[ClaimGateRecord] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], str]:
     value = _read_canonical_object(run_root / "risk-mapping.json", "risk mapping")
     item = _strict_object(
@@ -1986,9 +2078,74 @@ def _load_risk(
     included_claim_ids = {
         claim.candidate_id for claim in result.claims if claim.included
     }
+    if gate_records is None:
+        gate_value = _read_canonical_object(
+            run_root / "claim-gates.json",
+            "claim-gate artifact",
+        )
+        gate_item = _strict_object(
+            gate_value,
+            {"target", "extraction_sha256", "records"},
+            "claim-gate artifact",
+        )
+        if not isinstance(gate_item["records"], list):
+            raise QualityReportError("claim-gate fallback records are malformed")
+        try:
+            gate_records = tuple(
+                ClaimGateRecord.from_dict(entry) for entry in gate_item["records"]
+            )
+        except Exception as exc:
+            raise QualityReportError(
+                "claim-gate fallback failed typed validation"
+            ) from exc
+        candidate_by_id = {entry.candidate_id: entry for entry in candidates}
+        result_by_id = {entry.candidate_id: entry for entry in result.claims}
+        if gate_item["target"] != result.target.to_dict() or gate_item[
+            "extraction_sha256"
+        ] != _digest(
+            _read_canonical_object(
+                run_root / "extraction.json",
+                "extraction artifact",
+            )
+        ):
+            raise QualityReportError(
+                "claim-gate fallback differs from the pipeline result"
+            )
+        if (
+            len(gate_records) != len(candidate_by_id)
+            or {entry.candidate.candidate_id for entry in gate_records}
+            != set(candidate_by_id)
+        ):
+            raise QualityReportError(
+                "claim-gate fallback inventory differs from extraction"
+            )
+        for gate in gate_records:
+            candidate_id = gate.candidate.candidate_id
+            reference = result_by_id.get(candidate_id)
+            if (
+                gate.candidate.to_dict()
+                != candidate_by_id[candidate_id].to_dict()
+                or reference is None
+                or reference.gate_record_sha256 != gate.content_sha256
+                or reference.projection_eligible != gate.projection_eligible
+            ):
+                raise QualityReportError(
+                    "claim-gate fallback differs from the pipeline result"
+                )
     try:
-        effective_contexts = derive_model_use_contexts(
+        exact_contexts = derive_model_use_contexts(
             candidates, included_claim_ids
+        )
+        family_contexts = (
+            ()
+            if family_authorization is None
+            else family_authorization.nexus_inputs
+        )
+        effective_contexts = tuple(
+            sorted(
+                (*exact_contexts, *family_contexts),
+                key=lambda entry: entry.context_id,
+            )
         )
     except Exception as exc:
         raise QualityReportError(
@@ -2006,6 +2163,7 @@ def _load_risk(
         raise QualityReportError("risk FactReasoner withholding is inconsistent")
 
     mapping = item["taxonomy_mapping"]
+    typed_mapping: RiskMappingReport | None = None
     candidate_count = mapping_included_count = 0
     included_count = applicability_total = applicability_accepted = 0
     mapping_report_sha256 = None
@@ -2015,6 +2173,8 @@ def _load_risk(
             summary.status != "unavailable"
             or summary.mapping_report_sha256 is not None
             or summary.catalog_sha256 is not None
+            or derivations
+            or artifact.derivations
         ):
             raise QualityReportError("missing risk mapping disagrees with stage status")
     else:
@@ -2105,10 +2265,28 @@ def _load_risk(
         ):
             raise QualityReportError("taxonomy derivation inputs are stale")
     exported = tuple(artifact.derivations)
-    if not {entry.derivation_id for entry in exported} <= {
-        entry.derivation_id for entry in derivations
-    }:
-        raise QualityReportError("exported taxonomy derivation is not in risk mapping")
+    if typed_mapping is not None:
+        if family_authorization is None:
+            raise QualityReportError(
+                "taxonomy derivation replay lacks family authorization"
+            )
+        try:
+            _verify_taxonomy_derivation_chain(
+                report=typed_mapping,
+                contexts=contexts,
+                candidates=tuple(candidates),
+                gate_records=tuple(gate_records),
+                included_ids=included_claim_ids,
+                family_authorization=family_authorization,
+                target=result.target,
+                factreasoner_withheld_derivation_ids=fact_withheld_ids,
+                retained_derivations=derivations,
+                exported_derivations=exported,
+            )
+        except Exception as exc:
+            raise QualityReportError(
+                "taxonomy derivation chain failed exact replay"
+            ) from exc
     context_source_refs = {ref for context in contexts for ref in context.source_refs}
     metrics = {
         "status": summary.status,
@@ -2147,6 +2325,11 @@ def _load_risk(
             "summary_sha256": summary.summary_sha256,
             "mapping_report_sha256": mapping_report_sha256,
             "context_sha256": summary.context_sha256,
+            "family_authorization_sha256": (
+                None
+                if family_authorization is None
+                else family_authorization.report_sha256
+            ),
             "derivations": [entry.content_sha256 for entry in derivations],
             "exported_derivations": [entry.content_sha256 for entry in exported],
         }
@@ -2496,7 +2679,8 @@ def _surface_digests(
     repair: PipelineRepairReport,
     risk_surface: str,
     provider: Mapping[str, Any],
-    input_surface: str,
+    source_input_surface: str,
+    treatment_surface: str,
 ) -> dict[str, str]:
     audit_card = project_card(artifact)
     values = {
@@ -2519,7 +2703,8 @@ def _surface_digests(
         "validation": audit_card["validation"],
     }
     return {
-        "inputs": input_surface,
+        "source_inputs": source_input_surface,
+        "treatment": treatment_surface,
         "values": _digest(values),
         "bindings": _digest([item.to_dict() for item in artifact.bindings]),
         "artifact": result.artifact_sha256,
@@ -2536,6 +2721,48 @@ def _surface_digests(
         "privacy": result.privacy.report_sha256,
         "cost_latency": _provider_surface(provider),
     }
+
+
+def _source_input_surface(
+    *,
+    result: PipelineResult,
+    source_state: ImmutableSourceState,
+) -> str:
+    """Bind only the immutable target and frozen source identity.
+
+    Run configuration is deliberately excluded.  This lets the evaluation
+    harness compare two treatments over the same exact sources without
+    conflating the treatment choice with the experimental input surface.
+    """
+
+    return _digest(
+        {
+            "surface_version": _SOURCE_INPUT_SURFACE_VERSION,
+            "target": result.target.to_dict(),
+            "source_bundle_id": result.source_bundle_id,
+            "source_manifest_sha256": result.source_manifest_sha256,
+            "source_catalog_sha256": result.source_catalog_sha256,
+            "source_state_sha256": _digest(source_state.to_dict()),
+            "source_state_snapshot_sha256": source_state.snapshot_sha256,
+            "hf_bundle_id": source_state.hf_bundle_id,
+            "hf_manifest_sha256": source_state.hf_manifest_sha256,
+            "hf_catalog_sha256": source_state.hf_catalog_sha256,
+            "official_bundle_id": source_state.official_bundle_id,
+            "official_manifest_sha256": source_state.official_manifest_sha256,
+            "official_catalog_sha256": source_state.official_catalog_sha256,
+        }
+    )
+
+
+def _treatment_surface(configuration: Mapping[str, Any]) -> str:
+    """Bind the closed run configuration independently of frozen sources."""
+
+    return _digest(
+        {
+            "surface_version": _TREATMENT_SURFACE_VERSION,
+            "configuration": dict(configuration),
+        }
+    )
 
 
 def _aggregate(batch: _LoadedBatch) -> dict[str, Any]:

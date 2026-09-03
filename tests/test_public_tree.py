@@ -26,7 +26,11 @@ class PublicTreeTests(unittest.TestCase):
         "AGENTS.md",
         "CLAUDE.md",
         "CODEX.md",
+        "family-risk-authorizations.json",
         "pasted-text.txt",
+        "provider-execution.json",
+        "provider-orchestration.json",
+        "provider-result.json",
         "source-bundle.json",
         "source_bundle.json",
     }
@@ -69,6 +73,7 @@ class PublicTreeTests(unittest.TestCase):
             ".codex/config.json",
             "nested/CLAUDE.md",
             "nested/AGENTS.md",
+            "nested/family-risk-authorizations.json",
             "assets/unreviewed.pdf",
         )
         for path in should_ignore:

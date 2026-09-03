@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evaleval.github.io/model-cards/evaluation/item-manifest.schema.json",
+  "title": "Private artifact-bound Model Card evaluation item manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "study_unit_id",
+    "conditions",
+    "blinding_key_sha256",
+    "targets",
+    "items",
+    "inventory",
+    "manifest_sha256"
+  ],
+  "properties": {
+    "manifest_version": {"const": "model-card-evaluation-item-manifest/v1"},
+    "study_unit_id": {"$ref": "#/$defs/opaque_id"},
+    "conditions": {
+      "type": "array",
+      "items": {"enum": ["A", "B"]},
+      "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 2
+    },
+    "blinding_key_sha256": {"$ref": "#/$defs/digest"},
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/target"}
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/item"}
+    },
+    "inventory": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/inventory"}
+    },
+    "manifest_sha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "opaque_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{7,127}$"
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_name", "artifact_sha256"],
+      "properties": {
+        "artifact_name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*\\.json$"
+        },
+        "artifact_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "condition_artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "pipeline_result_sha256",
+        "source_input_surface_sha256",
+        "treatment_surface_sha256",
+        "run_identity_sha256",
+        "reviewer_payload_sha256s",
+        "artifacts"
+      ],
+      "properties": {
+        "condition": {"enum": ["A", "B"]},
+        "pipeline_result_sha256": {"$ref": "#/$defs/digest"},
+        "source_input_surface_sha256": {"$ref": "#/$defs/digest"},
+        "treatment_surface_sha256": {"$ref": "#/$defs/digest"},
+        "run_identity_sha256": {"$ref": "#/$defs/digest"},
+        "reviewer_payload_sha256s": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["primary", "warning_followup"],
+          "properties": {
+            "primary": {"$ref": "#/$defs/digest"},
+            "warning_followup": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 11,
+          "items": {"$ref": "#/$defs/artifact"}
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_blind_id",
+        "target_request",
+        "target_sha256",
+        "target_sheet_sha256",
+        "frozen_inputs",
+        "condition_artifacts"
+      ],
+      "properties": {
+        "target_blind_id": {"$ref": "#/$defs/opaque_id"},
+        "target_request": {"type": "string", "minLength": 44, "maxLength": 512},
+        "target_sha256": {"$ref": "#/$defs/digest"},
+        "target_sheet_sha256": {"$ref": "#/$defs/digest"},
+        "frozen_inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_bundle_id_sha256",
+            "source_manifest_sha256",
+            "source_catalog_sha256"
+          ],
+          "properties": {
+            "source_bundle_id_sha256": {"$ref": "#/$defs/digest"},
+            "source_manifest_sha256": {"$ref": "#/$defs/digest"},
+            "source_catalog_sha256": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "condition_artifacts": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/condition_artifacts"},
+          "minItems": 1,
+          "maxItems": 2
+        }
+      }
+    },
+    "artifact_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_name",
+        "artifact_sha256",
+        "json_pointer",
+        "record_sha256"
+      ],
+      "properties": {
+        "artifact_name": {"type": "string", "pattern": "^[a-z][a-z0-9-]*\\.json$"},
+        "artifact_sha256": {"$ref": "#/$defs/digest"},
+        "json_pointer": {"type": "string", "pattern": "^/", "maxLength": 512},
+        "record_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "coordinate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["char_start", "char_end", "json_pointer", "section_path", "table_id"],
+      "properties": {
+        "char_start": {"type": ["integer", "null"], "minimum": 0},
+        "char_end": {"type": ["integer", "null"], "minimum": 1},
+        "json_pointer": {"type": ["string", "null"], "maxLength": 1024},
+        "section_path": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "table_id": {"type": ["string", "null"], "maxLength": 128}
+      }
+    },
+    "evidence_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "evidence_sha256",
+        "source_id",
+        "source_sha256",
+        "source_revision_sha256",
+        "source_uri_sha256",
+        "kind",
+        "coordinate",
+        "fragment_sha256"
+      ],
+      "properties": {
+        "evidence_id": {"$ref": "#/$defs/opaque_id"},
+        "evidence_sha256": {"$ref": "#/$defs/digest"},
+        "source_id": {"type": "string", "minLength": 2, "maxLength": 128},
+        "source_sha256": {"$ref": "#/$defs/digest"},
+        "source_revision_sha256": {"$ref": "#/$defs/digest"},
+        "source_uri_sha256": {"$ref": "#/$defs/digest"},
+        "kind": {"enum": ["quote", "structured"]},
+        "coordinate": {"$ref": "#/$defs/coordinate"},
+        "fragment_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "gate_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate", "status", "reason", "decision_sha256"],
+      "properties": {
+        "gate": {"enum": ["coordinate_integrity", "entity_scope", "field_fit", "value_support"]},
+        "status": {"enum": ["accepted", "withheld"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 128},
+        "decision_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "fact_phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "phase",
+        "record_sha256",
+        "coverage_status",
+        "field_action",
+        "outcomes",
+        "atom_decision_sha256s"
+      ],
+      "properties": {
+        "phase": {"enum": ["original", "content", "publication_original", "final"]},
+        "record_sha256": {"$ref": "#/$defs/digest"},
+        "coverage_status": {"type": "string", "minLength": 1, "maxLength": 128},
+        "field_action": {"type": ["string", "null"], "maxLength": 128},
+        "outcomes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "atom_decision_sha256s": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "repair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "predecessor_candidate_sha256",
+        "selected_candidate_sha256",
+        "record_sha256"
+      ],
+      "properties": {
+        "status": {"enum": ["not_applicable", "repaired", "withheld"]},
+        "predecessor_candidate_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "selected_candidate_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "record_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "warning_present",
+        "gate_decisions",
+        "factreasoner",
+        "repair"
+      ],
+      "properties": {
+        "state": {"type": "string", "minLength": 1, "maxLength": 128},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 128},
+        "warning_present": {"type": "boolean"},
+        "gate_decisions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/gate_decision"}
+        },
+        "factreasoner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phases"],
+          "properties": {
+            "phases": {"type": "array", "items": {"$ref": "#/$defs/fact_phase"}}
+          }
+        },
+        "repair": {"$ref": "#/$defs/repair"}
+      }
+    },
+    "condition_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition",
+        "present",
+        "disposition",
+        "artifact_bindings",
+        "evidence_bindings"
+      ],
+      "properties": {
+        "condition": {"enum": ["A", "B"]},
+        "present": {"type": "boolean"},
+        "disposition": {"$ref": "#/$defs/disposition"},
+        "artifact_bindings": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/artifact_binding"}
+        },
+        "evidence_bindings": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/evidence_binding"}
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "target_blind_id",
+        "item_kind",
+        "semantic_key_sha256",
+        "subject",
+        "conditions"
+      ],
+      "properties": {
+        "item_id": {"$ref": "#/$defs/opaque_id"},
+        "target_blind_id": {"$ref": "#/$defs/opaque_id"},
+        "item_kind": {"enum": ["claim", "field", "risk", "warning"]},
+        "semantic_key_sha256": {"$ref": "#/$defs/digest"},
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["field_path", "native_ids", "native_sha256s"],
+          "properties": {
+            "field_path": {"type": ["string", "null"], "maxLength": 256},
+            "native_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "minLength": 1, "maxLength": 512}
+            },
+            "native_sha256s": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/digest"}
+            }
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/condition_binding"},
+          "minItems": 1,
+          "maxItems": 2
+        }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_blind_id",
+        "condition",
+        "claims",
+        "fields",
+        "risks",
+        "warnings",
+        "repairs"
+      ],
+      "properties": {
+        "target_blind_id": {"$ref": "#/$defs/opaque_id"},
+        "condition": {"enum": ["A", "B"]},
+        "claims": {"type": "integer", "minimum": 0},
+        "fields": {"type": "integer", "minimum": 0},
+        "risks": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "integer", "minimum": 0},
+        "repairs": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

@@ -19,8 +19,22 @@ import re
 import tempfile
 from typing import Any, Callable, Mapping
 
-from .claim_gate import ClaimCandidate, GateName, ProseCheckerDecision
-from .extraction import EXTRACTION_VERSION, ExtractionBatch, materialize_quote_batch
+from .claim_gate import (
+    ClaimCandidate,
+    ClaimGateRecord,
+    GateName,
+    ProseCheckerDecision,
+    evaluate_claim_gate,
+)
+from .extraction import (
+    EXTRACTION_VERSION,
+    ExtractionBatch,
+    build_source_windows,
+    build_use_risk_windows,
+    deterministic_publisher_context_candidates,
+    deterministic_structured_candidates,
+    materialize_quote_batch,
+)
 from .factreasoner import (
     FACTREASONER_KERNEL_VERSION,
     IBM_FACTREASONER_ADAPTER_VERSION,
@@ -35,7 +49,21 @@ from .factreasoner import (
     UpstreamFactReasonerUnavailable,
 )
 from .models import TargetIdentity
-from .pipeline import PIPELINE_VERSION, PipelineResult, run_offline_pipeline
+from .family_risk import (
+    FAMILY_RISK_BRIDGE_VERSION,
+    FamilyContextApplicabilityDecision,
+    FamilyDecisionStatus,
+    FamilyMembershipDecision,
+    FamilyRiskBridgeError,
+    select_config_family_membership,
+    validate_family_context_gate,
+)
+from .pipeline import (
+    PIPELINE_VERSION,
+    PipelineResult,
+    deterministic_publisher_context_decisions,
+    run_offline_pipeline,
+)
 from .provider import (
     MODEL_ID,
     PINNED_PROVIDER,
@@ -50,15 +78,24 @@ from .provider_adapters import (
     ADAPTER_VERSION,
     OpenRouterApplicabilityChecker,
     OpenRouterClaimChecker,
+    OpenRouterFamilyContextChecker,
     OpenRouterFactChecker,
     OpenRouterQuoteExtractor,
     ProviderAdapterError,
     _validate_existing_pinned_ledger,
     build_nexus_openrouter_inference_engine,
 )
+from .provider_execution import (
+    PROVIDER_EXECUTION_MANIFEST_FILENAME,
+    ProviderExecutionCollector,
+    ProviderExecutionError,
+    ProviderExecutionManifest,
+)
 from .risk_mapping import (
+    MappingStatus,
     NexusGenericRiskDetector,
     RiskCatalog,
+    RiskMappingReport,
     RiskMappingError,
     TaxonomyRelease,
     load_pinned_nexus_catalog,
@@ -68,7 +105,7 @@ from .run_ledger import path_sha256
 from .source_state import ImmutableSourceState, load_source_state
 
 
-ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v13"
+ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v16"
 ORCHESTRATION_SCOPE = "immutable_source_state_catalog"
 ORCHESTRATION_MANIFEST_FILENAME = "provider-orchestration.json"
 DEFAULT_MAX_RISKS = 5
@@ -124,6 +161,66 @@ def _claim_decision(
         if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
             raise
         return _unavailable_claim_decision(candidate, gate)
+
+
+def _unavailable_family_decision(
+    record: ClaimGateRecord,
+    membership: FamilyMembershipDecision,
+    membership_gate: ClaimGateRecord,
+) -> FamilyContextApplicabilityDecision:
+    return FamilyContextApplicabilityDecision.for_gate(
+        record,
+        membership,
+        membership_gate,
+        status=FamilyDecisionStatus.UNAVAILABLE,
+        checker=_CLAIM_AVAILABILITY_CHECKER,
+        method="recorded_provider_response_availability",
+        reason="provider_response_unavailable",
+        rationale=(
+            "The checkpoint applicability provider response was unavailable."
+        ),
+    )
+
+
+def _family_decision(
+    checker: OpenRouterFamilyContextChecker,
+    record: ClaimGateRecord,
+    membership: FamilyMembershipDecision,
+    membership_gate: ClaimGateRecord,
+) -> FamilyContextApplicabilityDecision:
+    try:
+        return checker.assess(record, membership, membership_gate)
+    except ProviderTerminalAttemptError as exc:
+        if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
+            raise
+        return _unavailable_family_decision(
+            record, membership, membership_gate
+        )
+    except ProviderResponseError as exc:
+        if exc.reason_code not in RECOVERABLE_PROVIDER_FAILURE_REASON_CODES:
+            raise
+        return _unavailable_family_decision(
+            record, membership, membership_gate
+        )
+
+
+def _matching_decisions(
+    candidate: ClaimCandidate,
+    decisions: tuple[ProseCheckerDecision, ...],
+) -> tuple[ProseCheckerDecision, ...]:
+    matches = []
+    for decision in decisions:
+        probe = ProseCheckerDecision.for_candidate(
+            candidate,
+            gate=decision.gate,
+            checker=decision.checker,
+            method=decision.method,
+            status=decision.status,
+            reason=decision.reason,
+        )
+        if probe.request_sha256 == decision.request_sha256:
+            matches.append(decision)
+    return tuple(sorted(matches, key=lambda item: item.gate.value))
 
 
 def _canonical(value: Any) -> bytes:
@@ -348,6 +445,7 @@ def _build_risk_interfaces(
     transport: ProviderTransport | None,
     call: CallFunction,
     max_risks: int,
+    execution_collector: ProviderExecutionCollector | None = None,
     aggregate_budget_path: Path | None = None,
 ) -> tuple[Any | None, Any | None, str]:
     if catalog is None:
@@ -376,6 +474,7 @@ def _build_risk_interfaces(
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
         )
     except ProviderAdapterError as exc:
         if str(exc) == "ai-atlas-nexus 1.2.4 is unavailable":
@@ -393,6 +492,7 @@ def _build_risk_interfaces(
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
         )
     except (ProviderAdapterError, RiskMappingError) as exc:
         raise OrchestrationError("risk provider interfaces failed closed") from exc
@@ -432,6 +532,7 @@ def _build_factreasoner_interface(
     environment: Mapping[str, str] | None,
     transport: ProviderTransport | None,
     call: CallFunction,
+    execution_collector: ProviderExecutionCollector | None = None,
     aggregate_budget_path: Path | None = None,
 ) -> tuple[FactChecker, str]:
     """Select genuine upstream FR1 or an explicit no-provider-call failure."""
@@ -448,6 +549,7 @@ def _build_factreasoner_interface(
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
         )
     except ProviderAdapterError as exc:
         raise OrchestrationError(
@@ -477,6 +579,7 @@ class ProviderOrchestrationResult:
     risk_catalog_sha256: str | None
     risk_interface_status: str
     factreasoner_interface_status: str
+    provider_execution_sha256: str | None
     pipeline_result: PipelineResult = dataclass_field(repr=False)
     orchestration_version: str = ORCHESTRATION_VERSION
     result_sha256: str = dataclass_field(init=False)
@@ -498,6 +601,10 @@ class ProviderOrchestrationResult:
             self.risk_catalog_sha256
         ):
             raise OrchestrationError("risk catalog digest is invalid")
+        if self.provider_execution_sha256 is not None and not _DIGEST_RE.fullmatch(
+            self.provider_execution_sha256
+        ):
+            raise OrchestrationError("provider execution manifest digest is invalid")
         source_ids = tuple(self.eligible_text_source_ids)
         batches = tuple(self.extraction_batch_sha256s)
         candidates = tuple(self.quote_candidate_ids)
@@ -562,6 +669,7 @@ class ProviderOrchestrationResult:
             "risk_catalog_sha256": self.risk_catalog_sha256,
             "risk_interface_status": self.risk_interface_status,
             "factreasoner_interface_status": self.factreasoner_interface_status,
+            "provider_execution_sha256": self.provider_execution_sha256,
             "pipeline_result_sha256": self.pipeline_result.result_sha256,
         }
 
@@ -626,6 +734,7 @@ def run_provider_assisted_pipeline(
         raise OrchestrationError("frozen source-state replay failed closed") from exc
     source_manifest_sha256 = source_state.snapshot_sha256
     _preflight_existing_pipeline(root, catalog, source_manifest_sha256)
+    execution_collector = ProviderExecutionCollector()
 
     selected_catalog, catalog_status = _select_risk_catalog(risk_catalog)
     risk_detector, risk_checker, risk_status = _build_risk_interfaces(
@@ -637,6 +746,7 @@ def run_provider_assisted_pipeline(
         transport=transport,
         call=call,
         max_risks=max_risks,
+        execution_collector=execution_collector,
         aggregate_budget_path=aggregate_budget,
     )
     fact_checker, factreasoner_status = _build_factreasoner_interface(
@@ -646,6 +756,7 @@ def run_provider_assisted_pipeline(
         environment=environment,
         transport=transport,
         call=call,
+        execution_collector=execution_collector,
         aggregate_budget_path=aggregate_budget,
     )
     eligible = tuple(
@@ -657,6 +768,11 @@ def run_provider_assisted_pipeline(
             ),
             key=lambda item: item.source_id,
         )
+    )
+    use_risk_signal_source_ids = tuple(
+        item.source_id
+        for item in eligible
+        if build_use_risk_windows(item, windows=build_source_windows(item))
     )
     admission = {
         "orchestration_version": ORCHESTRATION_VERSION,
@@ -687,6 +803,7 @@ def run_provider_assisted_pipeline(
         ),
         "risk_catalog_status": catalog_status,
         "risk_interface_status": risk_status,
+        "family_risk_bridge_version": FAMILY_RISK_BRIDGE_VERSION,
         "factreasoner_interface_status": factreasoner_status,
         "factreasoner_checker_id": fact_checker.checker_id,
         "factreasoner_checker_revision": fact_checker.checker_revision,
@@ -708,6 +825,7 @@ def run_provider_assisted_pipeline(
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget,
+            execution_collector=execution_collector,
         )
         claim_checker = OpenRouterClaimChecker(
             provider=provider,
@@ -717,6 +835,21 @@ def run_provider_assisted_pipeline(
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget,
+            execution_collector=execution_collector,
+        )
+        family_checker = (
+            None
+            if risk_detector is None or risk_checker is None
+            else OpenRouterFamilyContextChecker(
+                provider=provider,
+                ledger_path=ledger,
+                decision_dir=decisions,
+                environment=environment,
+                transport=transport,
+                call=call,
+                aggregate_budget_path=aggregate_budget,
+                execution_collector=execution_collector,
+            )
         )
         batches = tuple(
             extractor.extract_source(
@@ -760,6 +893,61 @@ def run_provider_assisted_pipeline(
     if len(prose_values) != len(semantic_gates) * len(quote_candidates):
         raise OrchestrationError("provider claim-check coverage is incomplete")
 
+    quote_gate_records = tuple(
+        evaluate_claim_gate(
+            candidate,
+            catalog.documents,
+            _matching_decisions(candidate, prose_values),
+        )
+        for candidate in quote_candidates
+    )
+    structured_result = deterministic_structured_candidates(catalog)
+    publisher_context_result = deterministic_publisher_context_candidates(
+        catalog,
+        existing_gate_records=quote_gate_records,
+    )
+    deterministic_context_decisions = (
+        deterministic_publisher_context_decisions(publisher_context_result)
+    )
+    gate_by_candidate: dict[str, ClaimGateRecord] = {
+        item.candidate.candidate_id: item for item in quote_gate_records
+    }
+    for candidate in structured_result.candidates:
+        record = evaluate_claim_gate(candidate, catalog.documents)
+        prior = gate_by_candidate.setdefault(candidate.candidate_id, record)
+        if prior.to_dict() != record.to_dict():
+            raise OrchestrationError("structured claim-gate identifier collision")
+    for candidate in publisher_context_result.candidates:
+        record = evaluate_claim_gate(
+            candidate,
+            catalog.documents,
+            _matching_decisions(candidate, deterministic_context_decisions),
+        )
+        prior = gate_by_candidate.setdefault(candidate.candidate_id, record)
+        if prior.to_dict() != record.to_dict():
+            raise OrchestrationError("publisher context claim-gate collision")
+
+    family_applicability_values: list[FamilyContextApplicabilityDecision] = []
+    membership_pair = select_config_family_membership(gate_by_candidate.values())
+    if membership_pair is not None and family_checker is not None:
+        membership_gate, membership = membership_pair
+        for record in sorted(
+            gate_by_candidate.values(),
+            key=lambda item: item.candidate.candidate_id,
+        ):
+            try:
+                validate_family_context_gate(record)
+            except FamilyRiskBridgeError:
+                continue
+            family_applicability_values.append(
+                _family_decision(
+                    family_checker,
+                    record,
+                    membership,
+                    membership_gate,
+                )
+            )
+
     _verify_frozen_catalog(source_state)
     pipeline_result = run_offline_pipeline(
         bundle_directory,
@@ -771,7 +959,118 @@ def run_provider_assisted_pipeline(
         risk_catalog=selected_catalog,
         risk_detector=risk_detector,
         risk_checker=risk_checker,
+        family_applicability_decisions=tuple(family_applicability_values),
     )
+    execution_path = root / PROVIDER_EXECUTION_MANIFEST_FILENAME
+    provider_execution_sha256: str | None = None
+    try:
+        ledger_has_events = ledger.is_file() and bool(ledger.read_bytes().strip())
+    except OSError as exc:
+        raise OrchestrationError("provider execution ledger could not be read") from exc
+    if execution_collector.bindings or ledger_has_events:
+        if not ledger.exists():
+            raise OrchestrationError("provider execution evidence is incomplete")
+        try:
+            risk_payload = _read_json(root / "risk-mapping.json")
+            if not isinstance(risk_payload, Mapping) or not isinstance(
+                risk_payload.get("use_contexts"), list
+            ):
+                raise ProviderExecutionError(
+                    "provider risk execution artifact is malformed"
+                )
+            mapping_value = risk_payload.get("taxonomy_mapping")
+            typed_mapping = (
+                None
+                if mapping_value is None
+                else RiskMappingReport.from_dict(mapping_value)
+            )
+            completed_bindings = execution_collector.bindings
+            nexus_instruction_sha256s = tuple(
+                sorted(
+                    item.context_metadata["instruction_sha256"]
+                    for item in completed_bindings
+                    if item.context_metadata.get("stage")
+                    == "nexus_risk_selection"
+                )
+            )
+            risk_applicability_candidate_ids = tuple(
+                sorted(
+                    item.candidate_id
+                    for item in (() if typed_mapping is None else typed_mapping.candidates)
+                )
+            )
+            factreasoner_batch_sha256s = tuple(
+                sorted(
+                    item.context_metadata["batch_sha256"]
+                    for item in completed_bindings
+                    if item.context_metadata.get("stage") == "factreasoner_batch"
+                )
+            )
+            expected_nexus_calls = (
+                len(risk_payload["use_contexts"])
+                if typed_mapping is not None
+                and typed_mapping.status is MappingStatus.COMPLETED
+                else 0
+            )
+            if len(nexus_instruction_sha256s) != expected_nexus_calls:
+                raise ProviderExecutionError(
+                    "provider Nexus execution count differs from risk mapping"
+                )
+            execution_manifest = ProviderExecutionManifest.build(
+                target=catalog.target,
+                source_catalog_sha256=catalog.catalog_sha256,
+                eligible_text_source_ids=tuple(
+                    item.source_id for item in eligible
+                ),
+                use_risk_signal_source_ids=use_risk_signal_source_ids,
+                quote_candidate_ids=tuple(
+                    item.candidate_id for item in quote_candidates
+                ),
+                family_applicability_candidate_ids=tuple(
+                    sorted(
+                        item.family_candidate_id
+                        for item in family_applicability_values
+                        if item.status is not FamilyDecisionStatus.UNAVAILABLE
+                    )
+                ),
+                family_applicability_failed_candidate_ids=tuple(
+                    sorted(
+                        item.family_candidate_id
+                        for item in family_applicability_values
+                        if item.status is FamilyDecisionStatus.UNAVAILABLE
+                    )
+                ),
+                nexus_instruction_sha256s=nexus_instruction_sha256s,
+                risk_applicability_candidate_ids=(
+                    risk_applicability_candidate_ids
+                ),
+                factreasoner_batch_sha256s=factreasoner_batch_sha256s,
+                pipeline_result_sha256=pipeline_result.result_sha256,
+                content_factreasoner_sha256=(
+                    pipeline_result.content_factreasoner_sha256
+                ),
+                publication_original_factreasoner_sha256=(
+                    pipeline_result.publication_original_factreasoner_sha256
+                ),
+                final_factreasoner_sha256=pipeline_result.factreasoner_sha256,
+                risk_mapping_report_sha256=(
+                    pipeline_result.risk.mapping_report_sha256
+                ),
+                adapter_version=ADAPTER_VERSION,
+                orchestration_version=ORCHESTRATION_VERSION,
+                max_risks=max_risks,
+                ledger_path=ledger,
+                executions=execution_collector.bindings,
+            )
+            execution_manifest.verify_run(root)
+        except (ProviderExecutionError, RiskMappingError) as exc:
+            raise OrchestrationError(
+                "provider execution evidence failed closed"
+            ) from exc
+        _atomic_admit(execution_path, execution_manifest.to_dict())
+        provider_execution_sha256 = execution_manifest.manifest_sha256
+    elif execution_path.exists() or execution_path.is_symlink():
+        raise OrchestrationError("provider execution evidence is incomplete")
     return ProviderOrchestrationResult(
         target=catalog.target,
         source_bundle_id=catalog.bundle_id,
@@ -789,6 +1088,7 @@ def run_provider_assisted_pipeline(
         ),
         risk_interface_status=risk_status,
         factreasoner_interface_status=factreasoner_status,
+        provider_execution_sha256=provider_execution_sha256,
         pipeline_result=pipeline_result,
     )
 
@@ -796,6 +1096,7 @@ def run_provider_assisted_pipeline(
 __all__ = [
     "DEFAULT_MAX_RISKS",
     "ORCHESTRATION_MANIFEST_FILENAME",
+    "PROVIDER_EXECUTION_MANIFEST_FILENAME",
     "ORCHESTRATION_SCOPE",
     "ORCHESTRATION_VERSION",
     "OrchestrationError",

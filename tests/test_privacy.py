@@ -93,15 +93,32 @@ class PrivacyAuditTests(unittest.TestCase):
         )
         self.write(
             root,
-            "schema/concepts.json",
+            "schema/model-card.schema.json",
             json.dumps(
                 {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "type": "object",
                     "properties": {
                         "prompt": {
                             "description": "Provider prompts remain private",
                             "type": "string",
                         }
+                    },
+                },
+                indent=2,
+            )
+            + "\n",
+        )
+        self.write(
+            root,
+            "evaluation/reviewer-packet.schema.json",
+            json.dumps(
+                {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "source_paths_removed": {"const": True},
+                        "source_uris_removed": {"const": True},
                     },
                 },
                 indent=2,
@@ -117,17 +134,82 @@ class PrivacyAuditTests(unittest.TestCase):
             "assets/diagram.pdf",
             "cards/model.json",
             "cards/model.md",
-            "schema/concepts.json",
+            "evaluation/reviewer-packet.schema.json",
+            "schema/model-card.schema.json",
             "src/tool.py",
         )
         first = audit_public_tree(root, files)
         second = audit_public_tree(root, tuple(reversed(files)))
         self.assertTrue(first.passed)
         self.assertEqual((), first.findings)
-        self.assertEqual(6, first.files_checked)
+        self.assertEqual(7, first.files_checked)
         self.assertEqual(1, first.cards_checked)
         self.assertEqual(first, second)
         self.assertEqual(first, load_privacy_report(serialize_privacy_report(first)))
+
+    def test_schema_names_do_not_exempt_private_payload_keys(self) -> None:
+        for relative in (
+            "evaluation/leak.schema.json",
+            "evaluation/reviewer-packet.schema.json",
+            "schema/unreviewed.json",
+        ):
+            with self.subTest(relative=relative):
+                root = self.temporary_root()
+                self.write(
+                    root,
+                    relative,
+                    json.dumps(
+                        {
+                            "$schema": "https://json-schema.org/draft/2020-12/schema",
+                            "type": "object",
+                            "source_text": "confidential frozen publisher source body",
+                        }
+                    )
+                    + "\n",
+                )
+                report = audit_public_tree(root, (relative,))
+                self.assertFalse(report.passed)
+                self.assertIn(
+                    PrivacyFindingCode.JSON_PRIVATE_KEY, self.codes(report)
+                )
+
+    def test_reviewed_schema_descriptor_allows_only_its_exact_metadata_key(self) -> None:
+        root = self.temporary_root()
+        self.write(
+            root,
+            "src/model_cards/resources/audit-card.schema.json",
+            json.dumps(
+                {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "x-model-card": {"contract_version": "synthetic-v1"},
+                }
+            )
+            + "\n",
+        )
+        report = audit_public_tree(
+            root, ("src/model_cards/resources/audit-card.schema.json",)
+        )
+        self.assertTrue(report.passed)
+
+        self.write(
+            root,
+            "src/model_cards/resources/audit-card.schema.json",
+            json.dumps(
+                {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "source_text": "private source body",
+                    "x-model-card": {"contract_version": "synthetic-v1"},
+                }
+            )
+            + "\n",
+        )
+        rejected = audit_public_tree(
+            root, ("src/model_cards/resources/audit-card.schema.json",)
+        )
+        self.assertFalse(rejected.passed)
+        self.assertIn(PrivacyFindingCode.JSON_PRIVATE_KEY, self.codes(rejected))
 
     def test_secret_auth_url_and_real_machine_path_are_hashed_not_copied(self) -> None:
         root = self.temporary_root()
@@ -175,6 +257,10 @@ class PrivacyAuditTests(unittest.TestCase):
             "official-source-bundle/objects/sha256/ab/source": "official publisher HTML body\n",
             "official_source_bundle/manifest.json": "{}\n",
             "provider-traces/trace.json": '{"request":{},"response":{}}\n',
+            "provider-execution.json": '{"executions":[],"receipt":{}}\n',
+            "provider-orchestration.json": '{"provider":"Together"}\n',
+            "provider-result.json": '{"provider":"Together"}\n',
+            "family-risk-authorizations.json": '{"authorizations":[]}\n',
             "prompt.md": "raw provider prompt\n",
             "codex-handoff.json": "{}\n",
             "usage.jsonl": '{"usage":1}\n',
@@ -192,6 +278,25 @@ class PrivacyAuditTests(unittest.TestCase):
         self.assertIn(PrivacyFindingCode.FORBIDDEN_LOG, codes)
         self.assertIn(PrivacyFindingCode.PROVIDER_ARTIFACT, codes)
         self.assertIn(PrivacyFindingCode.JSON_PRIVATE_KEY, codes)
+
+    def test_private_run_control_records_are_never_public_files(self) -> None:
+        for name in (
+            "family-risk-authorizations.json",
+            "provider-execution.json",
+            "provider-orchestration.json",
+            "provider-result.json",
+        ):
+            with self.subTest(name=name):
+                root = self.temporary_root()
+                self.write(root, name, '{}\n')
+                report = audit_public_tree(root, (name,))
+                self.assertFalse(report.passed)
+                self.assertTrue(
+                    {
+                        PrivacyFindingCode.PRIVATE_FILE_NAME,
+                        PrivacyFindingCode.PROVIDER_ARTIFACT,
+                    }.issubset(self.codes(report))
+                )
 
     def test_provider_payload_and_source_body_are_rejected_without_path_hints(self) -> None:
         root = self.temporary_root()

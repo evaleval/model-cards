@@ -30,6 +30,7 @@ from .run_ledger import (
     MAX_RETRIES,
     AttemptBinding,
     LedgerConflictError,
+    LedgerError,
     ReservationToken,
     RouteSnapshot,
     UncertainSendError,
@@ -52,6 +53,7 @@ OPENROUTER_ROUTE_URL = (
 )
 OPENROUTER_KEY_ENV = "OPENROUTER_API_KEY"
 PROVIDER_RUNTIME_VERSION = "openrouter-structured-provider/v7"
+PROVIDER_EXECUTION_BINDING_VERSION = "openrouter-execution-binding/v1"
 REASONING_CONFIG = {"effort": "minimal", "exclude": True}
 DETERMINISTIC_USER_AGENT = "evaleval-model-cards/0.1 structured-provider/v1"
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
@@ -400,9 +402,182 @@ class StructuredCallSpec:
 
 
 @dataclass(frozen=True)
+class ProviderExecutionBinding:
+    """Privacy-safe proof that one normalized decision settled in the ledger.
+
+    The binding deliberately retains no prompt, source text, raw response, API
+    key, or absolute path.  ``verify_provider_execution`` joins it back to the
+    private usage ledger and normalized decision sidecar before a reviewed
+    candidate may rely on the semantic result.
+    """
+
+    logical_call_id: str
+    attempt_id: str
+    model: str
+    provider: str
+    request_sha256: str
+    schema_sha256: str
+    sidecar_path_sha256: str
+    context_metadata: Mapping[str, Any]
+    decision_name: str
+    reservation_id: str
+    decision_sha256: str
+    sidecar_sha256: str
+    receipt: UsageReceipt
+    binding_version: str = PROVIDER_EXECUTION_BINDING_VERSION
+    binding_sha256: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if self.binding_version != PROVIDER_EXECUTION_BINDING_VERSION:
+            raise ProviderError("provider execution binding version is invalid")
+        attempt = self.attempt_binding
+        if (
+            not isinstance(self.decision_name, str)
+            or not re.fullmatch(r"[a-z0-9][a-z0-9_.-]{2,191}\.json", self.decision_name)
+        ):
+            raise ProviderError("provider execution decision name is invalid")
+        if (
+            not isinstance(self.reservation_id, str)
+            or not re.fullmatch(r"reservation_[0-9a-f]{24}", self.reservation_id)
+        ):
+            raise ProviderError("provider execution reservation is invalid")
+        for name, value in (
+            ("decision_sha256", self.decision_sha256),
+            ("sidecar_sha256", self.sidecar_sha256),
+        ):
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise ProviderError(f"provider execution {name} is invalid")
+        if not isinstance(self.receipt, UsageReceipt):
+            raise ProviderError("provider execution receipt is invalid")
+        if (
+            self.receipt.http_status != 200
+            or self.receipt.returned_model != MODEL_ID
+            or self.receipt.returned_provider != self.provider
+            or self.receipt.total_tokens is None
+            or self.receipt.charged_usd is None
+        ):
+            raise ProviderError("provider execution receipt is not a completed pinned call")
+        object.__setattr__(
+            self,
+            "context_metadata",
+            attempt.context_metadata,
+        )
+        object.__setattr__(
+            self,
+            "binding_sha256",
+            json_sha256(self._payload()),
+        )
+
+    @property
+    def attempt_binding(self) -> AttemptBinding:
+        return AttemptBinding(
+            logical_call_id=self.logical_call_id,
+            attempt_id=self.attempt_id,
+            model=self.model,
+            provider=self.provider,
+            request_sha256=self.request_sha256,
+            schema_sha256=self.schema_sha256,
+            sidecar_path_sha256=self.sidecar_path_sha256,
+            context_metadata=self.context_metadata,
+        )
+
+    def _payload(self) -> dict[str, Any]:
+        return {
+            "binding_version": self.binding_version,
+            "logical_call_id": self.logical_call_id,
+            "attempt_id": self.attempt_id,
+            "model": self.model,
+            "provider": self.provider,
+            "request_sha256": self.request_sha256,
+            "schema_sha256": self.schema_sha256,
+            "sidecar_path_sha256": self.sidecar_path_sha256,
+            "context_metadata": dict(self.context_metadata),
+            "decision_name": self.decision_name,
+            "reservation_id": self.reservation_id,
+            "decision_sha256": self.decision_sha256,
+            "sidecar_sha256": self.sidecar_sha256,
+            "receipt": self.receipt.to_dict(),
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**self._payload(), "binding_sha256": self.binding_sha256}
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "ProviderExecutionBinding":
+        expected = {
+            "binding_version",
+            "logical_call_id",
+            "attempt_id",
+            "model",
+            "provider",
+            "request_sha256",
+            "schema_sha256",
+            "sidecar_path_sha256",
+            "context_metadata",
+            "decision_name",
+            "reservation_id",
+            "decision_sha256",
+            "sidecar_sha256",
+            "receipt",
+            "binding_sha256",
+        }
+        item = _json_object(value, "provider execution binding")
+        if set(item) != expected:
+            raise ProviderError("provider execution binding has an invalid closed shape")
+        result = cls(
+            binding_version=item["binding_version"],
+            logical_call_id=item["logical_call_id"],
+            attempt_id=item["attempt_id"],
+            model=item["model"],
+            provider=item["provider"],
+            request_sha256=item["request_sha256"],
+            schema_sha256=item["schema_sha256"],
+            sidecar_path_sha256=item["sidecar_path_sha256"],
+            context_metadata=item["context_metadata"],
+            decision_name=item["decision_name"],
+            reservation_id=item["reservation_id"],
+            decision_sha256=item["decision_sha256"],
+            sidecar_sha256=item["sidecar_sha256"],
+            receipt=UsageReceipt.from_dict(item["receipt"]),
+        )
+        if result.binding_sha256 != item["binding_sha256"]:
+            raise ProviderError("provider execution binding digest is inconsistent")
+        return result
+
+    @classmethod
+    def completed(
+        cls,
+        *,
+        attempt: AttemptBinding,
+        decision_path: str | os.PathLike[str],
+        reservation_id: str,
+        decision_sha256: str,
+        sidecar_sha256: str,
+        receipt: UsageReceipt,
+    ) -> "ProviderExecutionBinding":
+        path = Path(decision_path)
+        return cls(
+            logical_call_id=attempt.logical_call_id,
+            attempt_id=attempt.attempt_id,
+            model=attempt.model,
+            provider=attempt.provider,
+            request_sha256=attempt.request_sha256,
+            schema_sha256=attempt.schema_sha256,
+            sidecar_path_sha256=attempt.sidecar_path_sha256,
+            context_metadata=attempt.context_metadata,
+            decision_name=path.name,
+            reservation_id=reservation_id,
+            decision_sha256=decision_sha256,
+            sidecar_sha256=sidecar_sha256,
+            receipt=receipt,
+        )
+
+
+@dataclass(frozen=True)
 class StructuredCallResult:
     decision: Mapping[str, Any]
     receipt: UsageReceipt
+    execution: ProviderExecutionBinding
     resumed: bool
     logical_call_id: str
     attempt_id: str
@@ -425,30 +600,8 @@ def structured_json_call(
 ) -> StructuredCallResult:
     """Run or deterministically resume one strict structured-output attempt."""
 
-    if not isinstance(spec, StructuredCallSpec):
-        raise ProviderError("spec must be a StructuredCallSpec")
-    request_payload = _request_payload(spec)
-    request_fingerprint_bytes = _canonical_bytes(request_payload)
-    if len(request_fingerprint_bytes) > MAX_REQUEST_BYTES:
-        raise ProviderError("provider request exceeds its byte bound")
-    semantic_payload = dict(request_payload)
-    semantic_payload.pop("provider")
-    semantic_request = {
-        "provider_runtime_version": PROVIDER_RUNTIME_VERSION,
-        "payload": semantic_payload,
-    }
-    request_sha = json_sha256(semantic_request)
-    schema_sha = json_sha256(spec.json_schema)
-    binding = AttemptBinding(
-        logical_call_id=spec.logical_call_id,
-        attempt_id=spec.attempt_id,
-        model=MODEL_ID,
-        provider=spec.provider,
-        request_sha256=request_sha,
-        schema_sha256=schema_sha,
-        sidecar_path_sha256=path_sha256(decision_path),
-        context_metadata=spec.context_metadata,
-    )
+    request_payload, binding = _prepare_structured_call(spec, decision_path)
+    request_sha = binding.request_sha256
     ledger = UsageLedger(ledger_path, clock=clock)
     snapshot = ledger.inspect(binding)
     if snapshot is not None:
@@ -459,10 +612,19 @@ def structured_json_call(
             validator=validator,
         )
         if resumed is not None:
-            decision, receipt = resumed
+            decision, receipt, reservation_id, decision_sha, sidecar_sha = resumed
+            execution = ProviderExecutionBinding.completed(
+                attempt=snapshot.binding,
+                decision_path=decision_path,
+                reservation_id=reservation_id,
+                decision_sha256=decision_sha,
+                sidecar_sha256=sidecar_sha,
+                receipt=receipt,
+            )
             return StructuredCallResult(
                 decision=decision,
                 receipt=receipt,
+                execution=execution,
                 resumed=True,
                 logical_call_id=spec.logical_call_id,
                 attempt_id=spec.attempt_id,
@@ -680,6 +842,14 @@ def structured_json_call(
         return StructuredCallResult(
             decision=decision,
             receipt=receipt,
+            execution=ProviderExecutionBinding.completed(
+                attempt=token.binding,
+                decision_path=decision_path,
+                reservation_id=token.reservation_id,
+                decision_sha256=decision_sha,
+                sidecar_sha256=sidecar_sha,
+                receipt=receipt,
+            ),
             resumed=False,
             logical_call_id=spec.logical_call_id,
             attempt_id=spec.attempt_id,
@@ -689,13 +859,113 @@ def structured_json_call(
     raise AssertionError("unreachable retry state")
 
 
+def replay_structured_json_call(
+    spec: StructuredCallSpec,
+    *,
+    ledger_path: str | os.PathLike[str],
+    decision_path: str | os.PathLike[str],
+    validator: DecisionValidator,
+    environment: Mapping[str, str] | None = None,
+    transport: ProviderTransport | None = None,
+    clock: Clock = utc_now,
+    monotonic: Monotonic = time.monotonic,
+    sleeper: Sleeper = time.sleep,
+    paid_send_budget: PaidSendBudget | None = None,
+) -> StructuredCallResult:
+    """Replay one exact structured call without credentials, network, or writes."""
+
+    del environment, clock, monotonic, sleeper
+    if transport is not None or paid_send_budget is not None:
+        raise ProviderError("provider execution replay cannot accept a transport or send budget")
+    if not callable(validator):
+        raise ProviderError("provider execution replay validator is invalid")
+    _request_payload_value, binding = _prepare_structured_call(spec, decision_path)
+    try:
+        snapshot = UsageLedger(ledger_path).inspect_read_only(binding)
+    except LedgerError as exc:
+        raise ProviderError("provider execution replay ledger is invalid") from exc
+    if snapshot is None:
+        raise ProviderError("provider execution replay has no matching attempt")
+    if snapshot.status == "failed":
+        terminal = snapshot.latest_terminal
+        if terminal is None:
+            raise ProviderError("failed provider replay attempt has no terminal event")
+        raise ProviderTerminalAttemptError(
+            "provider execution replay reached a retained terminal failure",
+            reason_code=terminal["payload"]["reason_code"],
+        )
+    if snapshot.status != "completed":
+        raise ProviderError("provider execution replay attempt is not safely completed")
+    decision, receipt, reservation_id, decision_sha, sidecar_sha = read_decision_sidecar(
+        decision_path,
+        binding=binding,
+        validator=validator,
+    )
+    execution = ProviderExecutionBinding.completed(
+        attempt=binding,
+        decision_path=decision_path,
+        reservation_id=reservation_id,
+        decision_sha256=decision_sha,
+        sidecar_sha256=sidecar_sha,
+        receipt=receipt,
+    )
+    replayed = verify_provider_execution(
+        execution,
+        ledger_path=ledger_path,
+        decision_dir=Path(decision_path).parent,
+        validator=validator,
+    )
+    if replayed != decision:
+        raise ProviderError("provider execution replay decision diverged")
+    return StructuredCallResult(
+        decision=decision,
+        receipt=receipt,
+        execution=execution,
+        resumed=True,
+        logical_call_id=spec.logical_call_id,
+        attempt_id=spec.attempt_id,
+        provider=spec.provider,
+        request_sha256=binding.request_sha256,
+    )
+
+
+def _prepare_structured_call(
+    spec: StructuredCallSpec,
+    decision_path: str | os.PathLike[str],
+) -> tuple[dict[str, Any], AttemptBinding]:
+    if not isinstance(spec, StructuredCallSpec):
+        raise ProviderError("spec must be a StructuredCallSpec")
+    request_payload = _request_payload(spec)
+    request_fingerprint_bytes = _canonical_bytes(request_payload)
+    if len(request_fingerprint_bytes) > MAX_REQUEST_BYTES:
+        raise ProviderError("provider request exceeds its byte bound")
+    semantic_payload = dict(request_payload)
+    semantic_payload.pop("provider")
+    request_sha = json_sha256(
+        {
+            "provider_runtime_version": PROVIDER_RUNTIME_VERSION,
+            "payload": semantic_payload,
+        }
+    )
+    return request_payload, AttemptBinding(
+        logical_call_id=spec.logical_call_id,
+        attempt_id=spec.attempt_id,
+        model=MODEL_ID,
+        provider=spec.provider,
+        request_sha256=request_sha,
+        schema_sha256=json_sha256(spec.json_schema),
+        sidecar_path_sha256=path_sha256(decision_path),
+        context_metadata=spec.context_metadata,
+    )
+
+
 def _resume_if_possible(
     ledger: UsageLedger,
     snapshot,
     *,
     decision_path: str | os.PathLike[str],
     validator: DecisionValidator,
-) -> tuple[dict[str, Any], UsageReceipt] | None:
+) -> tuple[dict[str, Any], UsageReceipt, str, str, str] | None:
     if snapshot.status == "completed":
         decision, receipt, reservation_id, decision_sha, sidecar_sha = read_decision_sidecar(
             decision_path,
@@ -710,7 +980,7 @@ def _resume_if_possible(
             or terminal["receipt"] != receipt.to_dict()
         ):
             raise LedgerConflictError("completed sidecar differs from its ledger receipt")
-        return decision, receipt
+        return decision, receipt, reservation_id, decision_sha, sidecar_sha
     if snapshot.status == "pending":
         if Path(decision_path).is_file() and not Path(decision_path).is_symlink():
             decision, receipt, reservation_id, decision_sha, sidecar_sha = read_decision_sidecar(
@@ -729,7 +999,7 @@ def _resume_if_possible(
                 decision_sha256=decision_sha,
                 sidecar_sha256=sidecar_sha,
             )
-            return decision, receipt
+            return decision, receipt, reservation_id, decision_sha, sidecar_sha
         token = snapshot.latest_reservation
         if token is not None:
             ledger.record_terminal(
@@ -753,6 +1023,69 @@ def _resume_if_possible(
     if snapshot.status == "uncertain":
         raise UncertainSendError("attempt has an uncertain paid send and cannot resume")
     return None
+
+
+def verify_provider_execution(
+    execution: ProviderExecutionBinding,
+    *,
+    ledger_path: str | os.PathLike[str],
+    decision_dir: str | os.PathLike[str],
+    validator: DecisionValidator | None = None,
+) -> dict[str, Any]:
+    """Replay one retained execution against its exact ledger and sidecar.
+
+    This function never sends a request.  It proves that the normalized
+    decision, completed receipt, attempt metadata, and immutable sidecar all
+    agree with the append-only usage ledger.  Callers remain responsible for
+    checking the decision's domain semantics against the FactReasoner or risk
+    artifact that references it.
+    """
+
+    if not isinstance(execution, ProviderExecutionBinding):
+        raise ProviderError("provider execution replay requires a typed binding")
+    root = Path(decision_dir)
+    if root.is_symlink() or not root.is_dir():
+        raise ProviderError("provider execution decision directory is unsafe")
+    decision_path = root / execution.decision_name
+    if decision_path.parent != root:
+        raise ProviderError("provider execution decision path escapes its directory")
+    attempt = execution.attempt_binding
+    if path_sha256(decision_path) != attempt.sidecar_path_sha256:
+        raise ProviderError("provider execution decision path differs from its attempt")
+    try:
+        snapshot = UsageLedger(ledger_path).inspect_read_only(attempt)
+    except LedgerError as exc:
+        raise ProviderError("provider execution ledger replay failed") from exc
+    if snapshot is None or snapshot.status != "completed":
+        raise ProviderError("provider execution is not completed in the ledger")
+    active_validator = validator or (lambda value: None)
+    try:
+        decision, receipt, reservation_id, decision_sha, sidecar_sha = (
+            read_decision_sidecar(
+                decision_path,
+                binding=attempt,
+                validator=active_validator,
+            )
+        )
+    except LedgerConflictError as exc:
+        raise ProviderError("provider execution sidecar replay failed") from exc
+    terminal = snapshot.latest_terminal
+    if terminal is None:
+        raise ProviderError("provider execution ledger has no terminal receipt")
+    terminal_payload = terminal["payload"]
+    if (
+        reservation_id != execution.reservation_id
+        or decision_sha != execution.decision_sha256
+        or sidecar_sha != execution.sidecar_sha256
+        or receipt.to_dict() != execution.receipt.to_dict()
+        or terminal_payload.get("reservation_id") != execution.reservation_id
+        or terminal_payload.get("outcome") != "completed"
+        or terminal_payload.get("decision_sha256") != execution.decision_sha256
+        or terminal_payload.get("sidecar_sha256") != execution.sidecar_sha256
+        or terminal_payload.get("receipt") != execution.receipt.to_dict()
+    ):
+        raise ProviderError("provider execution differs from its settled receipt")
+    return decision
 
 
 def _request_payload(spec: StructuredCallSpec) -> dict[str, Any]:
@@ -1218,12 +1551,14 @@ __all__ = [
     "OPENROUTER_ROUTE_URL",
     "PaidSendBudget",
     "PINNED_PROVIDER",
+    "PROVIDER_EXECUTION_BINDING_VERSION",
     "PROVIDER_RESPONSE_REASON_CODES",
     "PROVIDER_RUNTIME_VERSION",
     "RECOVERABLE_PROVIDER_FAILURE_REASON_CODES",
     "RECOVERABLE_PROVIDER_RESPONSE_REASON_CODES",
     "REASONING_CONFIG",
     "ProviderError",
+    "ProviderExecutionBinding",
     "ProviderHttpRequest",
     "ProviderHttpResponse",
     "ProviderResponseError",
@@ -1237,5 +1572,7 @@ __all__ = [
     "TERMINAL_PROVIDER_FAILURE_REASON_CODES",
     "TransportUncertainError",
     "UrllibProviderTransport",
+    "replay_structured_json_call",
     "structured_json_call",
+    "verify_provider_execution",
 ]

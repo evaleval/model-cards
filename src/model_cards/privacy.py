@@ -20,6 +20,7 @@ import stat
 from typing import Any, Iterable, Sequence
 
 from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.exceptions import SchemaError
 
 from .public_markdown import render_public_markdown
 from .public_export import PublicExportError, assert_public_projection
@@ -93,7 +94,11 @@ _PRIVATE_NAMES = frozenset(
         "agents.md",
         "claude.md",
         "codex.md",
+        "family-risk-authorizations.json",
         "handoff.md",
+        "provider-execution.json",
+        "provider-orchestration.json",
+        "provider-result.json",
         "source-bundle.json",
         "source_bundle.json",
         "usage.jsonl",
@@ -136,6 +141,40 @@ _PRIVATE_JSON_KEYS = frozenset(
         "use_and_risk",
         "validation",
         "validation_checks",
+    }
+)
+
+# JSON Schema contracts may legitimately *name* private fields in a
+# ``properties`` map to forbid or describe them.  Only these reviewed repository
+# locations receive that narrow, schema-aware treatment.  A filename suffix or
+# a directory named ``schema`` is not sufficient: arbitrary JSON there remains
+# subject to the ordinary private-key scan.
+_JSON_SCHEMA_CONTRACT_PATHS = frozenset(
+    {
+        "schema/model-card.schema.json",
+        "src/model_cards/resources/audit-card.schema.json",
+        "src/model_cards/resources/model-card.schema.json",
+        "evaluation/annotation.schema.json",
+        "evaluation/item-manifest.schema.json",
+        "evaluation/paired-audit-labels.schema.json",
+        "evaluation/paired-audit-target-map.schema.json",
+        "evaluation/reviewer-packet.schema.json",
+        "evaluation/target-sheet.schema.json",
+    }
+)
+_JSON_SCHEMA_NAME_MAP_KEYS = frozenset(
+    {
+        "$defs",
+        "definitions",
+        "dependentRequired",
+        "dependentSchemas",
+        "patternProperties",
+        "properties",
+    }
+)
+_JSON_SCHEMA_DESCRIPTOR_PRIVATE_KEYS = frozenset(
+    {
+        ("$.x-model-card", "contract_version"),
     }
 )
 
@@ -777,8 +816,12 @@ def _path_findings(snapshot: _FileSnapshot) -> list[PrivacyFinding]:
     source_code = path.suffix.casefold() in _SOURCE_CODE_SUFFIXES
     if not source_code and (stem in {
         "cost-ledger",
+        "family-risk-authorizations",
         "ledger",
         "prompt",
+        "provider-execution",
+        "provider-orchestration",
+        "provider-result",
         "provider-trace",
         "raw-prompt",
         "raw-request",
@@ -891,15 +934,19 @@ def _json_audit(
             )
         ]
     findings = []
-    if not _json_schema_description_path(snapshot.relative_path):
-        for json_path, key in _private_json_keys(value):
-            findings.append(
-                _finding(
-                    snapshot,
-                    PrivacyFindingCode.JSON_PRIVATE_KEY,
-                    f"{json_path}:{key}",
-                )
+    schema_contract = _validated_json_schema_contract(
+        snapshot.relative_path, value
+    )
+    for json_path, key in _private_json_keys(
+        value, schema_contract=schema_contract
+    ):
+        findings.append(
+            _finding(
+                snapshot,
+                PrivacyFindingCode.JSON_PRIVATE_KEY,
+                f"{json_path}:{key}",
             )
+        )
     return value, findings
 
 
@@ -1104,22 +1151,58 @@ def _card_json_pair_findings(
     return []
 
 
-def _private_json_keys(value: Any, path: str = "$") -> Iterable[tuple[str, str]]:
+def _private_json_keys(
+    value: Any,
+    path: str = "$",
+    *,
+    schema_contract: bool = False,
+    schema_name_map: bool = False,
+) -> Iterable[tuple[str, str]]:
     if isinstance(value, dict):
         for key, item in value.items():
-            if isinstance(key, str) and key.casefold() in _PRIVATE_JSON_KEYS:
+            if (
+                isinstance(key, str)
+                and not schema_name_map
+                and key.casefold() in _PRIVATE_JSON_KEYS
+                and not (
+                    schema_contract
+                    and (path, key.casefold())
+                    in _JSON_SCHEMA_DESCRIPTOR_PRIVATE_KEYS
+                )
+            ):
                 yield path, key.casefold()
-            yield from _private_json_keys(item, f"{path}.{key}")
+            child_name_map = bool(
+                schema_contract
+                and not schema_name_map
+                and isinstance(key, str)
+                and key in _JSON_SCHEMA_NAME_MAP_KEYS
+                and isinstance(item, dict)
+            )
+            yield from _private_json_keys(
+                item,
+                f"{path}.{key}",
+                schema_contract=schema_contract,
+                schema_name_map=child_name_map,
+            )
     elif isinstance(value, list):
         for index, item in enumerate(value):
-            yield from _private_json_keys(item, f"{path}[{index}]")
+            yield from _private_json_keys(
+                item,
+                f"{path}[{index}]",
+                schema_contract=schema_contract,
+            )
 
 
-def _json_schema_description_path(relative: str) -> bool:
-    parts = [part.casefold() for part in PurePosixPath(relative).parts]
-    return "schema" in parts or (
-        len(parts) >= 3 and parts[-3:-1] == ["model_cards", "resources"]
-    )
+def _validated_json_schema_contract(relative: str, value: Any) -> bool:
+    if relative not in _JSON_SCHEMA_CONTRACT_PATHS or not isinstance(value, dict):
+        return False
+    if value.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        return False
+    try:
+        Draft202012Validator.check_schema(value)
+    except SchemaError:
+        return False
+    return True
 
 
 def _is_card_path(relative: str) -> bool:

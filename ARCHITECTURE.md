@@ -222,6 +222,15 @@ record is `factreasoner-content.json`; it is distinct from the later checks of t
 Publisher-reported uses, limitations, biases, risks, and mitigations use the normal
 evidence-binding path. They are not interchangeable with taxonomy inferences.
 
+Model-family statements remain non-projectable. `model_family.py` permits a config
+`model_type` to establish exact-target family membership only through a closed,
+versioned rule that also binds the publisher namespace and model-ID pattern.
+`family_risk.py` then requires a separate checkpoint-applicability decision for each
+family statement, persists the complete decision chain in
+`family-risk-authorizations.json`, and reconstructs the resulting context during
+replay. Missing membership, unavailable applicability, ambiguous source linkage, or
+artifact drift yields no family-derived Nexus input.
+
 `risk_mapping.py` provides an optional adapter for AI Atlas Nexus 1.2.4 and its pinned
 IBM AI Risk Atlas snapshot. The Nexus dependency is loaded only when the exact package
 version is installed on Python 3.11 or newer. Taxonomy candidates require accepted use
@@ -300,6 +309,16 @@ stored separately in the private run directory and addressed by digest. The prov
 runtime version is part of each semantic request fingerprint and orchestration
 admission, so retry-policy or parsing changes cannot silently reuse an older attempt.
 
+Every attempted structured call yields a privacy-safe terminal execution binding.
+`provider-execution.json` deduplicates those bindings and closes the local execution
+chain over the exact target, source catalog, downstream pipeline, FactReasoner and
+risk records, adapter/orchestration/runtime versions, complete `usage.jsonl` bytes
+and event count, and exact normalized-sidecar inventory. A binding contains hashes,
+bounded context identifiers, the optional relative decision-sidecar name, and the
+settled success or failure receipt; it contains no prompt, source body, raw response,
+credential, or absolute path. A ledger with only failed attempts still requires this
+manifest. The manifest and all material it verifies remain local run artifacts.
+
 Route, identity, authorization, budget, ledger, and uncertain-send failures remain
 fatal. Safely recorded response failures during an individual claim or FactReasoner
 check become explicit unavailable outcomes, so the run can retain its audit trail but
@@ -311,6 +330,15 @@ are sent in deterministic batches of at most 64. Once any interrupted aggregate
 reservation has been reconciled, an ordinary replay reuses those sidecars before
 making a new reservation, so it adds neither a paid call nor a new aggregate-journal
 event.
+
+Sealed review replay is stricter than ordinary resume. The reviewer supplies the
+provider-assisted run root with the complete downstream closure set. The audit first
+verifies the manifest, ledger, sidecar inventory, receipts, and downstream hashes. It
+then re-executes the pinned IBM FactReasoner graph and Nexus selection/applicability
+path through a replay-only call interface that accepts neither a transport nor a paid
+send budget. Hash snapshots before and after must be identical; missing or stale
+execution evidence makes semantic closure unavailable or failed rather than silently
+trusting checker labels.
 
 ## 8. Run state and replay
 
@@ -345,6 +373,8 @@ privacy, and cost/latency surfaces.
 | `cards/NAME.json`, `cards/NAME.md` | Published canonical JSON and its deterministic human-readable companion | Yes |
 | `run-manifest.json`, `journal.jsonl`, `pipeline-result.json` | Run and artifact integrity chain | No |
 | `audit-view.json`, `usage-summary.json` | Body-free operational summaries | No |
+| `provider-orchestration.json`, `provider-result.json`, `provider-execution.json` | Provider admission/result and exact settled-call execution chain | No |
+| `usage.jsonl`, `provider-decisions/` | Private paid-call ledger and normalized semantic decisions | No |
 | `aggregate-budget.jsonl`, `aggregate-budget-summary.json` | Shared provider-batch cap and its batch-bound snapshot | No |
 | `quality-report.json` | Body-free batch or paired-replay aggregate | Separate publishable report |
 
@@ -360,7 +390,7 @@ privacy, and cost/latency surfaces.
 | `extraction.py`, `claim_gate.py`, `composer.py` | Candidate extraction, support checks, and evidence-only projection |
 | `factreasoner.py`, `findings.py`, `field_repair.py` | Atomic factuality, omission/conflict audits, and targeted repair |
 | `risk_mapping.py` | Pinned taxonomy integration and applicability gate |
-| `provider.py`, `provider_adapters.py`, `run_ledger.py`, `orchestration.py` | Exact provider route, bounded calls, normalized decisions, and accounting |
+| `provider.py`, `provider_adapters.py`, `provider_execution.py`, `run_ledger.py`, `orchestration.py` | Exact provider route, bounded calls, normalized decisions, accounting, and replay-bound execution receipts |
 | `artifact.py`, `review.py`, `public_export.py`, `public_markdown.py`, `privacy.py` | Typed artifact, append-only review, frozen-source replay-bound JSON export, deterministic Markdown, and publication boundary |
 | `run_state.py`, `pipeline.py`, `run_summary.py`, `quality_report.py` | End-to-end execution, resume, summaries, and batch aggregation |
 | `cli.py` | `collect`, `generate`, `batch`, `report`, inspection, review, repair-record, validation, and export commands |

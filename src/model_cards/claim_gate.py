@@ -29,6 +29,12 @@ from .models import (
     SourceRole,
     TargetIdentity,
 )
+from .model_family import (
+    CONFIG_MODEL_FAMILY_EVIDENCE_POINTERS,
+    CONFIG_MODEL_FAMILY_REGISTRY_SHA256,
+    ModelFamilyDerivationError,
+    replay_config_model_family_from_evidence,
+)
 from .pointer_registry import (
     DEFAULT_POINTER_FIELD_REGISTRY,
     POINTER_REGISTRY_NAME,
@@ -40,7 +46,7 @@ from .quote import normalize_ws
 from .schema import canonical_field_path, validate_field_value
 
 
-CLAIM_GATE_VERSION = "claim-support-gate/v2"
+CLAIM_GATE_VERSION = "claim-support-gate/v3"
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 _CANDIDATE_ID_RE = re.compile(r"^claim-[0-9a-f]{24}$")
@@ -922,6 +928,7 @@ def _field_fit_decision(
     candidate: ClaimCandidate,
     registry: PointerFieldRegistry,
     checker_decisions: Mapping[GateName, ProseCheckerDecision],
+    sources: Sequence[SourceDocument],
 ) -> GateDecision:
     kinds = {item.kind for item in candidate.evidence}
     if len(kinds) != 1:
@@ -935,6 +942,63 @@ def _field_fit_decision(
             registry=registry.sha256,
         )
     if kinds == {EvidenceKind.STRUCTURED}:
+        if (
+            canonical_field_path(candidate.field_path) == "lineage.model_family"
+            and any(
+                item.pointer in CONFIG_MODEL_FAMILY_EVIDENCE_POINTERS
+                for item in candidate.evidence
+            )
+        ):
+            derivations = []
+            try:
+                for evidence in candidate.evidence:
+                    matching_sources = tuple(
+                        source
+                        for source in sources
+                        if source.source_id == evidence.source_id
+                    )
+                    if len(matching_sources) != 1:
+                        raise ModelFamilyDerivationError(
+                            "model-family evidence source is missing or ambiguous"
+                        )
+                    derivation = replay_config_model_family_from_evidence(
+                        candidate.target,
+                        evidence,
+                        matching_sources[0],
+                    )
+                    if derivation is None or derivation.family_id != candidate.value:
+                        return _decision(
+                            candidate,
+                            gate=GateName.FIELD_FIT,
+                            checker=_GATE_CHECKER,
+                            method="closed_config_model_family_registry",
+                            status=DecisionStatus.WITHHELD,
+                            reason="config_model_family_not_allowlisted",
+                            model_family_registry=(
+                                CONFIG_MODEL_FAMILY_REGISTRY_SHA256
+                            ),
+                        )
+                    derivations.append(derivation.derivation_sha256)
+            except ModelFamilyDerivationError:
+                return _decision(
+                    candidate,
+                    gate=GateName.FIELD_FIT,
+                    checker=_GATE_CHECKER,
+                    method="closed_config_model_family_registry",
+                    status=DecisionStatus.WITHHELD,
+                    reason="config_model_family_derivation_invalid",
+                    model_family_registry=CONFIG_MODEL_FAMILY_REGISTRY_SHA256,
+                )
+            return _decision(
+                candidate,
+                gate=GateName.FIELD_FIT,
+                checker=_GATE_CHECKER,
+                method="closed_config_model_family_registry",
+                status=DecisionStatus.ACCEPTED,
+                reason="registered_config_model_family_derivation",
+                model_family_registry=CONFIG_MODEL_FAMILY_REGISTRY_SHA256,
+                family_derivations=_digest(sorted(derivations)),
+            )
         status = DecisionStatus.ACCEPTED
         reason = "registered_pointer_field_fit"
         reason_by_status = {
@@ -1388,7 +1452,7 @@ def evaluate_claim_gate(
     decisions = (
         _coordinate_decision(candidate, source_values),
         _entity_scope_decision(candidate, check_map),
-        _field_fit_decision(candidate, registry, check_map),
+        _field_fit_decision(candidate, registry, check_map, source_values),
         _value_support_decision(candidate, check_map),
     )
     return ClaimGateRecord(

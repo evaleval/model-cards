@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 from model_cards.claim_gate import (
@@ -50,6 +51,7 @@ from model_cards.pipeline import (
     PipelineError,
     PipelineRepairReport,
     PipelineResult,
+    derive_model_use_contexts,
     run_offline_pipeline,
     verify_pipeline_result,
 )
@@ -1260,6 +1262,77 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(0, detector.calls)
         self.assertEqual("no_grounded_use_context", result.risk.reason)
         self.assertEqual(0, result.risk.taxonomy_candidate_count)
+
+    def test_ambiguous_statement_qualifiers_do_not_cross_attach_to_all_uses(self) -> None:
+        statements = (
+            (
+                "use_and_risk.intended_uses[0]",
+                "The publisher intends this model for personalized assistant responses.",
+            ),
+            (
+                "use_and_risk.intended_uses[1]",
+                "The publisher intends this model for research question answering.",
+            ),
+            (
+                "use_and_risk.limitations[0]",
+                "The model can expose personal details from conversation history.",
+            ),
+            (
+                "use_and_risk.limitations[1]",
+                "The model may omit citations in long research summaries.",
+            ),
+        )
+        base_catalog = self.catalog()
+        readme = next(
+            item
+            for item in base_catalog.documents
+            if item.source_uri.endswith("/README.md")
+        )
+        source = replace(
+            readme,
+            text="# Exact target\n\n" + "\n\n".join(
+                statement for _field_path, statement in statements
+            ),
+            content_sha256=None,
+        )
+        catalog = SimpleNamespace(
+            target=base_catalog.target,
+            catalog_sha256="f" * 64,
+            documents=(source,),
+            by_id={source.source_id: source},
+        )
+        proposals = tuple(
+            QuoteProposal(
+                source_id=source.source_id,
+                field_path=field_path,
+                value=statement,
+                quote=statement,
+                claim_entity=f"acme/Instruct@{REVISION}",
+                relation=RelationToTarget.EXACT_TARGET,
+            )
+            for field_path, statement in statements
+        )
+        batch = ExtractionBatch.build(
+            target=catalog.target,
+            source_catalog_sha256=catalog.catalog_sha256,
+            provider="Together",
+            inference_config_sha256="b" * 64,
+            proposals=proposals,
+        )
+        candidates = materialize_quote_batch(batch, catalog).candidates
+        self.assertTrue(
+            all(candidate.evidence[0].verified for candidate in candidates)
+        )
+        contexts = derive_model_use_contexts(
+            candidates, {item.candidate_id for item in candidates}
+        )
+
+        self.assertEqual(2, len(contexts))
+        for context in contexts:
+            with self.subTest(context_id=context.context_id):
+                self.assertNotIn("Publisher-reported limitation:", context.description)
+                self.assertEqual(1, len(context.supporting_candidate_ids))
+                self.assertEqual(1, len(context.supporting_fields))
 
     def test_grounded_context_without_risk_provider_emits_no_taxonomy_risk(self) -> None:
         description = (

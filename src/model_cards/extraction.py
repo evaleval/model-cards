@@ -39,6 +39,11 @@ from .models import (
     SourceRole,
     TargetIdentity,
 )
+from .model_family import (
+    CONFIG_MODEL_FAMILY_REGISTRY_SHA256,
+    ModelFamilyDerivationError,
+    select_config_model_family_derivation,
+)
 from .pointer_registry import DEFAULT_POINTER_FIELD_REGISTRY, PointerFieldRegistry
 from .policy import decide_binding
 from .quote import match_quote, normalize_ws
@@ -52,11 +57,11 @@ from .schema import (
 from .source_documents import SourceDocumentCatalog
 
 
-EXTRACTION_VERSION = "model-card-evidence-extraction/v9"
+EXTRACTION_VERSION = "model-card-evidence-extraction/v14"
 EXTRACTION_SCHEMA_NAME = "model_card_quote_evidence_extraction_v2"
 USE_RISK_EXTRACTION_SCHEMA_NAME = "model_card_use_risk_quote_extraction_v1"
 DETERMINISTIC_PUBLISHER_CONTEXT_VERSION = (
-    "deterministic-root-publisher-context/v5"
+    "deterministic-publisher-context/v9"
 )
 INFERENCE_MODEL = "deepseek/deepseek-v4-flash-0731"
 DEFAULT_WINDOW_CHARS = 12_000
@@ -81,7 +86,7 @@ MAX_PROVIDER_SCOPE_JSON_CHARS = 1_000
 MAX_PROVIDER_RISK_NAME_CHARS = 256
 MAX_PROVIDER_RISK_DESCRIPTION_CHARS = 640
 MAX_PROVIDER_RISK_RATIONALE_CHARS = 512
-MAX_DETERMINISTIC_PUBLISHER_CONTEXTS_PER_FIELD = 8
+MAX_DETERMINISTIC_PUBLISHER_CONTEXTS_PER_FIELD = 16
 
 PUBLISHER_RISK_FIELD = "use_and_risk.identified_risks"
 PUBLISHER_RISK_PROPOSAL_FIELDS = (
@@ -122,7 +127,7 @@ _USE_RISK_FIELD_PATH_PATTERN = (
     + ")\\[(?:0|[1-9][0-9]*)\\]$"
 )
 _USE_RISK_SIGNAL_RE = re.compile(
-    r"\b(?:intended\s+uses?|use\s+cases?|out[-\s]+of[-\s]+scope|"
+    r"\b(?:intended\s+(?:uses?|usage)|use\s+cases?|out[-\s]+of[-\s]+scope|"
     r"limitations?|known\s+bias(?:es)?|safety|risks?|misuse|"
     r"mitigations?|restrictions?)\b",
     re.IGNORECASE,
@@ -154,6 +159,20 @@ _RELATED_MODEL_RE = re.compile(
     r"earlier\s+(?:model|version|checkpoint)|other\s+(?:model|checkpoint)s?|"
     r"derived\s+from|fine[-\s]+tuned\s+from|compared\s+(?:with|to))\b",
     re.IGNORECASE,
+)
+_FAMILY_SCOPE_HEADING_RE = re.compile(
+    r"\b(?:model\s+famil(?:y|ies)|famil(?:y|ies)\s+of\s+models?|"
+    r"all\s+(?:the\s+)?models?)\b",
+    re.IGNORECASE,
+)
+_FAMILY_SCOPE_PROSE_RE = re.compile(
+    r"\b(?:(?:these|those|both|our)\s+models|"
+    r"all(?:\s+of)?\s+(?:the\s+)?models|"
+    r"model\s+famil(?:y|ies)|famil(?:y|ies)\s+of\s+models?)\b",
+    re.IGNORECASE,
+)
+_SCOPE_HEADING_GENERIC_TOKENS = frozenset(
+    {"model", "models", "card", "checkpoint", "checkpoints", "for", "the"}
 )
 _MITIGATION_ACTION_RE = re.compile(
     r"(?:\b(?:users?|developers?|deployers?|operators?|publishers?)\s+"
@@ -203,6 +222,19 @@ _MIXED_VARIANT_RE = re.compile(
     r"(?:instruction[-\s]+tuned|instruct)\b)",
     re.IGNORECASE,
 )
+_ANAPHORIC_LIMITATION_RE = re.compile(
+    r"^it\s+(?:cannot|can't|does\s+not|is\s+unable\s+to|"
+    r"is\s+limited\s+(?:to|by|in)|may\s+not|suffers?\s+from|"
+    r"struggles?\s+with|has\s+difficulty\s+with|"
+    r"(?:may|can|could)\s+(?:produce|generate|expose|fail|hallucinate|omit|"
+    r"misclassify|provide|return|repeat))\b",
+    re.IGNORECASE,
+)
+_ANTECEDENT_MODEL_SUBJECT_RE = re.compile(
+    r"^(?:the\s+)?(?P<name>[A-Za-z0-9][A-Za-z0-9._ -]{1,100}?)\s+"
+    r"(?:model|checkpoint)\b",
+    re.IGNORECASE,
+)
 _LLAMA_31_TARGET_RE = re.compile(
     r"^meta-llama/Llama-3\.1-(?:8B|70B|405B)(?P<instruct>-Instruct)?$",
     re.IGNORECASE,
@@ -212,6 +244,13 @@ _LLAMA_31_MIXED_INTENDED_USE_RE = re.compile(
     r"assistant-like chat), whereas (?P<pretrained>pretrained models can be "
     r"adapted for a variety of natural language generation tasks\.)$"
 )
+_DEEPSEEK_LICENSE_TITLE = "DEEPSEEK LICENSE AGREEMENT"
+_DEEPSEEK_LICENSE_ATTACHMENT = "Attachment A"
+_DEEPSEEK_LICENSE_USE_RESTRICTIONS = "Use Restrictions"
+_DEEPSEEK_LICENSE_SCOPE = (
+    "You agree not to use the Model or Derivatives of the Model:"
+)
+_DEEPSEEK_LICENSE_BULLET_RE = re.compile(r"^[ \t]*-[ \t]+(\S.*?)[ \t]*$")
 
 
 class ExtractionError(ValueError):
@@ -356,6 +395,7 @@ class SourceWindow:
     source_uri: str
     source_revision: str
     source_role: str
+    normalized_source_sha256: str
     normalized_start: int
     normalized_end: int
     excerpt: str
@@ -365,6 +405,8 @@ class SourceWindow:
             raise ExtractionError("source window_id is invalid")
         if not self.source_id or not self.source_uri.startswith("https://"):
             raise ExtractionError("source window identity is invalid")
+        if not _DIGEST_RE.fullmatch(self.normalized_source_sha256):
+            raise ExtractionError("source window normalized-source digest is invalid")
         if self.normalized_start < 0 or self.normalized_end <= self.normalized_start:
             raise ExtractionError("source window coordinates are invalid")
         if not self.excerpt or len(self.excerpt) != self.normalized_end - self.normalized_start:
@@ -391,6 +433,7 @@ def build_source_windows(
     text = normalize_ws(source.text)
     if not text:
         raise ExtractionError("quote extraction source has no normalized text")
+    normalized_source_sha256 = hashlib.sha256(text.encode("utf-8")).hexdigest()
     windows: list[SourceWindow] = []
     start = 0
     step = window_chars - overlap
@@ -412,6 +455,7 @@ def build_source_windows(
                 source_uri=source.source_uri,
                 source_revision=source.source_revision,
                 source_role=source.role.value,
+                normalized_source_sha256=normalized_source_sha256,
                 normalized_start=start,
                 normalized_end=end,
                 excerpt=excerpt,
@@ -442,7 +486,33 @@ def build_use_risk_windows(
     candidates = tuple(build_source_windows(source) if windows is None else windows)
     if not candidates:
         return ()
+    normalized_source = normalize_ws(source.text)
+    normalized_source_sha256 = hashlib.sha256(
+        normalized_source.encode("utf-8")
+    ).hexdigest()
     index = build_document_index(source.text)
+    if (
+        index.normalized_sha256 != normalized_source_sha256
+        or index.normalized_length != len(normalized_source)
+    ):
+        raise ExtractionError("document index uses a different coordinate space")
+    for window in candidates:
+        if (
+            window.source_id != source.source_id
+            or window.source_uri != source.source_uri
+            or window.source_revision != source.source_revision
+            or window.source_role != source.role.value
+            or window.normalized_source_sha256 != normalized_source_sha256
+        ):
+            raise ExtractionError("use/risk window does not belong to the source")
+        if (
+            window.normalized_end > index.normalized_length
+            or normalized_source[
+                window.normalized_start : window.normalized_end
+            ]
+            != window.excerpt
+        ):
+            raise ExtractionError("use/risk window coordinates do not replay")
     spans = tuple(
         (section.char_start, section.char_end)
         for section in index.sections
@@ -897,6 +967,14 @@ def deterministic_structured_candidates(
 
     candidates: dict[str, ClaimCandidate] = {}
     outcomes: list[ProposalOutcome] = []
+    try:
+        selected_family = select_config_model_family_derivation(
+            catalog.target, catalog.documents
+        )
+    except ModelFamilyDerivationError as exc:
+        raise ExtractionError(
+            "config model-family derivation failed closed"
+        ) from exc
     for source in catalog.documents:
         if source.data is None:
             continue
@@ -947,6 +1025,44 @@ def deterministic_structured_candidates(
                     candidate.candidate_id,
                 )
             )
+        family_derivation = (
+            selected_family[1]
+            if selected_family is not None and selected_family[0] is source
+            else None
+        )
+        if family_derivation is not None:
+            try:
+                binding = structured_binding(
+                    target=catalog.target,
+                    source=source,
+                    field_path="lineage.model_family",
+                    pointer=family_derivation.pointer,
+                    claim_entity=(
+                        f"{catalog.target.model_id}@{catalog.target.revision}"
+                    ),
+                    relation=RelationToTarget.EXACT_TARGET,
+                )
+                candidate = ClaimCandidate.from_binding(catalog.target, binding)
+            except (TypeError, ValueError) as exc:
+                raise ExtractionError(
+                    "allowlisted config model-family candidate is invalid"
+                ) from exc
+            candidates[candidate.candidate_id] = candidate
+            proposal_id = "proposal-" + _digest(
+                {
+                    "kind": "registered_config_model_family",
+                    "candidate_id": candidate.candidate_id,
+                    "derivation_sha256": family_derivation.derivation_sha256,
+                }
+            )[:24]
+            outcomes.append(
+                ProposalOutcome(
+                    proposal_id,
+                    ProposalStatus.MATERIALIZED,
+                    "candidate_materialized",
+                    candidate.candidate_id,
+                )
+            )
     candidate_values = tuple(sorted(candidates.values(), key=lambda item: item.candidate_id))
     # Multiple registry aliases can resolve to the same candidate. Keep one outcome
     # per final candidate so coverage remains one-to-one and deterministic.
@@ -961,6 +1077,9 @@ def deterministic_structured_candidates(
             "mode": "closed_pointer_registry",
             "catalog_sha256": catalog.catalog_sha256,
             "registry_sha256": registry.sha256,
+            "config_model_family_registry_sha256": (
+                CONFIG_MODEL_FAMILY_REGISTRY_SHA256
+            ),
         }
     )
     return _make_result(catalog.target, input_digest, candidate_values, outcome_values)
@@ -972,6 +1091,7 @@ class _PublisherTextSegment:
     section_path: tuple[str, ...]
     inline_field: str | None
     complete_clause_without_terminal_punctuation: bool = False
+    antecedent_description: str | None = None
 
 
 def _target_scoped_publisher_segments(
@@ -1043,7 +1163,8 @@ def _publisher_structural_fields(
         ):
             return frozenset({"use_and_risk.out_of_scope_uses"})
         if re.fullmatch(
-            r"(?:(?:intended|primary|direct|supported|downstream) uses?|uses?|"
+            r"(?:(?:intended|primary|direct|supported|downstream) uses?|"
+            r"intended usage|uses?|"
             r"use cases?|intended applications?)",
             title,
         ):
@@ -1074,7 +1195,9 @@ def _publisher_structural_fields(
             return frozenset({"use_and_risk.mitigations"})
         if re.fullmatch(
             r"(?:risks?|safety(?: and security)?|responsible use|"
-            r"ethical considerations?|hazards?)",
+            r"ethical considerations?|ethical considerations? and risks?|"
+            r"safety risks and limitations|bias(?:es)? risks and limitations|"
+            r"risks? and limitations|hazards?)",
             title,
         ):
             return frozenset(
@@ -1193,13 +1316,14 @@ def _publisher_text_segments(text: str) -> tuple[_PublisherTextSegment, ...]:
     flush()
 
     results: list[_PublisherTextSegment] = []
-    seen: set[tuple[str, tuple[str, ...], str | None]] = set()
+    seen: set[tuple[str, tuple[str, ...], str | None, str | None]] = set()
     for raw, path in raw_segments:
         scoped_text, inline_field = _strip_segment_prefix(raw)
+        antecedent: str | None = None
         for sentence in _SENTENCE_BOUNDARY_RE.split(scoped_text):
             description, nested_field = _strip_segment_prefix(sentence)
             field = inline_field or nested_field
-            key = (description, path, field)
+            key = (description, path, field, antecedent)
             if description and key not in seen:
                 seen.add(key)
                 results.append(
@@ -1207,8 +1331,11 @@ def _publisher_text_segments(text: str) -> tuple[_PublisherTextSegment, ...]:
                         description,
                         path,
                         field,
+                        antecedent_description=antecedent,
                     )
                 )
+            if description:
+                antecedent = description
     return tuple(results)
 
 
@@ -1274,6 +1401,61 @@ def _publisher_statement_fields(
     return frozenset(fields)
 
 
+def _heading_scoped_anaphoric_fields(
+    segment: _PublisherTextSegment,
+    target: TargetIdentity,
+) -> frozenset[str]:
+    """Resolve one local pronoun only from an exact checkpoint heading.
+
+    Model cards sometimes put an exact checkpoint in the root heading, name a
+    shortened form of that same checkpoint in one sentence, and use ``It`` in
+    the immediately following sentence.  Sentence-only extraction otherwise
+    loses the antecedent (for example, Mistral's moderation limitation).  The
+    bridge is deliberately fail-closed: the heading must name the full target,
+    the immediately preceding sentence must name a target-token prefix rather
+    than a family or sibling, and only a limitation predicate is admitted.
+    """
+
+    antecedent = segment.antecedent_description
+    if antecedent is None or _ANAPHORIC_LIMITATION_RE.search(segment.description) is None:
+        return frozenset()
+    target_tokens = tuple(
+        _normalized_heading(target.model_id.split("/", 1)[1]).split()
+    )
+    exact_heading = any(
+        tuple(
+            token
+            for token in _normalized_heading(title).split()
+            if token not in _SCOPE_HEADING_GENERIC_TOKENS
+        )
+        == target_tokens
+        for title in segment.section_path
+    )
+    if not exact_heading:
+        return frozenset()
+    normalized_antecedent = _normalized_heading(antecedent)
+    if (
+        _FAMILY_SCOPE_PROSE_RE.search(normalized_antecedent)
+        or _MIXED_VARIANT_RE.search(antecedent)
+        or any(
+            match.group(0).casefold() != target.model_id.casefold()
+            for match in _MODEL_ID_IN_PROSE_RE.finditer(antecedent)
+        )
+    ):
+        return frozenset()
+    subject = _ANTECEDENT_MODEL_SUBJECT_RE.search(antecedent)
+    if subject is None:
+        return frozenset()
+    subject_tokens = tuple(_normalized_heading(subject.group("name")).split())
+    if (
+        len(subject_tokens) < 2
+        or len(subject_tokens) > len(target_tokens)
+        or subject_tokens != target_tokens[: len(subject_tokens)]
+    ):
+        return frozenset()
+    return frozenset({"use_and_risk.limitations"})
+
+
 def _publisher_statement_is_substantive(
     description: str,
     *,
@@ -1314,6 +1496,55 @@ def _publisher_statement_has_exact_scope(
         description
     ):
         return False
+    target_name_tokens = tuple(
+        _normalized_heading(target.model_id.split("/", 1)[1]).split()
+    )
+    normalized_description = _normalized_heading(description)
+    if _FAMILY_SCOPE_PROSE_RE.search(normalized_description):
+        return False
+    # A publisher can name a family without saying "family", as in
+    # "The OLMo-2 models ..." on an exact-checkpoint card.  A proper prefix of
+    # the target name followed by plural ``models`` is still family evidence,
+    # not exact-checkpoint evidence.  Reject the complete mixed-scope sentence;
+    # do not turn its later singular anaphor into an exact-target claim.
+    for token_count in range(1, len(target_name_tokens)):
+        family_phrase = " ".join((*target_name_tokens[:token_count], "models"))
+        if re.search(
+            rf"(?:^|\s){re.escape(family_phrase)}(?:\s|$)",
+            normalized_description,
+        ):
+            return False
+    for title in section_path:
+        if _FAMILY_SCOPE_HEADING_RE.search(title):
+            return False
+        heading_tokens = tuple(
+            token
+            for token in _normalized_heading(title).split()
+            if token not in _SCOPE_HEADING_GENERIC_TOKENS
+        )
+        # A heading that names only a proper prefix of the exact checkpoint is
+        # family/release scope, not evidence for the exact target.  Exact names
+        # remain admissible; generic structural headings contribute no tokens.
+        if (
+            heading_tokens
+            and len(heading_tokens) < len(target_name_tokens)
+            and heading_tokens == target_name_tokens[: len(heading_tokens)]
+        ):
+            return False
+        # A sibling checkpoint title can contain every token in the target
+        # name plus a variant marker (for example, ``Mistral 7B Instruct
+        # v0.3`` while the target is ``Mistral-7B-v0.3``).  It is neither a
+        # simple family prefix nor an explicit ``org/model`` identifier, so
+        # the guards above do not catch it.  Treat any model-like heading that
+        # overlaps at least two exact-target tokens but is not the exact token
+        # sequence as conflicting scope.  Generic structural headings have no
+        # such overlap and remain admissible.
+        if (
+            heading_tokens
+            and heading_tokens != target_name_tokens
+            and len(set(heading_tokens).intersection(target_name_tokens)) >= 2
+        ):
+            return False
     target_id = target.model_id.casefold()
     if not all(
         match.group(0).casefold() == target_id
@@ -1373,16 +1604,117 @@ def _publisher_context_source_is_eligible(
     )
 
 
+def _publisher_license_source_is_eligible(
+    source: SourceDocument, target: TargetIdentity
+) -> bool:
+    """Return whether a bundled model license is pinned to the exact target."""
+
+    if (
+        source.text is None
+        or source.synthetic
+        or source.target != target
+        or source.source_revision != target.revision
+        or source.role is not SourceRole.HUGGING_FACE_SNAPSHOT
+    ):
+        return False
+    parsed = urlsplit(source.source_uri)
+    return (
+        parsed.scheme == "https"
+        and parsed.netloc.casefold() == "huggingface.co"
+        and parsed.path
+        in {
+            f"/{target.model_id}/resolve/{target.revision}/LICENSE-MODEL",
+            f"/{target.model_id}/blob/{target.revision}/LICENSE-MODEL",
+        }
+        and not parsed.query
+        and not parsed.fragment
+    )
+
+
+def _deepseek_license_restrictions(source: SourceDocument) -> tuple[str, ...]:
+    """Parse the one closed, explicitly model-scoped DeepSeek restriction block.
+
+    This is intentionally not a general license parser. Every anchor must be a
+    unique complete line, Attachment A must directly contain the named section
+    and applicability clause, and the remainder must be one contiguous list of
+    complete restrictions. Any structural ambiguity withholds the whole block.
+    """
+
+    lines = source.text.splitlines() if source.text is not None else []
+    normalized_lines = tuple(normalize_ws(line) for line in lines)
+    nonempty = tuple(index for index, line in enumerate(normalized_lines) if line)
+    if not nonempty or normalized_lines[nonempty[0]] != _DEEPSEEK_LICENSE_TITLE:
+        return ()
+
+    anchors = (
+        _DEEPSEEK_LICENSE_TITLE,
+        _DEEPSEEK_LICENSE_ATTACHMENT,
+        _DEEPSEEK_LICENSE_USE_RESTRICTIONS,
+        _DEEPSEEK_LICENSE_SCOPE,
+    )
+    positions: list[int] = []
+    for anchor in anchors:
+        matches = tuple(
+            index for index, line in enumerate(normalized_lines) if line == anchor
+        )
+        if len(matches) != 1:
+            return ()
+        positions.append(matches[0])
+    if positions != sorted(positions) or len(set(positions)) != len(positions):
+        return ()
+
+    def next_nonempty(index: int) -> int | None:
+        return next(
+            (
+                candidate
+                for candidate in range(index + 1, len(normalized_lines))
+                if normalized_lines[candidate]
+            ),
+            None,
+        )
+
+    if (
+        next_nonempty(positions[1]) != positions[2]
+        or next_nonempty(positions[2]) != positions[3]
+    ):
+        return ()
+
+    restrictions: list[str] = []
+    seen: set[str] = set()
+    normalized_source = normalize_ws(source.text or "")
+    for index in range(positions[3] + 1, len(lines)):
+        if not normalized_lines[index]:
+            continue
+        match = _DEEPSEEK_LICENSE_BULLET_RE.fullmatch(lines[index])
+        if match is None:
+            return ()
+        description = normalize_ws(match.group(1))
+        folded = description.casefold()
+        if (
+            not 20 <= len(description) <= MAX_PROVIDER_QUOTE_CHARS
+            or len(_WORD_RE.findall(description)) < 5
+            or description[-1] not in ".;!?"
+            or folded in seen
+            or normalized_source.count(description) != 1
+        ):
+            return ()
+        seen.add(folded)
+        restrictions.append(description)
+    return tuple(restrictions)
+
+
 def deterministic_publisher_context_candidates(
     catalog: SourceDocumentCatalog,
     *,
     existing_gate_records: Iterable[ClaimGateRecord] = (),
 ) -> ExtractionResult:
-    """Extract exact context from the pinned root README.
+    """Extract exact context from closed, revision-pinned publisher sources.
 
     This pass does not infer risks and never invents prose. It admits only an
-    exact substring from an exact-target, non-synthetic publisher source only
-    when closed structural ancestry and an exact-subject predicate agree.
+    exact substring from an exact-target, non-synthetic publisher source. Root
+    README statements require closed structural ancestry and an exact-subject
+    predicate. A bundled ``LICENSE-MODEL`` uses a separate, strict DeepSeek
+    restriction-block parser; the generic README path still excludes legal text.
     A field already populated by a provider candidate that passed the complete
     claim gate is left untouched, preserving the provider's list indices. Mere
     materialization is not sufficient: an unverified or semantically rejected
@@ -1396,6 +1728,36 @@ def deterministic_publisher_context_candidates(
         tuple[str, int, str, str, QuoteProposal, Evidence]
     ] = []
     for source in sorted(catalog.documents, key=lambda item: item.source_id):
+        if _publisher_license_source_is_eligible(source, catalog.target):
+            for description in _deepseek_license_restrictions(source):
+                evidence = _quote_evidence(source, description)
+                if not evidence.verified or evidence.char_start is None:
+                    continue
+                field_path = "use_and_risk.out_of_scope_uses"
+                if field_path in populated_fields:
+                    continue
+                proposal = QuoteProposal(
+                    source_id=source.source_id,
+                    field_path=f"{field_path}[0]",  # stable index assigned below
+                    value=description,
+                    quote=description,
+                    claim_entity=(
+                        f"{catalog.target.model_id}@{catalog.target.revision}"
+                    ),
+                    relation=RelationToTarget.EXACT_TARGET,
+                    origin="source_stated",
+                )
+                material.append(
+                    (
+                        source.source_id,
+                        evidence.char_start,
+                        field_path,
+                        description,
+                        proposal,
+                        evidence,
+                    )
+                )
+            continue
         if not _publisher_context_source_is_eligible(source, catalog.target):
             continue
         for raw_segment in _publisher_text_segments(source.text):
@@ -1423,6 +1785,10 @@ def deterministic_publisher_context_candidates(
                 explicit_fields = _publisher_statement_fields(
                     segment.description, catalog.target
                 )
+                if not explicit_fields:
+                    explicit_fields = _heading_scoped_anaphoric_fields(
+                        segment, catalog.target
+                    )
                 if segment.inline_field is not None:
                     field_path = segment.inline_field
                     if explicit_fields and explicit_fields != {field_path}:

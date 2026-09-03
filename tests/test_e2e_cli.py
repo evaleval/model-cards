@@ -205,21 +205,40 @@ class E2ECommandLineTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
 
     def test_audit_review_rejects_partial_closure_artifacts(self) -> None:
-        result, _stdout, stderr = self.invoke(
-            [
-                "audit-review",
-                "artifact.json",
-                "--source-bundle",
-                "bundle",
+        incomplete_sets = (
+            ("--claim-gates", "claim-gates.json"),
+            (
                 "--claim-gates",
                 "claim-gates.json",
-                "--output",
-                "audit.json",
-            ]
+                "--publication-factreasoner",
+                "factreasoner-publication-original.json",
+                "--publication-validation",
+                "publication-validation.json",
+                "--final-factreasoner",
+                "factreasoner.json",
+                "--risk-mapping",
+                "risk-mapping.json",
+                "--privacy",
+                "privacy.json",
+            ),
+            ("--provider-run", "provider-run"),
         )
+        for closure_arguments in incomplete_sets:
+            with self.subTest(closure_arguments=closure_arguments):
+                result, _stdout, stderr = self.invoke(
+                    [
+                        "audit-review",
+                        "artifact.json",
+                        "--source-bundle",
+                        "bundle",
+                        *closure_arguments,
+                        "--output",
+                        "audit.json",
+                    ]
+                )
 
-        self.assertEqual(2, result)
-        self.assertIn("requires all downstream closure artifacts", stderr)
+                self.assertEqual(2, result)
+                self.assertIn("requires all downstream closure artifacts", stderr)
 
     def test_exact_generate_invocation_is_offline_private_and_resumable(self) -> None:
         self.assertEqual(build_parser().prog, "modelcards")

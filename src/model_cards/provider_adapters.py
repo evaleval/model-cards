@@ -53,17 +53,32 @@ from .factreasoner import (
     MAX_FACT_CHECKS_PER_BATCH,
     check_request_sha256,
 )
+from .family_risk import (
+    FamilyContextApplicabilityDecision,
+    FamilyDecisionStatus,
+    FamilyMembershipDecision,
+    verify_family_membership_decision,
+    validate_family_context_gate,
+)
+from .claim_gate import ClaimGateRecord
 from .models import SourceDocument, TargetIdentity
 from .provider import (
     MODEL_ID,
     PINNED_PROVIDER,
     PROVIDER_RUNTIME_VERSION,
     REASONING_CONFIG,
+    ProviderExecutionBinding,
     ProviderResponseError,
     ProviderTerminalAttemptError,
     ProviderTransport,
+    StructuredCallResult,
     StructuredCallSpec,
+    replay_structured_json_call,
     structured_json_call,
+)
+from .provider_execution import (
+    ProviderExecutionCollector,
+    ProviderExecutionRunEvidence,
 )
 from .risk_mapping import (
     ApplicabilityDecision,
@@ -88,7 +103,7 @@ from .schema import (
 )
 
 
-ADAPTER_VERSION = "model-card-openrouter-adapters/v18"
+ADAPTER_VERSION = "model-card-openrouter-adapters/v21"
 CLAIM_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 FACT_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 MAX_EXTRACTION_OUTPUT_TOKENS = 8192
@@ -232,7 +247,7 @@ def _validate_existing_pinned_ledger(path: Path, provider: str) -> None:
     if path.is_symlink() or not path.is_file():
         raise ProviderAdapterError("usage ledger path is unsafe")
     try:
-        providers = UsageLedger(path).audit_metrics()["providers"]
+        providers = UsageLedger(path).audit_metrics(read_only=True)["providers"]
     except Exception as exc:
         raise ProviderAdapterError("existing usage ledger failed validation") from exc
     if not isinstance(providers, list) or any(item != provider for item in providers):
@@ -849,6 +864,7 @@ class _Runtime:
     transport: ProviderTransport | None
     call: CallFunction
     aggregate_budget: _AggregatePaidCallBudget | None
+    execution_collector: ProviderExecutionCollector | None
 
     @classmethod
     def build(
@@ -861,9 +877,14 @@ class _Runtime:
         transport: ProviderTransport | None,
         call: CallFunction,
         aggregate_budget_path: str | os.PathLike[str] | None = None,
+        execution_collector: ProviderExecutionCollector | None = None,
     ) -> "_Runtime":
         if provider != PINNED_PROVIDER:
             raise ProviderAdapterError("the pinned OpenRouter provider is required")
+        if execution_collector is not None and not isinstance(
+            execution_collector, ProviderExecutionCollector
+        ):
+            raise ProviderAdapterError("execution collector is invalid")
         ledger = Path(ledger_path)
         if ledger.is_symlink() or ledger.parent.is_symlink():
             raise ProviderAdapterError("usage ledger path is unsafe")
@@ -885,6 +906,7 @@ class _Runtime:
             transport=transport,
             call=call,
             aggregate_budget=aggregate,
+            execution_collector=execution_collector,
         )
 
     def invoke(
@@ -946,10 +968,43 @@ class _Runtime:
                     }
                     if paid_send_budget is not None:
                         call_kwargs["paid_send_budget"] = paid_send_budget
-                    return self.call(
+                    result = self.call(
                         active_spec,
                         **call_kwargs,
                     )
+                    if self.execution_collector is not None:
+                        if not isinstance(result, StructuredCallResult) or not isinstance(
+                            result.execution, ProviderExecutionBinding
+                        ):
+                            raise ProviderAdapterError(
+                                "provider call returned no typed execution binding"
+                            )
+                        # Independently reconstruct the exact request binding and
+                        # re-read the just-settled sidecar.  This prevents an
+                        # injected call wrapper from changing ``decision`` while
+                        # retaining a receipt for another request or sidecar.
+                        replayed = replay_structured_json_call(
+                            active_spec,
+                            ledger_path=self.ledger_path,
+                            decision_path=decision_path,
+                            validator=validator,
+                        )
+                        if (
+                            replayed.execution.to_dict()
+                            != result.execution.to_dict()
+                            or replayed.decision != result.decision
+                            or replayed.receipt.to_dict()
+                            != result.receipt.to_dict()
+                            or replayed.logical_call_id != result.logical_call_id
+                            or replayed.attempt_id != result.attempt_id
+                            or replayed.provider != result.provider
+                            or replayed.request_sha256 != result.request_sha256
+                        ):
+                            raise ProviderAdapterError(
+                                "provider result differs from its settled execution"
+                            )
+                        self.execution_collector.record(result.execution)
+                    return result
             except (ProviderResponseError, ProviderTerminalAttemptError) as exc:
                 if (
                     exc.reason_code != "structured_decision_invalid"
@@ -972,6 +1027,7 @@ class OpenRouterQuoteExtractor:
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
+        execution_collector: ProviderExecutionCollector | None = None,
     ) -> None:
         self.runtime = _Runtime.build(
             provider=provider,
@@ -981,6 +1037,7 @@ class OpenRouterQuoteExtractor:
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
         )
 
     def extract_source(
@@ -1293,6 +1350,7 @@ class OpenRouterClaimChecker:
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
+        execution_collector: ProviderExecutionCollector | None = None,
     ) -> None:
         self.runtime = _Runtime.build(
             provider=provider,
@@ -1302,6 +1360,7 @@ class OpenRouterClaimChecker:
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
         )
 
     def decide(self, candidate: ClaimCandidate, gate: GateName) -> ProseCheckerDecision:
@@ -1413,6 +1472,168 @@ class OpenRouterClaimChecker:
         )
 
 
+class OpenRouterFamilyContextChecker:
+    """Independent checkpoint-applicability gate for model-family prose."""
+
+    checker_id = CLAIM_CHECKER_ID
+    checker_revision = ADAPTER_VERSION
+
+    def __init__(
+        self,
+        *,
+        provider: str,
+        ledger_path: str | os.PathLike[str],
+        decision_dir: str | os.PathLike[str],
+        aggregate_budget_path: str | os.PathLike[str] | None = None,
+        environment: Mapping[str, str] | None = None,
+        transport: ProviderTransport | None = None,
+        call: CallFunction = structured_json_call,
+        execution_collector: ProviderExecutionCollector | None = None,
+    ) -> None:
+        self.runtime = _Runtime.build(
+            provider=provider,
+            ledger_path=ledger_path,
+            decision_dir=decision_dir,
+            environment=environment,
+            transport=transport,
+            call=call,
+            aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
+        )
+
+    def assess(
+        self,
+        family_gate: ClaimGateRecord,
+        membership: FamilyMembershipDecision,
+        membership_gate: ClaimGateRecord,
+    ) -> FamilyContextApplicabilityDecision:
+        candidate = validate_family_context_gate(family_gate)
+        verify_family_membership_decision(membership, membership_gate)
+        if candidate.target != membership.target:
+            raise ProviderAdapterError(
+                "family applicability target differs from membership"
+            )
+        schema = {
+            "type": "object",
+            "required": ["status", "reason", "rationale"],
+            "properties": {
+                "status": {"enum": ["accepted", "withheld"]},
+                "reason": {
+                    "enum": [
+                        "family_statement_applies_to_checkpoint",
+                        "family_statement_checkpoint_scope_unclear",
+                        "family_statement_excludes_checkpoint",
+                    ]
+                },
+                "rationale": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 1600,
+                },
+            },
+            "additionalProperties": False,
+        }
+        payload = {
+            "task": (
+                "Decide only whether the publisher's model-family statement applies "
+                "to this exact checkpoint. Family membership is already established "
+                "by the separate registry decision. Accept only when the statement's "
+                "family, size, stage, modality, and version scope includes the target."
+            ),
+            "target": candidate.target.to_dict(),
+            "family_id": membership.family_id,
+            "membership": {
+                "decision_sha256": membership.decision_sha256,
+                "candidate_id": membership.membership_candidate_id,
+                "status": membership.status.value,
+            },
+            "family_statement": {
+                "candidate_id": candidate.candidate_id,
+                "field_path": candidate.field_path,
+                "value": candidate.value,
+                "claim_entity": candidate.claim_entity,
+                "relation": candidate.relation.value,
+                "evidence": [
+                    {
+                        "source_id": item.source_id,
+                        "source_revision": item.source_revision,
+                        "quote": item.quote,
+                        "section_path": list(item.section_path),
+                    }
+                    for item in candidate.evidence
+                ],
+            },
+            "rules": {
+                "do_not_relabel_family_prose_as_exact_target_evidence": True,
+                "do_not_infer_applicability_from_architecture_alone": True,
+                "withhold_ambiguous_checkpoint_scope": True,
+            },
+        }
+        logical = f"family.applicability.{candidate.candidate_id}"
+        spec = StructuredCallSpec(
+            logical_call_id=logical,
+            attempt_id=logical + ".attempt1",
+            provider=self.runtime.provider,
+            schema_name="model_card_family_checkpoint_applicability_v1",
+            json_schema=schema,
+            system_prompt=(
+                "Apply only the family-to-checkpoint applicability gate. The family "
+                "statement remains non-projectable even if it is accepted as private "
+                "risk-discovery context. Never rewrite its scope or content."
+            ),
+            user_prompt=_canonical(payload),
+            max_output_tokens=MAX_RISK_OUTPUT_TOKENS,
+            context_metadata={
+                "stage": "family_applicability",
+                "candidate_id": candidate.candidate_id,
+            },
+        )
+
+        def validate(value: Mapping[str, Any]) -> None:
+            item = _closed(
+                value,
+                {"status", "reason", "rationale"},
+                "family applicability decision",
+            )
+            allowed = {
+                "accepted": {"family_statement_applies_to_checkpoint"},
+                "withheld": {
+                    "family_statement_checkpoint_scope_unclear",
+                    "family_statement_excludes_checkpoint",
+                },
+            }
+            if (
+                item["status"] not in allowed
+                or item["reason"] not in allowed[item["status"]]
+            ):
+                raise ProviderAdapterError(
+                    "family applicability status/reason pair is invalid"
+                )
+            if not isinstance(item["rationale"], str) or not 20 <= len(
+                item["rationale"].strip()
+            ) <= 1600:
+                raise ProviderAdapterError(
+                    "family applicability rationale is invalid"
+                )
+
+        result = self.runtime.invoke(
+            spec,
+            decision_name=f"{candidate.candidate_id}-family-applicability.json",
+            validator=validate,
+        )
+        validate(result.decision)
+        return FamilyContextApplicabilityDecision.for_gate(
+            family_gate,
+            membership,
+            membership_gate,
+            status=FamilyDecisionStatus(result.decision["status"]),
+            checker=self.checker_id,
+            method="bounded_openrouter_family_checkpoint_applicability",
+            reason=result.decision["reason"],
+            rationale=result.decision["rationale"],
+        )
+
+
 class OpenRouterFactChecker:
     """FactReasoner checker using only the request's bounded frozen contexts."""
 
@@ -1429,6 +1650,7 @@ class OpenRouterFactChecker:
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
+        execution_collector: ProviderExecutionCollector | None = None,
     ) -> None:
         self.runtime = _Runtime.build(
             provider=provider,
@@ -1438,6 +1660,7 @@ class OpenRouterFactChecker:
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
         )
         self._response_cache: dict[str, CheckerResponse] = {}
 
@@ -1633,6 +1856,126 @@ class OpenRouterFactChecker:
         return self.check_many((request,))[0]
 
 
+class OpenRouterFactReplayChecker:
+    """Replay individual NLI decisions from verified completed batch receipts.
+
+    The live checker caches requests across several FactReasoner passes, so a
+    later record cannot in general reconstruct the historical batch boundary
+    in isolation.  This verifier first authenticates every batch through the
+    immutable provider-run manifest, then indexes only the request-level
+    decisions whose hashes and citations bind the current ``CheckRequest``.
+    """
+
+    checker_id = FACT_CHECKER_ID
+    checker_revision = ADAPTER_VERSION
+
+    def __init__(self, evidence: ProviderExecutionRunEvidence) -> None:
+        if not isinstance(evidence, ProviderExecutionRunEvidence):
+            raise ProviderAdapterError("FactReasoner replay evidence is invalid")
+        verified = evidence.verify()
+        responses: dict[str, CheckerResponse] = {}
+        for execution in evidence.manifest.executions:
+            metadata = execution.context_metadata
+            if metadata.get("stage") != "factreasoner_batch":
+                continue
+            value = verified.get(execution.binding_sha256)
+            if not isinstance(value, Mapping) or set(value) != {"decisions"}:
+                raise ProviderAdapterError("retained FactReasoner batch is malformed")
+            decisions = value["decisions"]
+            if (
+                not isinstance(decisions, list)
+                or not decisions
+                or metadata.get("request_count") != len(decisions)
+            ):
+                raise ProviderAdapterError("retained FactReasoner batch coverage is invalid")
+            request_hashes: list[str] = []
+            for item in decisions:
+                decision = _closed(
+                    item,
+                    {"request_sha256", "outcome", "cited_chunk_ids"},
+                    "retained FactReasoner decision",
+                )
+                request_hash = decision["request_sha256"]
+                outcome = decision["outcome"]
+                cited = decision["cited_chunk_ids"]
+                if (
+                    not isinstance(request_hash, str)
+                    or not _DIGEST_RE.fullmatch(request_hash)
+                    or outcome not in {"support", "contradiction", "neutral"}
+                    or not isinstance(cited, list)
+                    or not cited
+                    or len(cited) != len(set(cited))
+                    or any(
+                        not isinstance(chunk_id, str)
+                        or not chunk_id.startswith("chunk-")
+                        for chunk_id in cited
+                    )
+                ):
+                    raise ProviderAdapterError(
+                        "retained FactReasoner decision is invalid"
+                    )
+                request_hashes.append(request_hash)
+                response = CheckerResponse(
+                    outcome=CheckOutcome(outcome),
+                    reason_code={
+                        "support": "support_in_context",
+                        "contradiction": "contradiction_in_context",
+                        "neutral": "no_complete_support",
+                    }[outcome],
+                    cited_chunk_ids=tuple(cited),
+                )
+                previous = responses.setdefault(request_hash, response)
+                if previous != response:
+                    raise ProviderAdapterError(
+                        "retained FactReasoner request has conflicting decisions"
+                    )
+            batch_sha256 = _digest(
+                {
+                    "adapter_version": ADAPTER_VERSION,
+                    "request_sha256s": request_hashes,
+                }
+            )
+            if (
+                metadata.get("batch_sha256") != batch_sha256
+                or execution.logical_call_id != f"fact.batch.{batch_sha256[:24]}"
+                or not execution.decision_name.startswith(
+                    f"fact-batch-{batch_sha256[:24]}"
+                )
+            ):
+                raise ProviderAdapterError(
+                    "retained FactReasoner batch identity is inconsistent"
+                )
+        self._responses = responses
+
+    def check_many(
+        self, requests: Sequence[CheckRequest]
+    ) -> tuple[CheckerResponse, ...]:
+        ordered = tuple(requests)
+        if (
+            not ordered
+            or len(ordered) > MAX_FACT_CHECKS_PER_BATCH
+            or not all(isinstance(item, CheckRequest) for item in ordered)
+        ):
+            raise ProviderAdapterError(
+                "FactReasoner replay requires between 1 and 64 CheckRequests"
+            )
+        output: list[CheckerResponse] = []
+        for request in ordered:
+            response = self._responses.get(check_request_sha256(request))
+            context_ids = {item.chunk.chunk_id for item in request.contexts}
+            if response is None or not set(response.cited_chunk_ids).issubset(context_ids):
+                raise ProviderAdapterError(
+                    "FactReasoner replay request lacks a matching retained decision"
+                )
+            output.append(response)
+        return tuple(output)
+
+    def check(self, request: CheckRequest) -> CheckerResponse:
+        if not isinstance(request, CheckRequest):
+            raise ProviderAdapterError("FactReasoner replay requires a CheckRequest")
+        return self.check_many((request,))[0]
+
+
 class OpenRouterApplicabilityChecker:
     """Independent applicability gate for one taxonomy-grounded risk candidate."""
 
@@ -1646,6 +1989,7 @@ class OpenRouterApplicabilityChecker:
         environment: Mapping[str, str] | None = None,
         transport: ProviderTransport | None = None,
         call: CallFunction = structured_json_call,
+        execution_collector: ProviderExecutionCollector | None = None,
     ) -> None:
         self.runtime = _Runtime.build(
             provider=provider,
@@ -1655,6 +1999,7 @@ class OpenRouterApplicabilityChecker:
             transport=transport,
             call=call,
             aggregate_budget_path=aggregate_budget_path,
+            execution_collector=execution_collector,
         )
 
     def assess(
@@ -1751,6 +2096,7 @@ def build_nexus_openrouter_inference_engine(
     environment: Mapping[str, str] | None = None,
     transport: ProviderTransport | None = None,
     call: CallFunction = structured_json_call,
+    execution_collector: ProviderExecutionCollector | None = None,
 ) -> Any:
     """Return an optional Nexus ``InferenceEngine`` backed by the exact runtime.
 
@@ -1776,6 +2122,7 @@ def build_nexus_openrouter_inference_engine(
         transport=transport,
         call=call,
         aggregate_budget_path=aggregate_budget_path,
+        execution_collector=execution_collector,
     )
 
     class _OpenRouterNexusEngine(InferenceEngine):
@@ -1911,7 +2258,9 @@ __all__ = [
     "MAX_RISK_OUTPUT_TOKENS",
     "OpenRouterApplicabilityChecker",
     "OpenRouterClaimChecker",
+    "OpenRouterFamilyContextChecker",
     "OpenRouterFactChecker",
+    "OpenRouterFactReplayChecker",
     "OpenRouterQuoteExtractor",
     "ProviderAdapterError",
     "build_nexus_openrouter_inference_engine",

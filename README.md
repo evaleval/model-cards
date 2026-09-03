@@ -98,7 +98,11 @@ Nexus receives only evidence-bound Model Use Contexts. Each context must start
 from an accepted exact-target intended-use or out-of-scope-use claim. Accepted
 model properties, limitations, and known biases may qualify that core statement;
 their field paths, candidate IDs, and frozen source IDs remain attached to the
-context. Qualifiers alone never trigger risk inference, and an empty or withheld
+context. Exact-target properties are global qualifiers. Limitation and bias
+statements are source-local: with multiple core uses they attach only when source
+overlap identifies exactly one core, otherwise they are withheld from the Nexus
+prompt rather than copied across every use. Qualifiers alone never trigger risk
+inference, and an empty or withheld
 applicability decision is not replaced with generic top-ranked risks. The private
 `risk-mapping.json` retains every typed Nexus candidate and applicability decision,
 not just their hashes. Quality replay loads the exact Nexus 1.2.4 catalog, rebuilds
@@ -111,6 +115,9 @@ Publisher context has two evidence paths. A conservative deterministic pass acce
 only complete statements with an explicit model subject under closed use, limitation,
 bias, risk, or mitigation sections in the pinned root README. Pronouns cannot serve as
 the model subject because this local pass has no semantic coreference model. Verified
+Closed heading aliases such as `Intended Usage`, `Ethical Considerations & Risks`, and
+`Safety, Risks, and Limitations` use the same exact-target gate; model-family,
+partial-checkpoint, sibling, and unknown nested scopes remain withheld. Verified
 official developer reports remain available to the provider-assisted path, where the
 normal semantic binding gates must establish checkpoint scope.
 A versioned stage-disambiguation rule may select one exact contiguous clause
@@ -120,6 +127,23 @@ sentence remains rejected. Provider-assisted mode adds a dedicated bounded recov
 windows with use/risk signals. Both paths preserve exact quotes and coordinates and
 run the same four claim gates. Neither path adds risk fields to the public 33-field
 card.
+
+Family-scoped publisher prose remains ineligible for public-card projection. It may
+be used as private Nexus context only through a separate fail-closed bridge. The
+bridge first requires an accepted exact-target `lineage.model_family` claim produced
+by a closed, versioned publisher/model-ID/config-`model_type` registry; unknown or
+derivative namespaces abstain. A separate structured decision must then accept that
+one family statement as applicable to the exact checkpoint. The complete chain and
+any unavailable or withheld decisions are retained in
+`family-risk-authorizations.json` and replayed before the context can reach Nexus.
+
+A separate deterministic allowlist handles the bundled DeepSeek `LICENSE-MODEL`
+only when its Hugging Face URL, source revision, and source target all bind to the
+exact checkpoint. It admits only the complete bullets under the uniquely ordered
+`Attachment A` / `Use Restrictions` / explicit Model-or-Derivatives applicability
+anchors as publisher-reported out-of-scope uses. Missing, duplicate, reordered, or
+ambiguous anchors withhold the entire block. This does not relax the generic legal
+section exclusion for README or any other document.
 
 ## Generate one card
 
@@ -239,6 +263,7 @@ files are:
 | `extraction.json`, `claim-gates.json` | Candidate claims and the four-part support gate |
 | `composition-original.json`, `factreasoner-original.json`, `omissions-original.json` | Pre-repair audit projection and checks |
 | `repairs.json`, `composition.json`, `factreasoner-content.json`, `omissions.json` | Field-targeted repair/withholding and post-repair audit-content checks |
+| `family-risk-authorizations.json` | Private exact-checkpoint authorization and replay for any family-scoped Nexus context |
 | `risk-mapping.json` | Local publisher-use and taxonomy-risk audit; never a public-card section |
 | `factreasoner-publication-original.json`, `publication-validation.json` | Enriched 33-field pre-withhold check and deletion-only public-field decisions |
 | `factreasoner.json`, `privacy.json` | Final public-card FactReasoner record and privacy scan |
@@ -248,11 +273,16 @@ files are:
 
 Provider-assisted runs additionally retain `provider-orchestration.json`, a single
 `usage.jsonl` accounting ledger, normalized decision sidecars, and
-`provider-result.json` in the run directory. These are run records, not public-card
-content. A provider batch also retains its shared aggregate budget journal at the
-batch root and a body-free summary bound into batch reporting. Exact sidecar replay
-neither reserves nor records another paid call after any interrupted reservation has
-been reconciled.
+`provider-result.json` in the run directory. Whenever the ledger records a provider
+attempt, `provider-execution.json` binds the exact pinned route and runtime, target,
+source catalog, pipeline/FactReasoner/risk digests, complete usage-ledger digest and
+event count, every normalized decision sidecar, and the terminal receipts for both
+successful and failed attempts. It contains no prompt, source text, raw response,
+credential, or absolute path. These are local run records, not public-card content. A
+provider batch also retains its shared aggregate budget journal at the batch root and
+a body-free summary bound into batch reporting. Exact sidecar replay is read-only:
+after any interrupted reservation has been reconciled, it neither reserves nor
+records another paid call.
 
 ## Inspect, validate, review, and repair records
 
@@ -320,21 +350,30 @@ modelcards audit-review REVIEWED_ARTIFACT.json \
   --publication-factreasoner RERUN/factreasoner-publication-original.json \
   --publication-validation RERUN/publication-validation.json \
   --final-factreasoner RERUN/factreasoner.json \
+  --family-risk-authorizations RERUN/family-risk-authorizations.json \
   --risk-mapping RERUN/risk-mapping.json \
   --privacy RERUN/privacy.json \
+  --provider-run RERUN \
   --output REVIEW_AUDIT.json
 ```
 
 The closure inputs are all-or-none. The CLI replays the original and replacement
 claim gates, frozen-source publication enrichment, publication validation, and the
 privacy/source-overlap scan over the actual final card. The risk lane seals only its
-provider-free, no-grounded-context path by replaying the pinned taxonomy; a retained
-provider-produced mapping remains unavailable without an execution replay. A
+provider-free, no-grounded-context path by replaying the pinned taxonomy. For a
+provider-assisted run, `--provider-run` must name the retained run root that produced
+the supplied downstream records. The audit verifies its execution manifest, ledger,
+exact sidecar inventory, receipts, and downstream hashes; then it re-runs the pinned
+IBM FactReasoner graph and Nexus applicability path using replay-only structured
+calls. Before/after hashes must prove that neither the ledger nor any decision
+sidecar changed. Accepted or withheld family applicability decisions are replayed
+from their retained provider receipts before authorized family contexts are merged
+back into the Nexus input set. A
 non-empty review history and passing schema, omission, FactReasoner, risk, and privacy
 checks are all required for `reviewed_candidate_closed`; unavailable or stale inputs
 remain explicitly provisional. Appending a decision alone never claims whole-card
-review or release. The current FactReasoner records do not retain the IBM/NLI
-execution binding, so checker identity alone cannot pass that closure check.
+review or release. Checker identity or a copied FactReasoner record alone cannot pass
+closure; the retained execution chain must replay against the exact current inputs.
 
 ## Batch generation and aggregate reports
 
@@ -357,12 +396,17 @@ modelcards batch targets.json --provider Together --output BATCH_A \
   --offline-official-bundle 'MODEL@COMMIT=OFFICIAL_BUNDLE'
 ```
 
-The `model-card-quality-report/v4` report verifies each typed artifact before
+The `model-card-quality-report/v6` report verifies each typed artifact before
 aggregating claim outcomes,
 withholding, omissions, risk-stage status, usage, cost/latency, and paired replay
 stability. Provider-assisted reports include validated usage ledgers retained by
 failed targets as well as successful ones, and bind admitted targets to the batch's
-shared-budget snapshot. The report also replays the frozen-source publication enrichment and provenance,
+shared-budget snapshot. For any run whose provider ledger contains events, the report
+also requires the result-bound `provider-execution.json` and verifies its complete
+ledger, terminal-attempt sequence, and normalized-sidecar inventory. Each successful target exposes a
+source-only surface digest over the exact target and immutable source identities,
+plus a separate treatment/configuration digest. This permits a paired evaluation to
+hold sources fixed while deliberately varying the treatment. The report also replays the frozen-source publication enrichment and provenance,
 replays deletion-only publication validation, and verifies that the final
 FactReasoner record accounts for all 33 public fields. Competing frozen-source values
 are withheld and retained only in `publication-conflicts.json` as field/reason codes,

@@ -23,22 +23,34 @@ from .bindings import verify_artifact_sources
 from .claim_gate import ClaimCandidate, ClaimGateRecord, verify_claim_gate_record
 from .factreasoner import (
     IBM_FACTREASONER_UPSTREAM_REVISION,
+    IBMFactReasonerAdapter,
     CheckOutcome,
     FactReasonerRecord,
     FieldAction,
+    UpstreamFactReasonerUnavailable,
+    replay_factreasoner,
 )
 from .findings import OmissionAudit
+from .family_risk import (
+    FamilyDecisionStatus,
+    FamilyRiskAuthorizationReport,
+    build_family_risk_authorization_report,
+)
 from .models import (
     Disposition,
     ReviewAction,
     SourceDocument,
     TaxonomyRiskDerivation,
+    TargetIdentity,
 )
 from .pipeline import (
     PrivacyScanReport,
     RiskStageSummary,
+    _binding,
     _model_use_contexts,
     _privacy_scan_final_projection,
+    _reindex_taxonomy_derivations,
+    _taxonomy_risk_derivations,
 )
 from .publication_validation import (
     PublicationValidationReport,
@@ -47,12 +59,27 @@ from .publication_validation import (
 )
 from .publication import project_publication_card
 from .publication_schema import validate_publication_card
+from .publication_schema import PUBLICATION_SCHEMA
 from .publication_sources import enrich_publication_card
 from .risk_mapping import (
+    NexusGenericRiskDetector,
     RiskCatalog,
     RiskMappingReport,
     UseContext,
+    map_candidate_risks,
     replay_risk_mapping,
+)
+from .provider import PINNED_PROVIDER, replay_structured_json_call
+from .provider_adapters import (
+    OpenRouterApplicabilityChecker,
+    OpenRouterFamilyContextChecker,
+    OpenRouterFactReplayChecker,
+    ProviderAdapterError,
+    build_nexus_openrouter_inference_engine,
+)
+from .provider_execution import (
+    ProviderExecutionError,
+    ProviderExecutionRunEvidence,
 )
 from .schema import (
     CONTENT_FIELD_PATHS,
@@ -65,7 +92,7 @@ from .schema import (
 from .source_documents import SourceDocumentCatalog
 
 
-REVIEW_AUDIT_VERSION = "reviewed-candidate-audit/v2"
+REVIEW_AUDIT_VERSION = "reviewed-candidate-audit/v4"
 PROVISIONAL_VERDICT = "reviewed_candidate_requires_downstream_revalidation"
 CLOSED_VERDICT = "reviewed_candidate_closed"
 
@@ -220,9 +247,11 @@ class ReviewClosureEvidence:
     publication_factreasoner: FactReasonerRecord
     publication_validation: PublicationValidationReport
     final_factreasoner: FactReasonerRecord
+    family_authorization: FamilyRiskAuthorizationReport
     risk_catalog: RiskCatalog
     risk_mapping: dict[str, Any]
     privacy: PrivacyScanReport
+    provider_execution: ProviderExecutionRunEvidence | None = None
 
     def __post_init__(self) -> None:
         records = tuple(self.claim_gate_records)
@@ -239,18 +268,237 @@ class ReviewClosureEvidence:
             raise ReviewAuditError("closure publication validation report is invalid")
         if not isinstance(self.final_factreasoner, FactReasonerRecord):
             raise ReviewAuditError("closure final FactReasoner record is invalid")
+        if not isinstance(
+            self.family_authorization, FamilyRiskAuthorizationReport
+        ):
+            raise ReviewAuditError("closure family authorization report is invalid")
         if not isinstance(self.risk_catalog, RiskCatalog):
             raise ReviewAuditError("closure risk catalog is invalid")
         if not isinstance(self.privacy, PrivacyScanReport):
             raise ReviewAuditError("closure privacy report is invalid")
         if not isinstance(self.risk_mapping, dict):
             raise ReviewAuditError("closure risk mapping must be an object")
+        if self.provider_execution is not None and not isinstance(
+            self.provider_execution, ProviderExecutionRunEvidence
+        ):
+            raise ReviewAuditError("closure provider execution evidence is invalid")
         # Freeze a finite-JSON copy so later caller mutation cannot alter the audit.
         object.__setattr__(
             self,
             "risk_mapping",
             json.loads(_canonical(self.risk_mapping)),
         )
+
+
+def _replay_family_authorization(
+    evidence: ReviewClosureEvidence,
+    artifact: CardArtifact,
+    candidates: tuple[ClaimCandidate, ...],
+    included_ids: set[str],
+) -> FamilyRiskAuthorizationReport:
+    """Replay the family bridge and authenticate every settled applicability call."""
+
+    report = evidence.family_authorization
+    if report.target != artifact.target:
+        raise ReviewAuditError("family authorization target is stale")
+    replayed = build_family_risk_authorization_report(
+        evidence.claim_gate_records,
+        report.applicability_decisions,
+        target=artifact.target,
+    )
+    if replayed.to_dict() != report.to_dict():
+        raise ReviewAuditError("family authorization report did not replay")
+
+    settled_decisions = tuple(
+        item
+        for item in report.applicability_decisions
+        if item.status is not FamilyDecisionStatus.UNAVAILABLE
+    )
+    settled_ids = tuple(
+        sorted(item.family_candidate_id for item in settled_decisions)
+    )
+    execution = evidence.provider_execution
+    if settled_decisions and execution is None:
+        raise ReviewAuditError(
+            "family applicability execution evidence is unavailable"
+        )
+    if execution is not None:
+        if (
+            execution.manifest.target != artifact.target
+            or execution.manifest.family_applicability_candidate_ids
+            != settled_ids
+        ):
+            raise ReviewAuditError(
+                "family applicability execution coverage is stale"
+            )
+    if settled_decisions:
+        assert execution is not None
+        membership = report.membership
+        membership_gate = report.membership_gate
+        if membership is None or membership_gate is None:
+            raise ReviewAuditError(
+                "family applicability decisions lack membership"
+            )
+        gates_by_id = {
+            item.candidate.candidate_id: item for item in report.family_gates
+        }
+        before = execution.state_snapshot()
+        execution.verify()
+        checker = OpenRouterFamilyContextChecker(
+            provider=PINNED_PROVIDER,
+            ledger_path=execution.root / "usage.jsonl",
+            decision_dir=execution.root / "provider-decisions",
+            call=replay_structured_json_call,
+        )
+        for decision in settled_decisions:
+            gate = gates_by_id.get(decision.family_candidate_id)
+            if gate is None:
+                raise ReviewAuditError(
+                    "family applicability decision has no retained gate"
+                )
+            executed = checker.assess(gate, membership, membership_gate)
+            if executed.to_dict() != decision.to_dict():
+                raise ReviewAuditError(
+                    "family applicability provider replay diverged"
+                )
+        execution.verify()
+        if execution.state_snapshot() != before:
+            raise ReviewAuditError("family applicability replay mutated provider state")
+
+    family_contexts = report.nexus_inputs
+    if family_contexts:
+        if report.membership_gate is None:
+            raise ReviewAuditError("family risk context lacks a membership gate")
+        membership_candidate = report.membership_gate.candidate
+        effective_by_id = {item.candidate_id: item for item in candidates}
+        effective_membership = effective_by_id.get(
+            membership_candidate.candidate_id
+        )
+        if (
+            effective_membership is None
+            or membership_candidate.candidate_id not in included_ids
+            or effective_membership.content_sha256
+            != membership_candidate.content_sha256
+        ):
+            raise ReviewAuditError(
+                "family risk context lacks effective checkpoint membership"
+            )
+    return report
+
+
+def _verify_taxonomy_derivation_chain(
+    *,
+    report: RiskMappingReport,
+    contexts: tuple[UseContext, ...],
+    candidates: tuple[ClaimCandidate, ...],
+    gate_records: tuple[ClaimGateRecord, ...],
+    included_ids: set[str],
+    family_authorization: FamilyRiskAuthorizationReport,
+    target: TargetIdentity,
+    factreasoner_withheld_derivation_ids: tuple[str, ...],
+    retained_derivations: tuple[TaxonomyRiskDerivation, ...],
+    exported_derivations: tuple[TaxonomyRiskDerivation, ...],
+) -> tuple[TaxonomyRiskDerivation, ...]:
+    """Rebuild every taxonomy derivation and bind it to the exported artifact.
+
+    Matching counts or outer report hashes are insufficient: each retained risk
+    must preserve its exact mapping candidate, applicability decision, selected
+    contexts, claim-gate records, source references, public value, and final list
+    index after FactReasoner withholding.
+    """
+
+    if not isinstance(report, RiskMappingReport):
+        raise ReviewAuditError("taxonomy derivation replay requires a typed mapping")
+    if not isinstance(target, TargetIdentity):
+        raise ReviewAuditError("taxonomy derivation replay target is invalid")
+    if (
+        not isinstance(family_authorization, FamilyRiskAuthorizationReport)
+        or family_authorization.target != target
+    ):
+        raise ReviewAuditError("taxonomy derivation family authorization is stale")
+    if contexts != tuple(sorted(contexts, key=lambda item: item.context_id)) or len(
+        {item.context_id for item in contexts}
+    ) != len(contexts):
+        raise ReviewAuditError("taxonomy derivation contexts are non-canonical")
+    if report.context_sha256 != _digest([item.to_dict() for item in contexts]):
+        raise ReviewAuditError("taxonomy derivation contexts differ from the mapping")
+    if factreasoner_withheld_derivation_ids != tuple(
+        sorted(set(factreasoner_withheld_derivation_ids))
+    ):
+        raise ReviewAuditError("taxonomy derivation withholding is non-canonical")
+    if any(item.target != target for item in candidates):
+        raise ReviewAuditError("taxonomy derivation candidates target another model")
+    candidate_by_id = {item.candidate_id: item for item in candidates}
+    if len(candidate_by_id) != len(candidates):
+        raise ReviewAuditError("taxonomy derivation candidate inventory is ambiguous")
+    gate_by_id: dict[str, ClaimGateRecord] = {}
+    for gate in gate_records:
+        if not isinstance(gate, ClaimGateRecord) or gate.candidate.target != target:
+            raise ReviewAuditError("taxonomy derivation claim gate target is stale")
+        if gate.candidate.candidate_id in gate_by_id:
+            raise ReviewAuditError("taxonomy derivation claim gate is ambiguous")
+        gate_by_id[gate.candidate.candidate_id] = gate
+        prior_candidate = candidate_by_id.setdefault(
+            gate.candidate.candidate_id,
+            gate.candidate,
+        )
+        if prior_candidate.to_dict() != gate.candidate.to_dict():
+            raise ReviewAuditError(
+                "taxonomy derivation candidate differs from its claim gate"
+            )
+    if not included_ids.issubset(candidate_by_id):
+        raise ReviewAuditError("taxonomy derivation included candidate is unavailable")
+    derivation_candidates = tuple(
+        candidate_by_id[key] for key in sorted(candidate_by_id)
+    )
+
+    bindings_by_id = {}
+    for candidate_id in sorted(included_ids):
+        binding = _binding(candidate_by_id[candidate_id], target)
+        prior = bindings_by_id.setdefault(binding.binding_id, binding)
+        if prior.to_dict() != binding.to_dict():
+            raise ReviewAuditError("taxonomy derivation input binding is ambiguous")
+    publisher_artifact = CardArtifact(
+        target=target,
+        bindings=tuple(
+            bindings_by_id[key] for key in sorted(bindings_by_id)
+        ),
+    )
+    publisher_risks = get_field(
+        project_card(publisher_artifact), "use_and_risk.identified_risks"
+    )
+    first_index = len(publisher_risks) if isinstance(publisher_risks, list) else 0
+
+    provisional = _taxonomy_risk_derivations(
+        report=report,
+        contexts=contexts,
+        candidates=derivation_candidates,
+        gate_records=tuple(gate_by_id.values()),
+        included_ids=included_ids,
+        family_authorization=family_authorization,
+        target=target,
+        first_index=first_index,
+    )
+    withheld_ids = set(factreasoner_withheld_derivation_ids)
+    provisional_ids = {item.derivation_id for item in provisional}
+    if not withheld_ids.issubset(provisional_ids):
+        raise ReviewAuditError(
+            "FactReasoner withholding references an unavailable taxonomy derivation"
+        )
+    expected = _reindex_taxonomy_derivations(
+        provisional,
+        withheld_ids,
+        first_index=first_index,
+    )
+    if retained_derivations != expected:
+        raise ReviewAuditError(
+            "retained taxonomy derivations do not replay from the mapping"
+        )
+    if exported_derivations != expected:
+        raise ReviewAuditError(
+            "exported taxonomy derivations differ from the replayed mapping"
+        )
+    return expected
 
 
 @dataclass(frozen=True)
@@ -439,7 +687,9 @@ def _factreasoner_check(
     evidence: ReviewClosureEvidence,
     *,
     target: Any,
+    pre_publication_card: Mapping[str, Any],
     final_card: Mapping[str, Any],
+    sources: tuple[SourceDocument, ...],
 ) -> ReviewAuditCheck:
     payload = {
         "publication_factreasoner_sha256": (
@@ -447,6 +697,11 @@ def _factreasoner_check(
         ),
         "final_factreasoner_sha256": evidence.final_factreasoner.content_sha256,
         "final_card_sha256": _digest(final_card),
+        "provider_execution_sha256": (
+            None
+            if evidence.provider_execution is None
+            else evidence.provider_execution.evidence_sha256
+        ),
     }
     records = (
         evidence.publication_factreasoner,
@@ -461,6 +716,71 @@ def _factreasoner_check(
             "factreasoner",
             ReviewAuditStatus.FAILED,
             "factreasoner_checker_identity_mismatch",
+            payload,
+        )
+    execution = evidence.provider_execution
+    if execution is None:
+        return _check(
+            "factreasoner",
+            ReviewAuditStatus.UNAVAILABLE,
+            "factreasoner_execution_binding_unavailable",
+            payload,
+        )
+    manifest = execution.manifest
+    if (
+        manifest.target != target
+        or manifest.publication_original_factreasoner_sha256
+        != evidence.publication_factreasoner.content_sha256
+        or manifest.final_factreasoner_sha256
+        != evidence.final_factreasoner.content_sha256
+    ):
+        return _check(
+            "factreasoner",
+            ReviewAuditStatus.FAILED,
+            "factreasoner_execution_binding_mismatch",
+            payload,
+        )
+    try:
+        before = execution.state_snapshot()
+        execution.verify()
+        nli_checker = OpenRouterFactReplayChecker(execution)
+        checker = IBMFactReasonerAdapter(nli_checker)
+        checker.validate_installation()
+        replay_factreasoner(
+            evidence.publication_factreasoner,
+            pre_publication_card,
+            PUBLICATION_SCHEMA,
+            target,
+            sources,
+            checker,
+            source_availability=(
+                evidence.publication_factreasoner.source_availability
+            ),
+        )
+        replay_factreasoner(
+            evidence.final_factreasoner,
+            final_card,
+            PUBLICATION_SCHEMA,
+            target,
+            sources,
+            checker,
+            source_availability=evidence.final_factreasoner.source_availability,
+        )
+        execution.verify()
+        if execution.state_snapshot() != before:
+            raise ReviewAuditError("FactReasoner replay mutated provider state")
+    except UpstreamFactReasonerUnavailable:
+        return _check(
+            "factreasoner",
+            ReviewAuditStatus.UNAVAILABLE,
+            "factreasoner_runtime_unavailable",
+            payload,
+        )
+    except (ProviderAdapterError, ProviderExecutionError, TypeError, ValueError, RuntimeError):
+        return _check(
+            "factreasoner",
+            ReviewAuditStatus.FAILED,
+            "factreasoner_execution_replay_mismatch",
             payload,
         )
     try:
@@ -509,15 +829,10 @@ def _factreasoner_check(
             "factreasoner_checks_unavailable",
             payload,
         )
-    # FactReasonerRecord intentionally carries only the outer checker identity.
-    # It does not retain IBM inference traces or the injected NLI provider/model
-    # receipts, so matching the public identity is necessary but not proof that
-    # the pinned implementation executed.  Keep closure unavailable until a
-    # retained, replayable execution binding is part of the closure contract.
     return _check(
         "factreasoner",
-        ReviewAuditStatus.UNAVAILABLE,
-        "factreasoner_execution_binding_unavailable",
+        ReviewAuditStatus.PASSED,
+        "factreasoner_execution_replayed",
         payload,
     )
 
@@ -637,7 +952,25 @@ def _risk_check(
         contexts = tuple(UseContext.from_dict(item) for item in value["use_contexts"])
         if contexts != tuple(sorted(contexts, key=lambda item: item.context_id)):
             raise ReviewAuditError("risk contexts are non-canonical")
-        expected_contexts = _model_use_contexts(candidates, included_ids)
+        family_authorization = _replay_family_authorization(
+            evidence,
+            artifact,
+            candidates,
+            included_ids,
+        )
+        expected_contexts = tuple(
+            sorted(
+                (
+                    *_model_use_contexts(candidates, included_ids),
+                    *family_authorization.nexus_inputs,
+                ),
+                key=lambda item: item.context_id,
+            )
+        )
+        if len({item.context_id for item in expected_contexts}) != len(
+            expected_contexts
+        ):
+            raise ReviewAuditError("exact and family risk contexts collide")
         if tuple(item.to_dict() for item in contexts) != tuple(
             item.to_dict() for item in expected_contexts
         ):
@@ -689,18 +1022,6 @@ def _risk_check(
             TaxonomyRiskDerivation.from_dict(item)
             for item in value["taxonomy_derivations"]
         )
-        candidate_by_id = {item.candidate_id: item for item in candidates}
-        for derivation in derivations:
-            if derivation.target != artifact.target:
-                raise ReviewAuditError("risk derivation target is stale")
-            for claim in derivation.input_claims:
-                candidate = candidate_by_id.get(claim.candidate_id)
-                if (
-                    candidate is None
-                    or claim.candidate_id not in included_ids
-                    or claim.candidate_sha256 != candidate.content_sha256
-                ):
-                    raise ReviewAuditError("risk derivation input is stale")
 
         mapping = value["taxonomy_mapping"]
         if mapping is None:
@@ -709,6 +1030,7 @@ def _risk_check(
                 or summary.catalog_sha256 is not None
                 or summary.mapping_report_sha256 is not None
                 or derivations
+                or artifact.derivations
             ):
                 raise ReviewAuditError("missing risk mapping disagrees with summary")
             return _check(
@@ -736,6 +1058,21 @@ def _risk_check(
             or evidence.risk_catalog.catalog_sha256 != summary.catalog_sha256
         ):
             raise ReviewAuditError("risk summary and mapping disagree")
+        _verify_taxonomy_derivation_chain(
+            report=typed_mapping,
+            contexts=contexts,
+            candidates=candidates,
+            gate_records=(
+                *evidence.claim_gate_records,
+                *artifact.review_gate_records,
+            ),
+            included_ids=included_ids,
+            family_authorization=family_authorization,
+            target=artifact.target,
+            factreasoner_withheld_derivation_ids=withheld,
+            retained_derivations=derivations,
+            exported_derivations=tuple(artifact.derivations),
+        )
         if summary.status == "unavailable":
             return _check(
                 "risk",
@@ -746,19 +1083,61 @@ def _risk_check(
         if not summary.passed:
             raise ReviewAuditError("completed risk mapping did not pass")
         if contexts:
-            # The typed record proves that the retained selections and decisions
-            # still bind the reviewed contexts and pinned catalog.  Closure also
-            # needs proof that those semantic decisions came from the admitted
-            # provider execution; that receipt is not yet part of this artifact.
-            return _check(
-                "risk",
-                ReviewAuditStatus.UNAVAILABLE,
-                "risk_execution_replay_unavailable",
-                value,
+            execution = evidence.provider_execution
+            if execution is None:
+                return _check(
+                    "risk",
+                    ReviewAuditStatus.UNAVAILABLE,
+                    "risk_execution_replay_unavailable",
+                    value,
+                )
+            manifest = execution.manifest
+            if (
+                manifest.target != artifact.target
+                or manifest.risk_mapping_report_sha256
+                != typed_mapping.report_sha256
+            ):
+                raise ReviewAuditError("risk execution binding is stale")
+            before = execution.state_snapshot()
+            execution.verify()
+            engine = build_nexus_openrouter_inference_engine(
+                provider=PINNED_PROVIDER,
+                ledger_path=execution.root / "usage.jsonl",
+                decision_dir=execution.root / "provider-decisions",
+                call=replay_structured_json_call,
             )
-        if derivations:
+            detector = NexusGenericRiskDetector(
+                engine,
+                max_risks=manifest.max_risks,
+            )
+            checker = OpenRouterApplicabilityChecker(
+                provider=PINNED_PROVIDER,
+                ledger_path=execution.root / "usage.jsonl",
+                decision_dir=execution.root / "provider-decisions",
+                call=replay_structured_json_call,
+            )
+            executed_mapping = map_candidate_risks(
+                contexts,
+                evidence.risk_catalog,
+                detector,
+                checker,
+            )
+            execution.verify()
+            if (
+                executed_mapping.to_dict() != typed_mapping.to_dict()
+                or execution.state_snapshot() != before
+            ):
+                raise ReviewAuditError("risk provider execution replay diverged")
+        elif derivations:
             raise ReviewAuditError("empty-context risk replay retained derivations")
-    except (KeyError, TypeError, ValueError):
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+        RuntimeError,
+        ProviderAdapterError,
+        ProviderExecutionError,
+    ):
         return _check(
             "risk",
             ReviewAuditStatus.FAILED,
@@ -1052,7 +1431,9 @@ def audit_reviewed_candidate(
                 _factreasoner_check(
                     closure_evidence,
                     target=artifact.target,
+                    pre_publication_card=pre_publication,
                     final_card=final_publication,
+                    sources=source_values,
                 )
             )
             checks.append(
