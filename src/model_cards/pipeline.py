@@ -132,7 +132,7 @@ from .schema import (
 from .source_state import SourceStateMode, load_source_state
 
 
-PIPELINE_VERSION = "offline-model-card-pipeline/v18"
+PIPELINE_VERSION = "offline-model-card-pipeline/v19"
 PRIVACY_SCAN_VERSION = "public-card-privacy-scan/v1"
 RISK_STAGE_VERSION = "pipeline-risk-stage/v2"
 REPAIR_STAGE_VERSION = "pipeline-fact-withholding/v1"
@@ -1129,6 +1129,14 @@ def _deterministic_publisher_context_decisions(
             (
                 ProseCheckerDecision.for_candidate(
                     candidate,
+                    gate=GateName.ENTITY_SCOPE,
+                    checker="model_cards/deterministic_publisher_context",
+                    method="closed_exact_subject_section_classifier",
+                    status=DecisionStatus.ACCEPTED,
+                    reason="official_context_entity_scope",
+                ),
+                ProseCheckerDecision.for_candidate(
+                    candidate,
                     gate=GateName.FIELD_FIT,
                     checker="model_cards/deterministic_publisher_context",
                     method="closed_official_section_or_statement_classifier",
@@ -1334,7 +1342,7 @@ def _context_statement(
     )
 
 
-def _model_use_contexts(
+def derive_model_use_contexts(
     candidates: Sequence[ClaimCandidate], included_ids: set[str]
 ) -> tuple[UseContext, ...]:
     """Adapt accepted claims to the supported generic Nexus use-case interface.
@@ -1429,6 +1437,11 @@ def _model_use_contexts(
     return tuple(result)
 
 
+# Private compatibility alias for local audit code; new replay code uses the
+# explicit public name above.
+_model_use_contexts = derive_model_use_contexts
+
+
 def _risk_stage(
     *,
     candidates: Sequence[ClaimCandidate],
@@ -1437,7 +1450,7 @@ def _risk_stage(
     detector: RiskDetector | None,
     checker: ApplicabilityChecker | None,
 ) -> tuple[RiskStageSummary, RiskMappingReport | None, tuple[UseContext, ...]]:
-    contexts = _model_use_contexts(candidates, included_ids)
+    contexts = derive_model_use_contexts(candidates, included_ids)
     context_digest = _digest([item.to_dict() for item in contexts])
     core_candidate_ids = {
         candidate.candidate_id
@@ -2608,22 +2621,7 @@ def run_offline_pipeline(
         "taxonomy_mapping": (
             None
             if risk_report is None
-            else {
-                "mapping_version": risk_report.mapping_version,
-                "status": risk_report.status.value,
-                "catalog_sha256": risk_report.catalog_sha256,
-                "context_sha256": risk_report.context_sha256,
-                "candidate_ids": [item.candidate_id for item in risk_report.candidates],
-                "candidate_sha256": [
-                    item.candidate_sha256 for item in risk_report.candidates
-                ],
-                "decision_sha256": [
-                    item.decision_sha256 for item in risk_report.decisions
-                ],
-                "included_risks": list(risk_report.included_risks),
-                "reason": risk_report.reason,
-                "report_sha256": risk_report.report_sha256,
-            }
+            else risk_report.to_dict()
         ),
     }
     artifact_refs.append(
@@ -3199,6 +3197,7 @@ __all__ = [
     "PipelineValidationSummary",
     "PrivacyScanReport",
     "RiskStageSummary",
+    "derive_model_use_contexts",
     "run_offline_pipeline",
     "verify_pipeline_result",
 ]

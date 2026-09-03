@@ -255,6 +255,16 @@ class ExtractionTests(unittest.TestCase):
             reason="semantic_check_supported",
         )
 
+    def accepting_checks(self, candidate):
+        return tuple(
+            self.checker(candidate, gate)
+            for gate in (
+                GateName.ENTITY_SCOPE,
+                GateName.FIELD_FIT,
+                GateName.VALUE_SUPPORT,
+            )
+        )
+
     def test_bounded_windows_are_deterministic_and_ephemeral(self) -> None:
         windows = build_source_windows(self.readme, window_chars=500, overlap=50)
         self.assertEqual(1, len(windows))
@@ -296,12 +306,69 @@ class ExtractionTests(unittest.TestCase):
         self.assertTrue(evidence.verified)
         self.assertEqual(("Model Overview",), evidence.section_path)
         self.assertEqual(ProposalStatus.MATERIALIZED, result.outcomes[0].status)
-        decisions = (
-            self.checker(candidate, GateName.FIELD_FIT),
-            self.checker(candidate, GateName.VALUE_SUPPORT),
-        )
+        decisions = self.accepting_checks(candidate)
         gate = evaluate_claim_gate(candidate, self.catalog.documents, decisions)
         self.assertTrue(gate.projection_eligible)
+
+    def test_same_readme_sibling_quote_requires_independent_entity_attribution(self) -> None:
+        catalog = self.official_catalog()
+        source = catalog.documents[0]
+        quote = "Do not use acme/Instruct-Large for autonomous medical decisions."
+        proposal = self.proposal(
+            source_id=source.source_id,
+            field_path="use_and_risk.out_of_scope_uses[0]",
+            value=quote,
+            quote=quote,
+            # Adversarial extractor output: the source is the target README, but
+            # both the quote and its enclosing section concern a sibling.
+            claim_entity=f"acme/Instruct@{REVISION}",
+            relation=RelationToTarget.EXACT_TARGET,
+        )
+        candidate = materialize_quote_batch(
+            ExtractionBatch.build(
+                target=catalog.target,
+                source_catalog_sha256=catalog.catalog_sha256,
+                provider="Together",
+                inference_config_sha256="b" * 64,
+                proposals=(proposal,),
+            ),
+            catalog,
+        ).candidates[0]
+        self.assertEqual(
+            (
+                "Exact Target System Card",
+                "Sibling Checkpoint",
+                "Out-of-Scope Uses",
+            ),
+            candidate.evidence[0].section_path,
+        )
+
+        gate = evaluate_claim_gate(
+            candidate,
+            catalog.documents,
+            (
+                ProseCheckerDecision.for_candidate(
+                    candidate,
+                    gate=GateName.ENTITY_SCOPE,
+                    checker="deepseek/deepseek-v4-flash-0731",
+                    method="bounded_openrouter_entity_scope",
+                    status=DecisionStatus.WITHHELD,
+                    reason="wrong_entity",
+                ),
+                self.checker(candidate, GateName.FIELD_FIT),
+                self.checker(candidate, GateName.VALUE_SUPPORT),
+            ),
+        )
+
+        self.assertFalse(gate.projection_eligible)
+        self.assertEqual(
+            "wrong_entity",
+            next(
+                item
+                for item in gate.decisions
+                if item.gate is GateName.ENTITY_SCOPE
+            ).reason,
+        )
 
     def test_publisher_context_wrapper_is_constructed_locally_not_by_provider(self) -> None:
         description = (
@@ -324,10 +391,7 @@ class ExtractionTests(unittest.TestCase):
         gate = evaluate_claim_gate(
             candidate,
             self.catalog.documents,
-            (
-                self.checker(candidate, GateName.FIELD_FIT),
-                self.checker(candidate, GateName.VALUE_SUPPORT),
-            ),
+            self.accepting_checks(candidate),
         )
         self.assertTrue(gate.projection_eligible)
         with self.assertRaisesRegex(ExtractionError, "item index"):
@@ -366,10 +430,7 @@ class ExtractionTests(unittest.TestCase):
         gate = evaluate_claim_gate(
             candidate,
             self.catalog.documents,
-            (
-                self.checker(candidate, GateName.FIELD_FIT),
-                self.checker(candidate, GateName.VALUE_SUPPORT),
-            ),
+            self.accepting_checks(candidate),
         )
         self.assertTrue(gate.projection_eligible)
 
@@ -397,10 +458,7 @@ class ExtractionTests(unittest.TestCase):
         gate = evaluate_claim_gate(
             candidate,
             self.catalog.documents,
-            (
-                self.checker(candidate, GateName.FIELD_FIT),
-                self.checker(candidate, GateName.VALUE_SUPPORT),
-            ),
+            self.accepting_checks(candidate),
         )
         self.assertFalse(gate.projection_eligible)
         self.assertEqual(
@@ -415,10 +473,7 @@ class ExtractionTests(unittest.TestCase):
         gate = evaluate_claim_gate(
             candidate,
             self.catalog.documents,
-            (
-                self.checker(candidate, GateName.FIELD_FIT),
-                self.checker(candidate, GateName.VALUE_SUPPORT),
-            ),
+            self.accepting_checks(candidate),
         )
         coordinate = next(
             item for item in gate.decisions if item.gate is GateName.COORDINATE_INTEGRITY
@@ -494,10 +549,7 @@ class ExtractionTests(unittest.TestCase):
             gate = evaluate_claim_gate(
                 candidate,
                 catalog.documents,
-                (
-                    self.checker(candidate, GateName.FIELD_FIT),
-                    self.checker(candidate, GateName.VALUE_SUPPORT),
-                ),
+                self.accepting_checks(candidate),
             )
             self.assertTrue(gate.projection_eligible, candidate.field_path)
 
@@ -765,10 +817,7 @@ class ExtractionTests(unittest.TestCase):
         accepted_gate = evaluate_claim_gate(
             provider_candidate,
             catalog.documents,
-            (
-                self.checker(provider_candidate, GateName.FIELD_FIT),
-                self.checker(provider_candidate, GateName.VALUE_SUPPORT),
-            ),
+            self.accepting_checks(provider_candidate),
         )
         self.assertTrue(accepted_gate.projection_eligible)
         deterministic = deterministic_publisher_context_candidates(

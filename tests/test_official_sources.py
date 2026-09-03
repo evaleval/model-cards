@@ -20,6 +20,7 @@ from model_cards.official_sources import (
     EvalEvalJoinTier,
     OfficialFetchStatus,
     OfficialRemoteObject,
+    OfficialSourceError,
     OfficialSourceIntegrityError,
     OfficialSourceStatus,
     RelationAssertion,
@@ -140,7 +141,26 @@ class OfficialSourceCollectionTests(unittest.TestCase):
             }
         )
         destination = self.destination()
-        manifest = collect_official_sources(discovery, destination, adapter)
+        candidate = next(
+            item
+            for item in discovery.records
+            if item.status is DiscoveryStatus.DISCOVERED
+            and item.normalized_url == url
+        )
+        exact_assertion = RelationAssertion(
+            candidate.record_id,
+            discovery.target.model_id,
+            RelationToTarget.EXACT_TARGET,
+            candidate.declaring_source_id,
+            candidate.declaration_locator,
+            discovery.target.revision,
+        )
+        manifest = collect_official_sources(
+            discovery,
+            destination,
+            adapter,
+            relation_assertions=(exact_assertion,),
+        )
         source = next(
             item for item in manifest.sources
             if item.requested_url == url
@@ -165,6 +185,74 @@ class OfficialSourceCollectionTests(unittest.TestCase):
         self.assertEqual(body, replayed.contents[source.source_id])
         with self.assertRaises(FrozenInstanceError):
             source.reason_code = "tampered"
+
+    def test_unasserted_primary_is_unresolved_and_never_evidence_eligible(self) -> None:
+        url = "https://github.com/acme/model"
+        discovery = self.discovery(f"[Code]({url})\n".encode())
+        manifest = collect_official_sources(
+            discovery,
+            self.destination(),
+            PrimaryAdapter(),
+        )
+
+        source = next(item for item in manifest.sources if item.requested_url == url)
+        relation = next(
+            item for item in manifest.relations if item.source_id == source.source_id
+        )
+        self.assertEqual(OfficialSourceStatus.CONFLICTING, source.status)
+        self.assertEqual("relation_unresolved", source.reason_code)
+        self.assertFalse(source.evidence_eligible)
+        self.assertEqual(RelationToTarget.UNKNOWN, relation.relation_to_target)
+        self.assertEqual(RelationState.UNRESOLVED, relation.state)
+
+    def test_relation_assertion_must_match_declaration_subject_and_target_revision(
+        self,
+    ) -> None:
+        url = "https://github.com/acme/model"
+        discovery = self.discovery(f"[Code]({url})\n".encode())
+        candidate = next(
+            item
+            for item in discovery.records
+            if item.status is DiscoveryStatus.DISCOVERED
+        )
+        adapter = PrimaryAdapter()
+        mismatches = (
+            RelationAssertion(
+                candidate.record_id,
+                discovery.target.model_id,
+                RelationToTarget.EXACT_TARGET,
+                candidate.declaring_source_id,
+                candidate.declaration_locator + ".different",
+                discovery.target.revision,
+            ),
+            RelationAssertion(
+                candidate.record_id,
+                "acme/Other",
+                RelationToTarget.EXACT_TARGET,
+                candidate.declaring_source_id,
+                candidate.declaration_locator,
+                discovery.target.revision,
+            ),
+            RelationAssertion(
+                candidate.record_id,
+                discovery.target.model_id,
+                RelationToTarget.EXACT_TARGET,
+                candidate.declaring_source_id,
+                candidate.declaration_locator,
+                "b" * 40,
+            ),
+        )
+        for assertion in mismatches:
+            with self.subTest(assertion=assertion), self.assertRaises(
+                OfficialSourceError
+            ):
+                collect_official_sources(
+                    discovery,
+                    self.destination(),
+                    adapter,
+                    relation_assertions=(assertion,),
+                )
+        self.assertEqual([], adapter.calls)
 
     def test_unverified_ownership_and_secondary_hints_are_never_fetched(self) -> None:
         hostile = "https://github.com/other/model"
@@ -318,6 +406,7 @@ class OfficialSourceCollectionTests(unittest.TestCase):
                     relation,
                     candidate.declaring_source_id,
                     candidate.declaration_locator,
+                    discovery.target.revision,
                 )
             )
         manifest = collect_official_sources(
@@ -327,6 +416,13 @@ class OfficialSourceCollectionTests(unittest.TestCase):
             relation_assertions=assertions,
         )
         self.assertEqual(set(relations), {item.relation_to_target for item in manifest.relations})
+        sources_by_id = {item.source_id: item for item in manifest.sources}
+        for relation in manifest.relations:
+            with self.subTest(relation=relation.relation_to_target.value):
+                self.assertEqual(
+                    relation.relation_to_target is RelationToTarget.EXACT_TARGET,
+                    sources_by_id[relation.source_id].evidence_eligible,
+                )
         source_ids = {
             next(item.source_id for item in manifest.sources if item.requested_url == url)
             for url in urls
@@ -356,9 +452,13 @@ class OfficialSourceCollectionTests(unittest.TestCase):
             candidate.declaration_locator,
         )
         assertions = (
-            RelationAssertion(shared[0], "acme/Model", RelationToTarget.EXACT_TARGET, shared[1], shared[2]),
             RelationAssertion(
-                shared[0], "acme/Base", RelationToTarget.BASE_MODEL, shared[1], shared[2]
+                shared[0], "acme/Model", RelationToTarget.EXACT_TARGET,
+                shared[1], shared[2], discovery.target.revision,
+            ),
+            RelationAssertion(
+                shared[0], "acme/Base", RelationToTarget.BASE_MODEL,
+                shared[1], shared[2], discovery.target.revision,
             ),
         )
         manifest = collect_official_sources(
@@ -420,6 +520,23 @@ class OfficialSourceCollectionTests(unittest.TestCase):
         (second / "unsafe").symlink_to(second / "manifest.json")
         with self.assertRaisesRegex(OfficialSourceIntegrityError, "symbolic link"):
             replay_official_sources(second)
+
+    def test_replay_rejects_legacy_bundle_version_with_implicit_relations(self) -> None:
+        discovery = self.discovery(b"# no declared links\n")
+        destination = self.destination()
+        collect_official_sources(discovery, destination, PrimaryAdapter())
+        manifest_path = destination / "manifest.json"
+        value = json.loads(manifest_path.read_text(encoding="utf-8"))
+        value["manifest_version"] = "official-source-bundle/v1"
+        manifest_path.write_text(
+            json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(
+            OfficialSourceIntegrityError,
+            "manifest version is unsupported",
+        ):
+            replay_official_sources(destination)
 
     def test_evaleval_join_uses_exact_shape_but_remains_discovery_only(self) -> None:
         record_path = "data/mmlu/acme/Model/result.json"

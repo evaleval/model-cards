@@ -88,7 +88,7 @@ from .schema import (
 )
 
 
-ADAPTER_VERSION = "model-card-openrouter-adapters/v17"
+ADAPTER_VERSION = "model-card-openrouter-adapters/v18"
 CLAIM_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 FACT_CHECKER_ID = "openrouter/deepseek-v4-flash-0731"
 MAX_EXTRACTION_OUTPUT_TOKENS = 8192
@@ -1063,6 +1063,14 @@ class OpenRouterQuoteExtractor:
                 },
                 "unknown_or_ambiguous_claims": "omit",
                 "base_family_sibling_claims_keep_relation": True,
+                "attribution_policy": (
+                    "The source container is bound to the target, but an individual "
+                    "section or sentence may describe a base model, family, sibling, "
+                    "variant, comparison model, benchmark, subset, or version. Assign "
+                    "claim_entity and relation from the quoted statement and its local "
+                    "section, never from the container identity alone. Omit unresolved "
+                    "attribution."
+                ),
                 "source_id_must_equal": source.source_id,
             },
             "windows": [
@@ -1086,7 +1094,9 @@ class OpenRouterQuoteExtractor:
                 "Extract only verbatim, fully supported Model Card evidence from the "
                 "provided frozen public-source windows. Inspect all windows and obey "
                 "the category-reservation rule before filling remaining proposal "
-                "slots. Return the strict JSON object."
+                "slots. Attribute every quote to its local subject; an exact-target "
+                "document can contain base, family, sibling, variant, or comparison "
+                "claims. Return the strict JSON object."
             ),
             user_prompt=_canonical(payload),
             max_output_tokens=MAX_EXTRACTION_OUTPUT_TOKENS,
@@ -1141,6 +1151,7 @@ class OpenRouterQuoteExtractor:
                         "value_fields": list(PUBLISHER_RISK_PROPOSAL_FIELDS),
                     },
                     "source_id_must_equal": source.source_id,
+                    "attribution_policy": payload["rules"]["attribution_policy"],
                     "unknown_or_ambiguous_claims": "omit",
                     "absence_markers_are_omitted_not_proposed": [
                         "Not specified",
@@ -1171,7 +1182,8 @@ class OpenRouterQuoteExtractor:
                     "Extract only publisher-stated intended uses, out-of-scope uses, "
                     "limitations, known biases, risks, and mitigations from the "
                     "bounded exact-target windows. Return exact quotes and never "
-                    "invent a use or risk to fill the response."
+                    "invent a use or risk to fill the response. Attribute every quote "
+                    "to its local subject, not merely to the containing document."
                 ),
                 user_prompt=_canonical(recovery_payload),
                 max_output_tokens=MAX_EXTRACTION_OUTPUT_TOKENS,
@@ -1247,12 +1259,20 @@ class OpenRouterQuoteExtractor:
 
 
 class OpenRouterClaimChecker:
-    """Independent field-fit and complete-value checks for one quote candidate."""
+    """Independent entity, field-fit, and complete-value checks for one quote claim."""
 
     checker_id = CLAIM_CHECKER_ID
     checker_revision = ADAPTER_VERSION
 
     _REASONS = {
+        GateName.ENTITY_SCOPE: {
+            "accepted": ("semantic_entity_scope",),
+            "withheld": (
+                "wrong_entity",
+                "wrong_relation",
+                "ambiguous_entity_scope",
+            ),
+        },
         GateName.FIELD_FIT: {
             "accepted": ("semantic_field_fit",),
             "withheld": ("wrong_field", "ambiguous_field_fit"),
@@ -1289,7 +1309,9 @@ class OpenRouterClaimChecker:
             raise ProviderAdapterError("claim checker requires a typed candidate")
         gate = GateName(gate)
         if gate not in self._REASONS:
-            raise ProviderAdapterError("claim checker can decide only prose gates")
+            raise ProviderAdapterError(
+                "claim checker can decide only entity, field-fit, or value-support gates"
+            )
         reasons = self._REASONS[gate]
         allowed_reasons = sorted(reasons["accepted"] + reasons["withheld"])
         schema = {
@@ -1306,19 +1328,37 @@ class OpenRouterClaimChecker:
                 "source_id": item.source_id,
                 "source_role": item.source_role.value,
                 "source_revision": item.source_revision,
+                "source_target": (
+                    None if item.source_target is None else item.source_target.to_dict()
+                ),
                 "quote": item.quote,
                 "section_path": list(item.section_path),
                 "table_id": item.table_id,
             }
             for item in candidate.evidence
         ]
-        task = (
-            "Decide whether the quoted evidence semantically belongs in exactly the "
-            "proposed Model Card field. Do not assess or alter the value."
-            if gate is GateName.FIELD_FIT
-            else "Decide whether the quoted evidence completely supports every proposed "
-            "value and qualification. Do not alter the value, field, entity, or relation."
-        )
+        if gate is GateName.ENTITY_SCOPE:
+            task = (
+                "Decide whether every quoted statement, read with its local section and "
+                "table context, actually concerns the proposed claim_entity under the "
+                "proposed relation to the target. The source_target identifies only the "
+                "containing document: an exact-target README or report may contain facts "
+                "about a base model, model family, sibling checkpoint, variant, comparison "
+                "model, benchmark, subset, or version. Withhold wrong_entity or "
+                "wrong_relation when that local subject differs; withhold "
+                "ambiguous_entity_scope when the attribution is not established. Do not "
+                "assess field fit or value completeness, and do not alter any attribute."
+            )
+        elif gate is GateName.FIELD_FIT:
+            task = (
+                "Decide whether the quoted evidence semantically belongs in exactly the "
+                "proposed Model Card field. Do not assess or alter the value."
+            )
+        else:
+            task = (
+                "Decide whether the quoted evidence completely supports every proposed "
+                "value and qualification. Do not alter the value, field, entity, or relation."
+            )
         payload = {
             "task": task,
             "target": candidate.target.to_dict(),
@@ -1335,11 +1375,12 @@ class OpenRouterClaimChecker:
             logical_call_id=logical,
             attempt_id=logical + ".attempt1",
             provider=self.runtime.provider,
-            schema_name=f"model_card_{gate.value}_v1",
+            schema_name=f"model_card_{gate.value}_v2",
             json_schema=schema,
             system_prompt=(
                 "Apply only the named Model Card support gate to the supplied frozen "
-                "evidence. Accept or withhold; never rewrite any candidate attribute."
+                "evidence. Source-container identity does not prove quote-level entity "
+                "attribution. Accept or withhold; never rewrite any candidate attribute."
             ),
             user_prompt=_canonical(payload),
             max_output_tokens=MAX_CLAIM_OUTPUT_TOKENS,

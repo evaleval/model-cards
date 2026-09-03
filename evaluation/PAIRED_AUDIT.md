@@ -11,7 +11,7 @@ client and cannot make provider calls.
 ## Inputs
 
 At least one named condition is required. A condition is a privacy-safe
-`model-card-quality-report/v3` file produced by `modelcards report`.
+`model-card-quality-report/v4` file produced by `modelcards report`.
 
 - With one condition, the harness audits its aggregate metrics and verifies its
   paired replay record when present.

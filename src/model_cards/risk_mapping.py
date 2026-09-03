@@ -27,7 +27,7 @@ import warnings
 from .schema import canonical_field_path
 
 
-RISK_MAPPING_VERSION = "model-card-risk-mapping/v2"
+RISK_MAPPING_VERSION = "model-card-risk-mapping/v3"
 APPLICABILITY_GATE_VERSION = "risk-applicability-gate/v1"
 NEXUS_PACKAGE_VERSION = "1.2.4"
 NEXUS_TAXONOMY_ID = "ibm-risk-atlas"
@@ -121,6 +121,27 @@ class TaxonomyRelease:
             "snapshot_sha256": self.snapshot_sha256,
         }
 
+    @classmethod
+    def from_dict(cls, value: Any) -> "TaxonomyRelease":
+        item = _strict(
+            value,
+            {
+                "taxonomy_id",
+                "name",
+                "version",
+                "source_url",
+                "snapshot_sha256",
+            },
+            "taxonomy release",
+        )
+        return cls(
+            taxonomy_id=item["taxonomy_id"],
+            name=item["name"],
+            version=item["version"],
+            source_url=item["source_url"],
+            snapshot_sha256=item["snapshot_sha256"],
+        )
+
 
 @dataclass(frozen=True)
 class TaxonomyRisk:
@@ -152,6 +173,29 @@ class TaxonomyRisk:
             "source_url": self.source_url,
             "mitigation_ids": list(self.mitigation_ids),
         }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "TaxonomyRisk":
+        item = _strict(
+            value,
+            {
+                "risk_id",
+                "name",
+                "description",
+                "source_url",
+                "mitigation_ids",
+            },
+            "taxonomy risk",
+        )
+        if not isinstance(item["mitigation_ids"], list):
+            raise RiskMappingError("taxonomy risk mitigation_ids must be an array")
+        return cls(
+            risk_id=item["risk_id"],
+            name=item["name"],
+            description=item["description"],
+            source_url=item["source_url"],
+            mitigation_ids=tuple(item["mitigation_ids"]),
+        )
 
 
 @dataclass(frozen=True)
@@ -200,8 +244,29 @@ class RiskCatalog:
                 return item
         raise KeyError(risk_id)
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "release": self.release.to_dict(),
+            "risks": [item.to_dict() for item in self.risks],
+            "catalog_sha256": self.catalog_sha256,
+        }
 
-@lru_cache(maxsize=1)
+    @classmethod
+    def from_dict(cls, value: Any) -> "RiskCatalog":
+        item = _strict(
+            value,
+            {"release", "risks", "catalog_sha256"},
+            "risk catalog",
+        )
+        if not isinstance(item["risks"], list):
+            raise RiskMappingError("risk catalog risks must be an array")
+        return cls(
+            release=TaxonomyRelease.from_dict(item["release"]),
+            risks=tuple(TaxonomyRisk.from_dict(entry) for entry in item["risks"]),
+            catalog_sha256=item["catalog_sha256"],
+        )
+
+
 def load_pinned_nexus_catalog() -> RiskCatalog:
     """Load AI Atlas Nexus 1.2.4 and verify its exact Risk Atlas data bytes."""
 
@@ -217,8 +282,23 @@ def load_pinned_nexus_catalog() -> RiskCatalog:
         ).read_bytes()
     except (AttributeError, FileNotFoundError, ModuleNotFoundError, OSError) as exc:
         raise RiskMappingError("pinned IBM AI Risk Atlas snapshot is unavailable") from exc
-    if hashlib.sha256(snapshot).hexdigest() != RISK_ATLAS_SNAPSHOT_SHA256:
+    snapshot_sha256 = hashlib.sha256(snapshot).hexdigest()
+    if snapshot_sha256 != RISK_ATLAS_SNAPSHOT_SHA256:
         raise RiskMappingError("IBM AI Risk Atlas snapshot digest has drifted")
+    return _materialize_pinned_nexus_catalog(installed, snapshot_sha256)
+
+
+@lru_cache(maxsize=1)
+def _materialize_pinned_nexus_catalog(
+    installed_version: str, snapshot_sha256: str
+) -> RiskCatalog:
+    """Materialize an already re-verified release without repeated Nexus startup."""
+
+    if (
+        installed_version != NEXUS_PACKAGE_VERSION
+        or snapshot_sha256 != RISK_ATLAS_SNAPSHOT_SHA256
+    ):
+        raise RiskMappingError("Nexus catalog cache key is not the pinned release")
     try:
         nexus = _new_nexus_instance()
         raw_risks = nexus.get_all_risks(NEXUS_TAXONOMY_ID)
@@ -455,14 +535,31 @@ class RiskCandidate:
         object.__setattr__(self, "source_refs", tuple(self.source_refs))
         if not isinstance(self.taxonomy, TaxonomyRelease):
             raise RiskMappingError("risk candidate taxonomy is invalid")
+        if not isinstance(self.risk_id, str) or not _ID_RE.fullmatch(self.risk_id):
+            raise RiskMappingError("risk candidate risk_id is invalid")
+        for label, value in (("name", self.name), ("description", self.description)):
+            if not isinstance(value, str) or not value.strip() or value != value.strip():
+                raise RiskMappingError(f"risk candidate {label} is invalid")
         if self.mapping_method != "ai_atlas_nexus":
             raise RiskMappingError("risk candidate mapping method is invalid")
+        if self.tool_version != NEXUS_PACKAGE_VERSION:
+            raise RiskMappingError("risk candidate tool version is not pinned")
         if self.inference_model != INFERENCE_MODEL:
             raise RiskMappingError("risk candidate used an unauthorized inference model")
         if not _DIGEST_RE.fullmatch(self.inference_config_sha256):
             raise RiskMappingError("risk candidate inference config digest is invalid")
         if not self.context_ids or not self.grounds or not self.source_refs:
             raise RiskMappingError("risk candidate must be specifically grounded")
+        if self.context_ids != tuple(sorted(set(self.context_ids))) or any(
+            not isinstance(item, str) or not _ID_RE.fullmatch(item)
+            for item in self.context_ids
+        ):
+            raise RiskMappingError("risk candidate context identifiers are invalid")
+        if self.source_refs != tuple(sorted(set(self.source_refs))) or any(
+            not isinstance(item, str) or not _ID_RE.fullmatch(item)
+            for item in self.source_refs
+        ):
+            raise RiskMappingError("risk candidate source references are invalid")
         for ground in self.grounds:
             if set(ground) != {"kind", "ref", "relevance"}:
                 raise RiskMappingError("risk ground has an invalid shape")
@@ -490,6 +587,53 @@ class RiskCandidate:
             "inference_model": self.inference_model,
             "inference_config_sha256": self.inference_config_sha256,
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "candidate_id": self.candidate_id,
+            **self._payload(),
+            "candidate_sha256": self.candidate_sha256,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "RiskCandidate":
+        item = _strict(
+            value,
+            {
+                "candidate_id",
+                "risk_id",
+                "taxonomy",
+                "name",
+                "description",
+                "context_ids",
+                "grounds",
+                "source_refs",
+                "mapping_method",
+                "tool_version",
+                "inference_model",
+                "inference_config_sha256",
+                "candidate_sha256",
+            },
+            "risk candidate",
+        )
+        for name in ("context_ids", "grounds", "source_refs"):
+            if not isinstance(item[name], list):
+                raise RiskMappingError(f"risk candidate {name} must be an array")
+        return cls(
+            candidate_id=item["candidate_id"],
+            risk_id=item["risk_id"],
+            taxonomy=TaxonomyRelease.from_dict(item["taxonomy"]),
+            name=item["name"],
+            description=item["description"],
+            context_ids=tuple(item["context_ids"]),
+            grounds=tuple(item["grounds"]),
+            source_refs=tuple(item["source_refs"]),
+            mapping_method=item["mapping_method"],
+            tool_version=item["tool_version"],
+            inference_model=item["inference_model"],
+            inference_config_sha256=item["inference_config_sha256"],
+            candidate_sha256=item["candidate_sha256"],
+        )
 
     @classmethod
     def build(
@@ -614,6 +758,39 @@ class ApplicabilityDecision:
             "rationale": self.rationale,
         }
 
+    def to_dict(self) -> dict[str, Any]:
+        return {**self._payload(), "decision_sha256": self.decision_sha256}
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "ApplicabilityDecision":
+        item = _strict(
+            value,
+            {
+                "gate_version",
+                "candidate_id",
+                "candidate_sha256",
+                "status",
+                "checker",
+                "method",
+                "reason",
+                "rationale",
+                "decision_sha256",
+            },
+            "applicability decision",
+        )
+        if item["gate_version"] != APPLICABILITY_GATE_VERSION:
+            raise RiskMappingError("applicability gate version is invalid")
+        return cls(
+            candidate_id=item["candidate_id"],
+            candidate_sha256=item["candidate_sha256"],
+            status=item["status"],
+            checker=item["checker"],
+            method=item["method"],
+            reason=item["reason"],
+            rationale=item["rationale"],
+            decision_sha256=item["decision_sha256"],
+        )
+
     @classmethod
     def for_candidate(
         cls,
@@ -685,13 +862,24 @@ class RiskMappingReport:
         decision_ids = [item.candidate_id for item in self.decisions]
         if candidate_ids != sorted(candidate_ids) or len(candidate_ids) != len(set(candidate_ids)):
             raise RiskMappingError("risk mapping candidate order is invalid")
+        if len({item.risk_id for item in self.candidates}) != len(self.candidates):
+            raise RiskMappingError("risk mapping contains duplicate taxonomy risks")
         if decision_ids != candidate_ids:
             raise RiskMappingError("risk mapping decisions do not cover every candidate")
+        if any(
+            decision.candidate_sha256 != candidate.candidate_sha256
+            for candidate, decision in zip(self.candidates, self.decisions)
+        ):
+            raise RiskMappingError("risk mapping decision is stale or misassigned")
         expected_included = sum(
             item.status is ApplicabilityStatus.ACCEPTED for item in self.decisions
         )
         if len(self.included_risks) != expected_included:
             raise RiskMappingError("risk mapping included-risk count is inconsistent")
+        if self.status is not MappingStatus.COMPLETED and (
+            self.candidates or self.decisions or self.included_risks
+        ):
+            raise RiskMappingError("incomplete risk mapping cannot retain inferred risks")
         if self.report_sha256 != _digest(self._payload()):
             raise RiskMappingError("risk mapping report digest is inconsistent")
 
@@ -701,12 +889,51 @@ class RiskMappingReport:
             "status": self.status.value,
             "catalog_sha256": self.catalog_sha256,
             "context_sha256": self.context_sha256,
-            "candidate_ids": [item.candidate_id for item in self.candidates],
-            "candidate_sha256": [item.candidate_sha256 for item in self.candidates],
-            "decision_sha256": [item.decision_sha256 for item in self.decisions],
+            "candidates": [item.to_dict() for item in self.candidates],
+            "decisions": [item.to_dict() for item in self.decisions],
             "included_risks": list(self.included_risks),
             "reason": self.reason,
         }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {**self._payload(), "report_sha256": self.report_sha256}
+
+    @classmethod
+    def from_dict(cls, value: Any) -> "RiskMappingReport":
+        item = _strict(
+            value,
+            {
+                "mapping_version",
+                "status",
+                "catalog_sha256",
+                "context_sha256",
+                "candidates",
+                "decisions",
+                "included_risks",
+                "reason",
+                "report_sha256",
+            },
+            "risk mapping report",
+        )
+        for name in ("candidates", "decisions", "included_risks"):
+            if not isinstance(item[name], list):
+                raise RiskMappingError(f"risk mapping report {name} must be an array")
+        return cls(
+            mapping_version=item["mapping_version"],
+            status=item["status"],
+            catalog_sha256=item["catalog_sha256"],
+            context_sha256=item["context_sha256"],
+            candidates=tuple(
+                RiskCandidate.from_dict(entry) for entry in item["candidates"]
+            ),
+            decisions=tuple(
+                ApplicabilityDecision.from_dict(entry)
+                for entry in item["decisions"]
+            ),
+            included_risks=tuple(item["included_risks"]),
+            reason=item["reason"],
+            report_sha256=item["report_sha256"],
+        )
 
 
 def map_candidate_risks(
@@ -804,6 +1031,119 @@ def unavailable_risk_report(
     )
 
 
+@dataclass(frozen=True)
+class _RetainedDetectorIdentity:
+    """Minimum detector identity needed to deterministically rebuild a candidate."""
+
+    detector_name: str
+    detector_version: str
+    inference_model: str
+    inference_config_sha256: str
+
+
+def replay_risk_mapping(
+    contexts: Iterable[UseContext],
+    catalog: RiskCatalog,
+    report: RiskMappingReport,
+) -> RiskMappingReport:
+    """Replay a retained mapping without provider inference.
+
+    Nexus selection and applicability are the paid semantic decisions.  Their
+    full typed records are retained in ``report``.  Replay independently binds
+    those records to the effective evidence-derived use contexts and exact
+    pinned catalog, reconstructs every candidate and public value, and rejects
+    any self-consistent rewrite of the serialized artifact.
+    """
+
+    if not isinstance(catalog, RiskCatalog) or not isinstance(
+        report, RiskMappingReport
+    ):
+        raise RiskMappingError("risk mapping replay inputs are invalid")
+    context_values = tuple(sorted(tuple(contexts), key=lambda item: item.context_id))
+    if len({item.context_id for item in context_values}) != len(context_values):
+        raise RiskMappingError("duplicate use context identifiers")
+    context_digest = _digest([item.to_dict() for item in context_values])
+    if report.catalog_sha256 != catalog.catalog_sha256:
+        raise RiskMappingError("risk mapping catalog differs from the pinned release")
+    if report.context_sha256 != context_digest:
+        raise RiskMappingError("risk mapping contexts differ from effective use contexts")
+    if report.status is not MappingStatus.COMPLETED:
+        replayed = _make_report(
+            status=report.status,
+            catalog=catalog,
+            context_digest=context_digest,
+            candidates=(),
+            decisions=(),
+            included=(),
+            reason=report.reason,
+        )
+        if replayed != report:
+            raise RiskMappingError("unavailable risk mapping does not replay")
+        return replayed
+
+    context_by_id = {item.context_id: item for item in context_values}
+    rebuilt_candidates: list[RiskCandidate] = []
+    rebuilt_included: list[dict[str, Any]] = []
+    for candidate, decision in zip(report.candidates, report.decisions):
+        try:
+            risk = catalog.risk(candidate.risk_id)
+        except KeyError as exc:
+            raise RiskMappingError(
+                "risk mapping contains an identifier outside the pinned release"
+            ) from exc
+        if (
+            candidate.taxonomy != catalog.release
+            or candidate.name != risk.name
+            or candidate.description != risk.description
+            or candidate.tool_version != NEXUS_PACKAGE_VERSION
+        ):
+            raise RiskMappingError(
+                "risk mapping candidate differs from the pinned catalog"
+            )
+        try:
+            selected_contexts = tuple(
+                context_by_id[context_id] for context_id in candidate.context_ids
+            )
+        except KeyError as exc:
+            raise RiskMappingError(
+                "risk mapping candidate references a non-effective use context"
+            ) from exc
+        identity = _RetainedDetectorIdentity(
+            detector_name="ai_atlas_nexus.generic_usecase",
+            detector_version=candidate.tool_version,
+            inference_model=candidate.inference_model,
+            inference_config_sha256=candidate.inference_config_sha256,
+        )
+        rebuilt = RiskCandidate.build(
+            risk,
+            selected_contexts,
+            identity,  # type: ignore[arg-type]
+            catalog.release,
+        )
+        if rebuilt != candidate:
+            raise RiskMappingError(
+                "risk mapping candidate does not replay from retained contexts"
+            )
+        rebuilt_candidates.append(rebuilt)
+        if decision.status is ApplicabilityStatus.ACCEPTED:
+            rebuilt_included.append(rebuilt.public_value(decision, risk))
+
+    replayed = _make_report(
+        status=report.status,
+        catalog=catalog,
+        context_digest=context_digest,
+        candidates=tuple(rebuilt_candidates),
+        decisions=report.decisions,
+        included=tuple(rebuilt_included),
+        reason=report.reason,
+    )
+    if replayed != report:
+        raise RiskMappingError(
+            "risk mapping decisions or included public values do not replay"
+        )
+    return replayed
+
+
 def _make_report(
     *,
     status: MappingStatus,
@@ -819,9 +1159,8 @@ def _make_report(
         "status": MappingStatus(status).value,
         "catalog_sha256": catalog.catalog_sha256,
         "context_sha256": context_digest,
-        "candidate_ids": [item.candidate_id for item in candidates],
-        "candidate_sha256": [item.candidate_sha256 for item in candidates],
-        "decision_sha256": [item.decision_sha256 for item in decisions],
+        "candidates": [item.to_dict() for item in candidates],
+        "decisions": [item.to_dict() for item in decisions],
         "included_risks": list(included),
         "reason": reason,
     }
@@ -858,5 +1197,6 @@ __all__ = [
     "UseContext",
     "load_pinned_nexus_catalog",
     "map_candidate_risks",
+    "replay_risk_mapping",
     "unavailable_risk_report",
 ]

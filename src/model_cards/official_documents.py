@@ -8,7 +8,7 @@ collection, integrity, encoding, and media-type checks pass.
 
 Source bodies are intentionally absent from every serialized catalog shape.
 The catalog is instead bound to the original content digest, the deterministic
-interpretation digest, and (for HTML) a versioned parser identifier.
+interpretation digest, and versioned HTML and PDF parser identities.
 """
 
 from __future__ import annotations
@@ -40,13 +40,21 @@ from .official_sources import (
     SourceAuthority,
     SourceRelation,
 )
+from .pdf_extraction import (
+    PDF_EXTRACTOR_VERSION,
+    PDF_PARSER_NAME,
+    PDF_PARSER_VERSION,
+    PdfExtractionLimits,
+    PdfExtractionStatus,
+    extract_pdf_text,
+)
 
 
-OFFICIAL_DOCUMENT_CATALOG_VERSION = "official-document-catalog/v1"
+OFFICIAL_DOCUMENT_CATALOG_VERSION = "official-document-catalog/v2"
 HTML_TEXT_PARSER_VERSION = "stdlib-html-visible-text/v1"
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
-_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_OFFICIAL_REVISION_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _REASON_RE = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 _RELATION_ID_RE = re.compile(r"^source_relation_[0-9a-f]{24}$")
 _SOURCE_ID_RE = re.compile(r"^primary_src_[0-9a-f]{24}$")
@@ -75,14 +83,74 @@ class OfficialLoadStatus(str, Enum):
     INVALID_HTML = "invalid_html"
     UNSAFE_TEXT = "unsafe_text"
     EMPTY = "empty"
-    UNSUPPORTED_PDF = "unsupported_pdf"
+    INVALID_PDF = "invalid_pdf"
+    ENCRYPTED_PDF = "encrypted_pdf"
+    IMAGE_ONLY_PDF = "image_only_pdf"
+    PDF_LIMIT_EXCEEDED = "pdf_limit_exceeded"
+    PDF_EXTRACTION_UNAVAILABLE = "pdf_extraction_unavailable"
+    PDF_EXTRACTION_FAILED = "pdf_extraction_failed"
     UNSUPPORTED_MEDIA_TYPE = "unsupported_media_type"
+
+
+_RELATION_ADMISSION_REASONS = frozenset(
+    {"related_source_not_exact_target", "relation_unresolved"}
+)
+
+_PDF_LOAD_STATUS_BY_EXTRACTION = MappingProxyType(
+    {
+        PdfExtractionStatus.EXTRACTED: OfficialLoadStatus.LOADED,
+        PdfExtractionStatus.ENCRYPTED: OfficialLoadStatus.ENCRYPTED_PDF,
+        PdfExtractionStatus.MALFORMED: OfficialLoadStatus.INVALID_PDF,
+        PdfExtractionStatus.IMAGE_ONLY: OfficialLoadStatus.IMAGE_ONLY_PDF,
+        PdfExtractionStatus.EMPTY: OfficialLoadStatus.EMPTY,
+        PdfExtractionStatus.UNSAFE_TEXT: OfficialLoadStatus.UNSAFE_TEXT,
+        PdfExtractionStatus.SOURCE_LIMIT: OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+        PdfExtractionStatus.PAGE_LIMIT: OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+        PdfExtractionStatus.TEXT_LIMIT: OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+        PdfExtractionStatus.TIME_LIMIT: OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+        PdfExtractionStatus.RESOURCE_LIMIT: OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+        PdfExtractionStatus.PARSER_UNAVAILABLE:
+            OfficialLoadStatus.PDF_EXTRACTION_UNAVAILABLE,
+        PdfExtractionStatus.ISOLATION_UNAVAILABLE:
+            OfficialLoadStatus.PDF_EXTRACTION_UNAVAILABLE,
+        PdfExtractionStatus.FAILED: OfficialLoadStatus.PDF_EXTRACTION_FAILED,
+    }
+)
+
+
+def _relations_admit_exact_target(
+    relations: tuple["OfficialRelationRecord", ...],
+) -> bool:
+    if len(relations) != 1:
+        return False
+    relation = relations[0]
+    return (
+        relation.state is RelationState.DECLARED
+        and relation.relation_to_target is RelationToTarget.EXACT_TARGET
+        and relation.subject_model_id == relation.target_model_id
+    )
+
+
+def _relation_admission_reason(
+    relations: tuple["OfficialRelationRecord", ...],
+) -> str:
+    if (
+        len(relations) != 1
+        or any(item.state is not RelationState.DECLARED for item in relations)
+        or any(
+            item.relation_to_target is RelationToTarget.UNKNOWN
+            for item in relations
+        )
+    ):
+        return "relation_unresolved"
+    return "related_source_not_exact_target"
 
 
 class OfficialDocumentMode(str, Enum):
     TEXT = "text"
     JSON = "json"
     HTML_TEXT = "html_text"
+    PDF_TEXT = "pdf_text"
 
 
 @dataclass(frozen=True)
@@ -176,10 +244,11 @@ class OfficialSourceLoadRecord:
             raise OfficialDocumentError("official load source_id is invalid")
         if self.source_uri is not None:
             _validate_public_source_uri(self.source_uri)
-        if not isinstance(self.source_revision, str) or not _COMMIT_RE.fullmatch(
-            self.source_revision
+        if not isinstance(self.source_revision, str) or (
+            self.source_revision != "unresolved"
+            and not _OFFICIAL_REVISION_RE.fullmatch(self.source_revision)
         ):
-            raise OfficialDocumentError("official load revision is not exact")
+            raise OfficialDocumentError("official load revision is not immutable")
         try:
             object.__setattr__(
                 self, "source_kind", OfficialSourceKind(self.source_kind)
@@ -239,6 +308,13 @@ class OfficialSourceLoadRecord:
             raise OfficialDocumentError(
                 "official load stored-byte metadata is incomplete"
             )
+        expected_revision = (
+            f"sha256:{self.source_sha256}" if stored else "unresolved"
+        )
+        if self.source_revision != expected_revision:
+            raise OfficialDocumentError(
+                "official load revision differs from its frozen byte state"
+            )
         if self.collection_status in {
             OfficialSourceStatus.COLLECTED,
             OfficialSourceStatus.CONFLICTING,
@@ -266,26 +342,65 @@ class OfficialSourceLoadRecord:
                 "official load status loses the collection outcome"
             )
         if self.collection_status is OfficialSourceStatus.COLLECTED:
-            if (
-                self.authority is not SourceAuthority.PRIMARY
-                or not self.evidence_eligible
-            ):
+            exact_target_admitted = _relations_admit_exact_target(self.relations)
+            relation_blocked = (
+                self.status is OfficialLoadStatus.BLOCKED
+                and self.reason_code in _RELATION_ADMISSION_REASONS
+            )
+            if self.authority is not SourceAuthority.PRIMARY:
                 raise OfficialDocumentError(
                     "collected official evidence must be verified primary authority"
                 )
+            if relation_blocked:
+                if self.evidence_eligible or exact_target_admitted:
+                    raise OfficialDocumentError(
+                        "relation-blocked official source claims exact-target admission"
+                    )
+            elif not self.evidence_eligible or not exact_target_admitted:
+                raise OfficialDocumentError(
+                    "collected official evidence lacks a declared exact-target relation"
+                )
             collected_outcomes = {
                 OfficialLoadStatus.LOADED,
+                OfficialLoadStatus.BLOCKED,
                 OfficialLoadStatus.INVALID_UTF8,
                 OfficialLoadStatus.INVALID_JSON,
                 OfficialLoadStatus.INVALID_HTML,
                 OfficialLoadStatus.UNSAFE_TEXT,
                 OfficialLoadStatus.EMPTY,
-                OfficialLoadStatus.UNSUPPORTED_PDF,
+                OfficialLoadStatus.INVALID_PDF,
+                OfficialLoadStatus.ENCRYPTED_PDF,
+                OfficialLoadStatus.IMAGE_ONLY_PDF,
+                OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+                OfficialLoadStatus.PDF_EXTRACTION_UNAVAILABLE,
+                OfficialLoadStatus.PDF_EXTRACTION_FAILED,
                 OfficialLoadStatus.UNSUPPORTED_MEDIA_TYPE,
             }
             if self.status not in collected_outcomes:
                 raise OfficialDocumentError(
                     "collected official source has an impossible load outcome"
+                )
+            if (
+                self.status is OfficialLoadStatus.BLOCKED
+                and not relation_blocked
+            ):
+                raise OfficialDocumentError(
+                    "collected official source has an invalid blocked outcome"
+                )
+            pdf_only_outcomes = {
+                OfficialLoadStatus.INVALID_PDF,
+                OfficialLoadStatus.ENCRYPTED_PDF,
+                OfficialLoadStatus.IMAGE_ONLY_PDF,
+                OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+                OfficialLoadStatus.PDF_EXTRACTION_UNAVAILABLE,
+                OfficialLoadStatus.PDF_EXTRACTION_FAILED,
+            }
+            if (
+                self.status in pdf_only_outcomes
+                and self.media_type != "application/pdf"
+            ):
+                raise OfficialDocumentError(
+                    "a PDF-only load outcome requires PDF source media"
                 )
         elif self.evidence_eligible:
             raise OfficialDocumentError(
@@ -302,6 +417,7 @@ class OfficialSourceLoadRecord:
                 "text/html": OfficialDocumentMode.HTML_TEXT,
                 "text/markdown": OfficialDocumentMode.TEXT,
                 "text/plain": OfficialDocumentMode.TEXT,
+                "application/pdf": OfficialDocumentMode.PDF_TEXT,
             }
             if expected_modes.get(self.media_type) is not self.document_mode:
                 raise OfficialDocumentError(
@@ -341,6 +457,10 @@ class OfficialDocumentCatalog:
 
     catalog_version: str
     html_parser_version: str
+    pdf_extractor_version: str
+    pdf_parser_name: str
+    pdf_parser_version: str
+    pdf_extraction_limits: PdfExtractionLimits
     official_bundle_id: str
     source_bundle_id: str
     target: TargetIdentity
@@ -355,6 +475,15 @@ class OfficialDocumentCatalog:
             raise OfficialDocumentError("official document catalog version is unsupported")
         if self.html_parser_version != HTML_TEXT_PARSER_VERSION:
             raise OfficialDocumentError("official HTML parser version is unsupported")
+        if self.pdf_extractor_version != PDF_EXTRACTOR_VERSION:
+            raise OfficialDocumentError("official PDF extractor version is unsupported")
+        if (
+            self.pdf_parser_name != PDF_PARSER_NAME
+            or self.pdf_parser_version != PDF_PARSER_VERSION
+        ):
+            raise OfficialDocumentError("official PDF parser identity is unsupported")
+        if not isinstance(self.pdf_extraction_limits, PdfExtractionLimits):
+            raise OfficialDocumentError("official PDF extraction limits are invalid")
         if not isinstance(self.official_bundle_id, str) or not re.fullmatch(
             r"official_bundle_[0-9a-f]{32}", self.official_bundle_id
         ):
@@ -390,10 +519,6 @@ class OfficialDocumentCatalog:
             )
         by_record = {item.source_id: item for item in self.records}
         for record in self.records:
-            if record.source_revision != self.target.revision:
-                raise OfficialDocumentError(
-                    "official load record revision differs from the exact target"
-                )
             if any(
                 relation.target_model_id != self.target.model_id
                 for relation in record.relations
@@ -406,7 +531,6 @@ class OfficialDocumentCatalog:
             expected_role = _role_for_kind(record.source_kind)
             if (
                 document.source_uri != record.source_uri
-                or document.source_revision != self.target.revision
                 or document.source_revision != record.source_revision
                 or document.target != self.target
                 or document.role is not expected_role
@@ -424,7 +548,11 @@ class OfficialDocumentCatalog:
                 else (
                     OfficialDocumentMode.HTML_TEXT
                     if record.media_type == "text/html"
-                    else OfficialDocumentMode.TEXT
+                    else (
+                        OfficialDocumentMode.PDF_TEXT
+                        if record.media_type == "application/pdf"
+                        else OfficialDocumentMode.TEXT
+                    )
                 )
             )
             if record.document_mode is not expected_mode:
@@ -437,6 +565,11 @@ class OfficialDocumentCatalog:
             self.target,
             self.records,
             self.documents,
+            html_parser_version=self.html_parser_version,
+            pdf_extractor_version=self.pdf_extractor_version,
+            pdf_parser_name=self.pdf_parser_name,
+            pdf_parser_version=self.pdf_parser_version,
+            pdf_extraction_limits=self.pdf_extraction_limits,
         )
         if self.catalog_sha256 != expected_digest:
             raise OfficialDocumentError(
@@ -457,6 +590,10 @@ class OfficialDocumentCatalog:
         return {
             "catalog_version": self.catalog_version,
             "html_parser_version": self.html_parser_version,
+            "pdf_extractor_version": self.pdf_extractor_version,
+            "pdf_parser_name": self.pdf_parser_name,
+            "pdf_parser_version": self.pdf_parser_version,
+            "pdf_extraction_limits": self.pdf_extraction_limits.to_dict(),
             "official_bundle_id": self.official_bundle_id,
             "source_bundle_id": self.source_bundle_id,
             "target": self.target.to_dict(),
@@ -471,6 +608,10 @@ class OfficialDocumentCatalog:
         OfficialDocumentCatalog(
             catalog_version=self.catalog_version,
             html_parser_version=self.html_parser_version,
+            pdf_extractor_version=self.pdf_extractor_version,
+            pdf_parser_name=self.pdf_parser_name,
+            pdf_parser_version=self.pdf_parser_version,
+            pdf_extraction_limits=self.pdf_extraction_limits,
             official_bundle_id=self.official_bundle_id,
             source_bundle_id=self.source_bundle_id,
             target=self.target,
@@ -483,12 +624,23 @@ class OfficialDocumentCatalog:
 
 def build_official_document_catalog(
     bundle: ReplayedOfficialSourceBundle,
+    *,
+    pdf_extraction_limits: PdfExtractionLimits | None = None,
 ) -> OfficialDocumentCatalog:
     """Interpret one strictly replayed official bundle without provider calls."""
 
     if not isinstance(bundle, ReplayedOfficialSourceBundle):
         raise OfficialDocumentError(
             "bundle must be a verified ReplayedOfficialSourceBundle"
+        )
+    active_pdf_limits = (
+        PdfExtractionLimits()
+        if pdf_extraction_limits is None
+        else pdf_extraction_limits
+    )
+    if not isinstance(active_pdf_limits, PdfExtractionLimits):
+        raise OfficialDocumentError(
+            "pdf_extraction_limits must be PdfExtractionLimits"
         )
     _validate_replayed_bundle(bundle)
     target = TargetIdentity(
@@ -500,7 +652,12 @@ def build_official_document_catalog(
     documents: list[SourceDocument] = []
     for replayed in bundle.sources:
         relations = relations_by_source.get(replayed.record.source_id, ())
-        record, document = _load_official_source(replayed, target, relations)
+        record, document = _load_official_source(
+            replayed,
+            target,
+            relations,
+            pdf_extraction_limits=active_pdf_limits,
+        )
         records.append(record)
         if document is not None:
             documents.append(document)
@@ -512,10 +669,19 @@ def build_official_document_catalog(
         target,
         record_values,
         document_values,
+        html_parser_version=HTML_TEXT_PARSER_VERSION,
+        pdf_extractor_version=PDF_EXTRACTOR_VERSION,
+        pdf_parser_name=PDF_PARSER_NAME,
+        pdf_parser_version=PDF_PARSER_VERSION,
+        pdf_extraction_limits=active_pdf_limits,
     )
     return OfficialDocumentCatalog(
         catalog_version=OFFICIAL_DOCUMENT_CATALOG_VERSION,
         html_parser_version=HTML_TEXT_PARSER_VERSION,
+        pdf_extractor_version=PDF_EXTRACTOR_VERSION,
+        pdf_parser_name=PDF_PARSER_NAME,
+        pdf_parser_version=PDF_PARSER_VERSION,
+        pdf_extraction_limits=active_pdf_limits,
         official_bundle_id=bundle.manifest.bundle_id,
         source_bundle_id=bundle.manifest.source_bundle_id,
         target=target,
@@ -594,6 +760,8 @@ def _load_official_source(
     replayed: ReplayedOfficialSource,
     target: TargetIdentity,
     relations: tuple[OfficialRelationRecord, ...],
+    *,
+    pdf_extraction_limits: PdfExtractionLimits,
 ) -> tuple[OfficialSourceLoadRecord, SourceDocument | None]:
     source = replayed.record
     source_uri = source.final_url or source.requested_url
@@ -615,6 +783,20 @@ def _load_official_source(
                 reason_code=source.reason_code,
                 document_mode=None,
                 rendered_sha256=None,
+            ),
+            None,
+        )
+    if not _relations_admit_exact_target(relations):
+        return (
+            _make_record(
+                source,
+                target,
+                relations,
+                status=OfficialLoadStatus.BLOCKED,
+                reason_code=_relation_admission_reason(relations),
+                document_mode=None,
+                rendered_sha256=None,
+                evidence_eligible=False,
             ),
             None,
         )
@@ -644,17 +826,66 @@ def _load_official_source(
             None,
         )
     if source.media_type == "application/pdf":
+        extraction = extract_pdf_text(content, limits=pdf_extraction_limits)
+        if (
+            extraction.source_sha256 != source.sha256
+            or extraction.source_byte_size != source.byte_size
+        ):
+            raise OfficialDocumentError(
+                "PDF extraction input differs from the frozen official source"
+            )
+        if (
+            extraction.extractor_version != PDF_EXTRACTOR_VERSION
+            or extraction.parser_name != PDF_PARSER_NAME
+            or extraction.parser_version != PDF_PARSER_VERSION
+            or extraction.limits != pdf_extraction_limits
+        ):
+            raise OfficialDocumentError(
+                "PDF extraction profile differs from the catalog binding"
+            )
+        load_status = _PDF_LOAD_STATUS_BY_EXTRACTION[extraction.status]
+        if load_status is not OfficialLoadStatus.LOADED:
+            return (
+                _make_record(
+                    source,
+                    target,
+                    relations,
+                    status=load_status,
+                    reason_code=extraction.reason_code,
+                    document_mode=None,
+                    rendered_sha256=None,
+                ),
+                None,
+            )
+        if extraction.text is None or extraction.output_sha256 is None:
+            raise OfficialDocumentError(
+                "successful PDF extraction lacks bound output text"
+            )
+        document = SourceDocument(
+            source_id=source.source_id,
+            source_uri=source_uri,
+            role=_role_for_kind(source.kind),
+            source_revision=f"sha256:{source.sha256}",
+            target=target,
+            text=extraction.text,
+            synthetic=False,
+            content_sha256=source.sha256,
+        )
+        if _rendered_digest(document) != extraction.output_sha256:
+            raise OfficialDocumentError(
+                "PDF extraction output differs from its recorded digest"
+            )
         return (
             _make_record(
                 source,
                 target,
                 relations,
-                status=OfficialLoadStatus.UNSUPPORTED_PDF,
-                reason_code="pdf_extraction_unsupported",
-                document_mode=None,
-                rendered_sha256=None,
+                status=OfficialLoadStatus.LOADED,
+                reason_code="loaded_pdf_text",
+                document_mode=OfficialDocumentMode.PDF_TEXT,
+                rendered_sha256=extraction.output_sha256,
             ),
-            None,
+            document,
         )
     if source.media_type not in {
         "application/json",
@@ -707,7 +938,7 @@ def _load_official_source(
         "source_id": source.source_id,
         "source_uri": source_uri,
         "role": _role_for_kind(source.kind),
-        "source_revision": target.revision,
+        "source_revision": f"sha256:{source.sha256}",
         "target": target,
         "synthetic": False,
         "content_sha256": source.sha256,
@@ -847,18 +1078,27 @@ def _make_record(
     reason_code: str,
     document_mode: OfficialDocumentMode | None,
     rendered_sha256: str | None,
+    evidence_eligible: bool | None = None,
 ) -> OfficialSourceLoadRecord:
     return OfficialSourceLoadRecord(
         source_id=source.source_id,
         source_uri=source.final_url or source.requested_url,
-        source_revision=target.revision,
+        source_revision=(
+            f"sha256:{source.sha256}"
+            if source.sha256 is not None
+            else "unresolved"
+        ),
         source_kind=source.kind,
         authority=source.authority,
         collection_status=source.status,
         status=status,
         collection_reason_code=source.reason_code,
         reason_code=reason_code,
-        evidence_eligible=source.evidence_eligible,
+        evidence_eligible=(
+            source.evidence_eligible
+            if evidence_eligible is None
+            else evidence_eligible
+        ),
         media_type=source.media_type,
         source_sha256=source.sha256,
         byte_size=source.byte_size,
@@ -1016,10 +1256,20 @@ def _catalog_digest(
     target: TargetIdentity,
     records: tuple[OfficialSourceLoadRecord, ...],
     documents: tuple[SourceDocument, ...],
+    *,
+    html_parser_version: str,
+    pdf_extractor_version: str,
+    pdf_parser_name: str,
+    pdf_parser_version: str,
+    pdf_extraction_limits: PdfExtractionLimits,
 ) -> str:
     value = {
         "catalog_version": OFFICIAL_DOCUMENT_CATALOG_VERSION,
-        "html_parser_version": HTML_TEXT_PARSER_VERSION,
+        "html_parser_version": html_parser_version,
+        "pdf_extractor_version": pdf_extractor_version,
+        "pdf_parser_name": pdf_parser_name,
+        "pdf_parser_version": pdf_parser_version,
+        "pdf_extraction_limits": pdf_extraction_limits.to_dict(),
         "official_bundle_id": bundle_id,
         "source_bundle_id": source_bundle_id,
         "target": target.to_dict(),
@@ -1122,12 +1372,16 @@ def _validate_public_source_uri(value: Any) -> None:
 __all__ = [
     "HTML_TEXT_PARSER_VERSION",
     "OFFICIAL_DOCUMENT_CATALOG_VERSION",
+    "PDF_EXTRACTOR_VERSION",
+    "PDF_PARSER_NAME",
+    "PDF_PARSER_VERSION",
     "OfficialDocumentCatalog",
     "OfficialDocumentError",
     "OfficialDocumentMode",
     "OfficialLoadStatus",
     "OfficialRelationRecord",
     "OfficialSourceLoadRecord",
+    "PdfExtractionLimits",
     "build_official_document_catalog",
     "serialize_official_document_catalog",
 ]

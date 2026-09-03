@@ -178,6 +178,14 @@ class FieldRepairKernelTests(unittest.TestCase):
         return (
             ProseCheckerDecision.for_candidate(
                 candidate,
+                gate=GateName.ENTITY_SCOPE,
+                checker="tests/field-repair-semantic-v1",
+                method="bounded_entity_scope",
+                status=DecisionStatus.ACCEPTED,
+                reason="entity_scope_checked",
+            ),
+            ProseCheckerDecision.for_candidate(
+                candidate,
                 gate=GateName.FIELD_FIT,
                 checker="tests/field-repair-semantic-v1",
                 method="bounded_field_fit",

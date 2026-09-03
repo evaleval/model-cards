@@ -31,6 +31,7 @@ from model_cards.official_discovery import discover_official_sources
 from model_cards.official_sources import (
     OfficialFetchStatus,
     OfficialRemoteObject,
+    RelationAssertion,
     collect_official_sources,
 )
 from model_cards.risk_mapping import RiskCatalog, TaxonomyRisk
@@ -193,6 +194,8 @@ class ResumableFakeCall:
             }
         if stage == "quote_extraction_use_risk":
             return {"proposals": []}
+        if stage == "entity_scope":
+            return {"status": "accepted", "reason": "semantic_entity_scope"}
         if stage == "field_fit":
             return {"status": "accepted", "reason": "semantic_field_fit"}
         if stage == "value_support":
@@ -395,7 +398,7 @@ class OrchestrationTests(unittest.TestCase):
             ):
                 return run()
 
-    def test_exact_provider_flow_two_gates_and_downstream_injection(self):
+    def test_exact_provider_flow_three_semantic_gates_and_downstream_injection(self):
         fake = ResumableFakeCall()
         with patch(
             "model_cards.orchestration.run_offline_pipeline",
@@ -407,10 +410,10 @@ class OrchestrationTests(unittest.TestCase):
         gates = [
             item[0]
             for item in fake.invocations
-            if item[0] in {"field_fit", "value_support"}
+            if item[0] in {"entity_scope", "field_fit", "value_support"}
         ]
         self.assertEqual(1, len(extraction), "JSON sources must stay on the local path")
-        self.assertEqual(["field_fit", "value_support"], gates)
+        self.assertEqual(["entity_scope", "field_fit", "value_support"], gates)
         self.assertEqual(MODEL_ID, result.to_dict()["model"])
         self.assertEqual("Together", result.provider)
         self.assertTrue(all(spec.provider == "Together" for spec in fake.specs))
@@ -432,16 +435,16 @@ class OrchestrationTests(unittest.TestCase):
             {Path(item["decision_path"]).parent for item in fake.kwargs},
         )
         self.assertEqual(1, len(result.quote_candidate_ids))
-        self.assertEqual(2, len(result.prose_decision_sha256s))
+        self.assertEqual(3, len(result.prose_decision_sha256s))
 
         self.assertEqual(1, downstream.call_count)
         injected = downstream.call_args.kwargs
         self.assertEqual(1, len(injected["quote_batches"]))
         self.assertIsInstance(injected["quote_batches"][0], ExtractionBatch)
         self.assertEqual("Together", injected["quote_batches"][0].provider)
-        self.assertEqual(2, len(injected["prose_checker_decisions"]))
+        self.assertEqual(3, len(injected["prose_checker_decisions"]))
         self.assertEqual(
-            {"field_fit", "value_support"},
+            {"entity_scope", "field_fit", "value_support"},
             {item.gate.value for item in injected["prose_checker_decisions"]},
         )
         self.assertEqual(
@@ -538,7 +541,24 @@ class OrchestrationTests(unittest.TestCase):
             "acme/Exact", self.bundle, OfficialLinkedBundleAdapter()
         )
         discovery = discover_official_sources(replay_source_bundle(self.bundle))
-        collect_official_sources(discovery, official, OfficialAdapter())
+        assertions = tuple(
+            RelationAssertion(
+                candidate.record_id,
+                discovery.target.model_id,
+                "exact_target",
+                candidate.declaring_source_id,
+                candidate.declaration_locator,
+                discovery.target.revision,
+            )
+            for candidate in discovery.records
+            if candidate.normalized_url == OFFICIAL_URL
+        )
+        collect_official_sources(
+            discovery,
+            official,
+            OfficialAdapter(),
+            relation_assertions=assertions,
+        )
 
         fake = CombinedSourceFakeCall()
         result = self.invoke(fake, official_bundle_directory=official)
@@ -547,10 +567,10 @@ class OrchestrationTests(unittest.TestCase):
         ]
         gates = [
             item for item in fake.invocations
-            if item[0] in {"field_fit", "value_support"}
+            if item[0] in {"entity_scope", "field_fit", "value_support"}
         ]
         self.assertEqual(2, len(extraction))
-        self.assertEqual(4, len(gates))
+        self.assertEqual(6, len(gates))
         self.assertEqual(2, len(result.quote_candidate_ids))
         self.assertTrue(result.source_bundle_id.startswith("combined_bundle_"))
         self.assertEqual(
@@ -600,7 +620,7 @@ class OrchestrationTests(unittest.TestCase):
     def test_one_checker_response_failure_withholds_candidate_and_continues(self):
         result = self.invoke(OneCheckerFailureFakeCall())
         self.assertTrue((self.run / "public-card.json").is_file())
-        self.assertEqual(2, len(result.prose_decision_sha256s))
+        self.assertEqual(3, len(result.prose_decision_sha256s))
         gates = json.loads((self.run / "claim-gates.json").read_text())
         reasons = {
             decision["reason"]

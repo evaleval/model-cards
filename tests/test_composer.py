@@ -56,6 +56,14 @@ class ComposerTests(unittest.TestCase):
         return (
             ProseCheckerDecision.for_candidate(
                 candidate,
+                gate=GateName.ENTITY_SCOPE,
+                checker="tests/composer-prose-checker-v1",
+                method="bounded_semantic_entity_review",
+                status=DecisionStatus.ACCEPTED,
+                reason="semantic_entity_scope",
+            ),
+            ProseCheckerDecision.for_candidate(
+                candidate,
                 gate=GateName.FIELD_FIT,
                 checker="tests/composer-prose-checker-v1",
                 method="bounded_semantic_field_review",

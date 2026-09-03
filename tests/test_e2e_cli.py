@@ -18,8 +18,14 @@ from model_cards.field_repair import (
     RepairOutcome,
     RepairReason,
 )
-from model_cards.models import TargetIdentity
-from model_cards.official_sources import OfficialFetchStatus, OfficialRemoteObject
+from model_cards.models import RelationToTarget, TargetIdentity
+from model_cards.official_sources import (
+    OfficialFetchStatus,
+    OfficialRemoteObject,
+    OfficialSourceStatus,
+    RelationState,
+    replay_official_sources,
+)
 from model_cards.pipeline import PipelineResult
 from model_cards.provider import (
     MissingCredentialError,
@@ -33,6 +39,7 @@ from model_cards.quality_report import (
     serialize_quality_report,
 )
 from model_cards.publication_schema import validate_publication_card
+from model_cards.scholarly_discovery import ScholarlyResponse, ScholarlyService
 from model_cards.source_bundle import (
     FetchStatus,
     RemoteObject,
@@ -102,7 +109,7 @@ class _FixtureHubAdapter:
 
 
 class _LinkedFixtureHubAdapter(_FixtureHubAdapter):
-    OFFICIAL_URL = "https://github.com/acme/collect"
+    OFFICIAL_URL = f"https://github.com/acme/collect/tree/{COMMIT}"
 
     def fetch_file(self, model_id, revision, repo_path, *, max_bytes):
         if repo_path == "README.md":
@@ -111,7 +118,7 @@ class _LinkedFixtureHubAdapter(_FixtureHubAdapter):
                 (
                     "# Exact target\n\n"
                     f"This frozen source describes {self.model_id} at {self.revision}.\n\n"
-                    f"[Official developer code]({self.OFFICIAL_URL})\n"
+                    f"[Code repository for {self.model_id}]({self.OFFICIAL_URL})\n"
                 ).encode("utf-8"),
             )
         return super().fetch_file(
@@ -132,6 +139,25 @@ class _FixtureOfficialAdapter:
             final_url=url,
             redirect_chain=(url,),
             media_type="text/plain",
+        )
+
+
+class _FixtureScholarlyAdapter:
+    def __init__(self) -> None:
+        self.services = []
+
+    def open(self, request):
+        self.services.append(request.service)
+        if request.service is ScholarlyService.OPENALEX:
+            return ScholarlyResponse(
+                200,
+                _json_bytes({"results": [{"doi": "10.1234/acme.collect"}]}),
+            )
+        return ScholarlyResponse(
+            200,
+            _json_bytes(
+                {"data": [{"externalIds": {"ArXiv": "2401.01234"}}]}
+            ),
         )
 
 
@@ -177,6 +203,23 @@ class E2ECommandLineTests(unittest.TestCase):
             "provider_trace",
         ):
             self.assertNotIn(forbidden, text)
+
+    def test_audit_review_rejects_partial_closure_artifacts(self) -> None:
+        result, _stdout, stderr = self.invoke(
+            [
+                "audit-review",
+                "artifact.json",
+                "--source-bundle",
+                "bundle",
+                "--claim-gates",
+                "claim-gates.json",
+                "--output",
+                "audit.json",
+            ]
+        )
+
+        self.assertEqual(2, result)
+        self.assertIn("requires all downstream closure artifacts", stderr)
 
     def test_exact_generate_invocation_is_offline_private_and_resumable(self) -> None:
         self.assertEqual(build_parser().prog, "modelcards")
@@ -313,16 +356,21 @@ class E2ECommandLineTests(unittest.TestCase):
             str(output),
         ]
         hub = _LinkedFixtureHubAdapter("acme/Collect", COMMIT)
+        scholarly = _FixtureScholarlyAdapter()
         with mock.patch(
             "model_cards.cli.HuggingFaceHubAdapter", return_value=hub
         ), mock.patch(
             "model_cards.cli.StdlibOfficialSourceAdapter",
             return_value=_FixtureOfficialAdapter(),
-        ) as official_factory:
+        ) as official_factory, mock.patch(
+            "model_cards.cli.StdlibScholarlyDiscoveryTransport",
+            return_value=scholarly,
+        ) as scholarly_factory:
             result, stdout, stderr = self.invoke(arguments)
         self.assertEqual(result, 0, stderr)
         summary = json.loads(stdout)
         self.assertIn("official-discovery.json", summary["artifacts"])
+        self.assertIn("scholarly-discovery.json", summary["artifacts"])
         self.assertIn("official-source-bundle/manifest.json", summary["artifacts"])
         self.assertIn("source-state.json", summary["artifacts"])
         self.assertEqual(
@@ -330,9 +378,42 @@ class E2ECommandLineTests(unittest.TestCase):
             json.loads((output / "source-state.json").read_text())["mode"],
         )
         official_factory.assert_called_once()
+        scholarly_factory.assert_called_once_with()
+        self.assertEqual(
+            [ScholarlyService.OPENALEX, ScholarlyService.SEMANTIC_SCHOLAR],
+            scholarly.services,
+        )
         allowed_hosts = set(official_factory.call_args.args[0])
         self.assertIn("github.com", allowed_hosts)
         self.assertIn("arxiv.org", allowed_hosts)
+        official = replay_official_sources(output / "official-source-bundle")
+        collected = [
+            item
+            for item in official.manifest.sources
+            if item.requested_url == _LinkedFixtureHubAdapter.OFFICIAL_URL
+        ]
+        self.assertEqual(1, len(collected))
+        self.assertEqual(OfficialSourceStatus.COLLECTED, collected[0].status)
+        self.assertTrue(collected[0].evidence_eligible)
+        relations = [
+            item
+            for item in official.manifest.relations
+            if item.source_id == collected[0].source_id
+        ]
+        self.assertEqual(1, len(relations))
+        self.assertEqual(RelationState.DECLARED, relations[0].state)
+        self.assertEqual(
+            RelationToTarget.EXACT_TARGET,
+            relations[0].relation_to_target,
+        )
+        self.assertEqual("acme/Collect", relations[0].subject_model_id)
+        scholarly_hints = [
+            item
+            for item in official.manifest.sources
+            if item.status is OfficialSourceStatus.DISCOVERY_ONLY
+        ]
+        self.assertEqual(2, len(scholarly_hints))
+        self.assertTrue(all(not item.evidence_eligible for item in scholarly_hints))
         self.assert_private_text_absent(stdout + stderr)
 
         journal_before = (output / "journal.jsonl").read_bytes()
@@ -342,6 +423,9 @@ class E2ECommandLineTests(unittest.TestCase):
         ), mock.patch(
             "model_cards.cli.StdlibOfficialSourceAdapter",
             side_effect=AssertionError("resume attempted official-source access"),
+        ), mock.patch(
+            "model_cards.cli.StdlibScholarlyDiscoveryTransport",
+            side_effect=AssertionError("resume attempted scholarly discovery"),
         ):
             resumed, resumed_stdout, resumed_stderr = self.invoke(arguments)
         self.assertEqual(resumed, 0, resumed_stderr)
@@ -804,7 +888,11 @@ class E2ECommandLineTests(unittest.TestCase):
             )
         )
 
-        report = build_quality_report(output)
+        with mock.patch(
+            "model_cards.quality_report.load_pinned_nexus_catalog",
+            return_value=RISK_CATALOG,
+        ):
+            report = build_quality_report(output)
         value = report.to_dict()
         self.assertEqual(
             "batch_root",
@@ -836,7 +924,10 @@ class E2ECommandLineTests(unittest.TestCase):
         admission = json.loads(admission_path.read_text())
         admission["eligible_source_set_sha256"] = "0" * 64
         admission_path.write_bytes(_json_bytes(admission) + b"\n")
-        with self.assertRaises(QualityReportError):
+        with mock.patch(
+            "model_cards.quality_report.load_pinned_nexus_catalog",
+            return_value=RISK_CATALOG,
+        ), self.assertRaises(QualityReportError):
             build_quality_report(stale)
 
         stale_budget = self.root / "provider-report-stale-budget"
@@ -845,7 +936,10 @@ class E2ECommandLineTests(unittest.TestCase):
         budget = json.loads(budget_path.read_text())
         budget["reserved_usd_capacity"] = "1"
         budget_path.write_bytes(_json_bytes(budget) + b"\n")
-        with self.assertRaises(QualityReportError):
+        with mock.patch(
+            "model_cards.quality_report.load_pinned_nexus_catalog",
+            return_value=RISK_CATALOG,
+        ), self.assertRaises(QualityReportError):
             build_quality_report(stale_budget)
 
     def test_failed_provider_target_cost_is_retained_and_budget_bound(self) -> None:

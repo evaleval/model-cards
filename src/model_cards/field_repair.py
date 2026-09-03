@@ -40,7 +40,7 @@ from .findings import (
 from .models import Evidence, SourceDocument, TargetIdentity
 from .public_export import SENSITIVE_TEXT, assert_public_projection
 from .publication import project_publication_card
-from .risk_mapping import MappingStatus, RiskMappingReport
+from .risk_mapping import MappingStatus, RiskMappingError, RiskMappingReport
 from .schema import CONTENT_FIELD_PATHS, canonical_field_path, get_field, validate_public_card
 
 
@@ -907,24 +907,13 @@ def evaluate_downstream_reaudits(
     else:
         status = ReauditStatus.PASSED
         reason = "risk_reaudit_completed"
-        expected_risk_sha256 = _digest(
-            {
-                "mapping_version": risk_report.mapping_version,
-                "status": risk_report.status.value,
-                "catalog_sha256": risk_report.catalog_sha256,
-                "context_sha256": risk_report.context_sha256,
-                "candidate_ids": [item.candidate_id for item in risk_report.candidates],
-                "candidate_sha256": [
-                    item.candidate_sha256 for item in risk_report.candidates
-                ],
-                "decision_sha256": [
-                    item.decision_sha256 for item in risk_report.decisions
-                ],
-                "included_risks": list(risk_report.included_risks),
-                "reason": risk_report.reason,
-            }
-        )
-        if expected_risk_sha256 != risk_report.report_sha256:
+        try:
+            validated_risk_report = RiskMappingReport.from_dict(
+                risk_report.to_dict()
+            )
+        except RiskMappingError:
+            validated_risk_report = None
+        if validated_risk_report != risk_report:
             status = ReauditStatus.FAILED
             reason = "risk_reaudit_integrity_failed"
         elif risk_card_sha256 != repaired_composition.card_sha256:

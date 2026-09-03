@@ -57,7 +57,11 @@ from .models import (
     TaxonomyRiskDerivation,
 )
 from .official_discovery import OfficialDiscoveryManifest
-from .official_sources import replay_official_sources
+from .official_sources import (
+    OfficialSourceStatus,
+    SourceAuthority,
+    replay_official_sources,
+)
 from .orchestration import (
     ORCHESTRATION_MANIFEST_FILENAME,
     ORCHESTRATION_SCOPE,
@@ -71,6 +75,7 @@ from .pipeline import (
     PipelineResult,
     PrivacyScanReport,
     RiskStageSummary,
+    derive_model_use_contexts,
 )
 from .public_export import assert_public_projection
 from .publication import project_publication_card
@@ -93,9 +98,16 @@ from .provider_adapters import (
     ADAPTER_VERSION,
     AGGREGATE_BUDGET_SUMMARY_VERSION,
     AGGREGATE_BUDGET_VERSION,
+    CLAIM_CHECKER_ID,
     summarize_aggregate_budget,
 )
-from .risk_mapping import RISK_MAPPING_VERSION, UseContext
+from .risk_mapping import (
+    NexusGenericRiskDetector,
+    RiskMappingReport,
+    UseContext,
+    load_pinned_nexus_catalog,
+    replay_risk_mapping,
+)
 from .run_ledger import GLOBAL_PAID_CALL_CAP, GLOBAL_USD_CAP, UsageLedger
 from .run_summary import (
     AUDIT_VIEW_FILENAME,
@@ -113,9 +125,13 @@ from .schema import (
 from .source_bundle import parse_target_request, replay_source_bundle
 from .source_documents import SourceDocumentCatalog
 from .source_state import SourceStateMode, load_source_state
+from .scholarly_discovery import (
+    SCHOLARLY_DISCOVERY_FILENAME,
+    load_scholarly_discovery,
+)
 
 
-QUALITY_REPORT_VERSION = "model-card-quality-report/v3"
+QUALITY_REPORT_VERSION = "model-card-quality-report/v4"
 
 _AGGREGATE_BUDGET_FILENAME = "aggregate-budget.jsonl"
 _AGGREGATE_BUDGET_SUMMARY_FILENAME = "aggregate-budget-summary.json"
@@ -1145,6 +1161,30 @@ def _load_successful_target(
             )
     else:
         discovery = None
+    scholarly_path = run_root / SCHOLARLY_DISCOVERY_FILENAME
+    if scholarly_path.exists() or scholarly_path.is_symlink():
+        scholarly_relative = run_relative / SCHOLARLY_DISCOVERY_FILENAME
+        expected_batch_artifacts.add(scholarly_relative)
+        try:
+            scholarly = load_scholarly_discovery(
+                _safe_child(
+                    batch_root,
+                    scholarly_relative,
+                    require_file=True,
+                ).read_bytes(),
+            )
+        except Exception as exc:
+            raise QualityReportError(
+                "scholarly discovery failed typed validation"
+            ) from exc
+        if discovery is None or state_mode != SourceStateMode.HF_AND_OFFICIAL.value:
+            raise QualityReportError(
+                "scholarly discovery exists without declared discovery and official state"
+            )
+        if scholarly.target.to_dict() != result.target.to_dict():
+            raise QualityReportError("scholarly discovery target differs from the run")
+    else:
+        scholarly = None
     if set(artifact_paths) != expected_batch_artifacts:
         raise QualityReportError("batch target artifact inventory is incomplete or stale")
     try:
@@ -1214,6 +1254,22 @@ def _load_successful_target(
             raise QualityReportError(
                 "official discovery policy differs from the collected bundle"
             )
+        if scholarly is not None:
+            retained_hints = tuple(
+                sorted(
+                    item.requested_url
+                    for item in official_bundle.manifest.sources
+                    if (
+                        item.authority is SourceAuthority.SCHOLARLY_DISCOVERY
+                        and item.status is OfficialSourceStatus.DISCOVERY_ONLY
+                        and item.requested_url is not None
+                    )
+                )
+            )
+            if retained_hints != tuple(item.url for item in scholarly.hints):
+                raise QualityReportError(
+                    "scholarly discovery hints differ from the official bundle"
+                )
     source_catalog = source_state.catalog
     source_value = _read_canonical_object(run_root / "source-catalog.json", "source catalog")
     if source_value != source_catalog.to_dict():
@@ -1264,7 +1320,12 @@ def _load_successful_target(
         publication_validation,
     )
     risk_value, risk_metrics, risk_surface = _load_risk(
-        run_root, result, artifact, repair
+        run_root,
+        result,
+        artifact,
+        repair,
+        extraction,
+        provider_admission,
     )
 
     included_ids = {item.candidate_id for item in result.claims if item.included}
@@ -1607,6 +1668,15 @@ def _load_exports(
         "validation_checks",
         "derivations",
     }
+    if "review_gate_records" in artifact_value:
+        artifact_keys.add("review_gate_records")
+    elif any(
+        isinstance(item, dict) and item.get("action") == "reassign"
+        for item in artifact_value.get("reviews", [])
+    ):
+        raise QualityReportError(
+            "card artifact reassign review lacks retained claim-gate records"
+        )
     if "publication" in artifact_value:
         artifact_keys.add("publication")
     _strict_object(
@@ -1874,6 +1944,8 @@ def _load_risk(
     result: PipelineResult,
     artifact: CardArtifact,
     repair: PipelineRepairReport,
+    candidates: Sequence[ClaimCandidate],
+    provider_admission: Mapping[str, Any] | None,
 ) -> tuple[dict[str, Any], dict[str, Any], str]:
     value = _read_canonical_object(run_root / "risk-mapping.json", "risk mapping")
     item = _strict_object(
@@ -1911,6 +1983,21 @@ def _load_risk(
         raise QualityReportError("risk contexts are not canonical")
     if _digest([entry.to_dict() for entry in contexts]) != summary.context_sha256:
         raise QualityReportError("risk context digest is stale")
+    included_claim_ids = {
+        claim.candidate_id for claim in result.claims if claim.included
+    }
+    try:
+        effective_contexts = derive_model_use_contexts(
+            candidates, included_claim_ids
+        )
+    except Exception as exc:
+        raise QualityReportError(
+            "effective risk use contexts could not be reconstructed"
+        ) from exc
+    if contexts != effective_contexts:
+        raise QualityReportError(
+            "retained risk contexts differ from effective accepted claims"
+        )
     fact_withheld_ids = tuple(item["factreasoner_withheld_derivation_ids"])
     if (
         fact_withheld_ids != tuple(sorted(set(fact_withheld_ids)))
@@ -1924,60 +2011,85 @@ def _load_risk(
     mapping_report_sha256 = None
     ground_count = 0
     if mapping is None:
-        if summary.status != "unavailable" or summary.mapping_report_sha256 is not None:
+        if (
+            summary.status != "unavailable"
+            or summary.mapping_report_sha256 is not None
+            or summary.catalog_sha256 is not None
+        ):
             raise QualityReportError("missing risk mapping disagrees with stage status")
     else:
-        mapping = _strict_object(
-            mapping,
-            {
-                "mapping_version",
-                "status",
-                "catalog_sha256",
-                "context_sha256",
-                "candidate_ids",
-                "candidate_sha256",
-                "decision_sha256",
-                "included_risks",
-                "reason",
-                "report_sha256",
-            },
-            "taxonomy mapping",
-        )
-        for name in ("candidate_ids", "candidate_sha256", "decision_sha256", "included_risks"):
-            if not isinstance(mapping[name], list):
-                raise QualityReportError(f"taxonomy mapping {name} must be an array")
-        if mapping["mapping_version"] != RISK_MAPPING_VERSION:
-            raise QualityReportError("taxonomy mapping version is invalid")
-        candidate_ids = mapping["candidate_ids"]
-        if candidate_ids != sorted(set(candidate_ids)) or any(
-            not isinstance(value, str) or not value.startswith("risk-candidate-")
-            for value in candidate_ids
-        ):
-            raise QualityReportError("taxonomy candidate identifiers are invalid")
-        if len(candidate_ids) != len(mapping["candidate_sha256"]) or len(candidate_ids) != len(mapping["decision_sha256"]):
-            raise QualityReportError("taxonomy mapping decisions do not cover candidates")
-        for digest in (*mapping["candidate_sha256"], *mapping["decision_sha256"]):
-            _require_digest(digest, "taxonomy mapping digest")
-        payload = {key: mapping[key] for key in mapping if key != "report_sha256"}
-        if mapping["report_sha256"] != _digest(payload):
-            raise QualityReportError("taxonomy mapping report digest is stale")
+        try:
+            typed_mapping = RiskMappingReport.from_dict(mapping)
+            pinned_catalog = load_pinned_nexus_catalog()
+            replayed_mapping = replay_risk_mapping(
+                contexts, pinned_catalog, typed_mapping
+            )
+        except Exception as exc:
+            raise QualityReportError(
+                "taxonomy mapping failed pinned-catalog replay"
+            ) from exc
         if (
-            mapping["catalog_sha256"] != summary.catalog_sha256
-            or mapping["context_sha256"] != summary.context_sha256
-            or mapping["report_sha256"] != summary.mapping_report_sha256
+            typed_mapping.to_dict() != mapping
+            or replayed_mapping.to_dict() != mapping
+        ):
+            raise QualityReportError("taxonomy mapping typed replay differs")
+        if provider_admission is not None:
+            if provider_admission["risk_interface_status"] == "nexus_provider_enabled":
+                expected_detector = NexusGenericRiskDetector(
+                    object(), max_risks=provider_admission["max_risks"]
+                )
+                if any(
+                    candidate.tool_version != expected_detector.detector_version
+                    or candidate.inference_model != expected_detector.inference_model
+                    or candidate.inference_config_sha256
+                    != expected_detector.inference_config_sha256
+                    for candidate in typed_mapping.candidates
+                ) or any(
+                    decision.checker != CLAIM_CHECKER_ID
+                    or decision.method
+                    != "bounded_openrouter_use_context_applicability"
+                    for decision in typed_mapping.decisions
+                ):
+                    raise QualityReportError(
+                        "risk decisions differ from the admitted provider interfaces"
+                    )
+            elif typed_mapping.candidates or typed_mapping.decisions:
+                raise QualityReportError(
+                    "unavailable provider risk interface retained inferred decisions"
+                )
+        if (
+            typed_mapping.catalog_sha256 != summary.catalog_sha256
+            or typed_mapping.context_sha256 != summary.context_sha256
+            or typed_mapping.report_sha256 != summary.mapping_report_sha256
+            or typed_mapping.status.value != summary.status
+            or summary.reason
+            not in {
+                typed_mapping.reason,
+                "factreasoner_withheld_taxonomy_claims",
+            }
         ):
             raise QualityReportError("taxonomy mapping inputs differ from risk summary")
-        candidate_count = len(candidate_ids)
-        mapping_included_count = len(mapping["included_risks"])
-        applicability_total = len(mapping["decision_sha256"])
-        applicability_accepted = mapping_included_count
+        candidate_count = len(typed_mapping.candidates)
+        mapping_included_count = len(typed_mapping.included_risks)
+        applicability_total = len(typed_mapping.decisions)
+        applicability_accepted = sum(
+            decision.status.value == "accepted"
+            for decision in typed_mapping.decisions
+        )
         if mapping_included_count > candidate_count:
             raise QualityReportError("taxonomy mapping includes too many risks")
-        for risk in mapping["included_risks"]:
-            if not isinstance(risk, dict) or not isinstance(risk.get("grounds"), list):
-                raise QualityReportError("taxonomy included risk grounding is malformed")
+        for risk in typed_mapping.included_risks:
             ground_count += len(risk["grounds"])
-        mapping_report_sha256 = mapping["report_sha256"]
+        mapping_report_sha256 = typed_mapping.report_sha256
+    admitted_catalog_sha256 = (
+        None
+        if provider_admission is None
+        else provider_admission["risk_catalog_sha256"]
+    )
+    if provider_admission is not None and admitted_catalog_sha256 != summary.catalog_sha256:
+        raise QualityReportError(
+            "provider-admitted risk catalog differs from the risk summary"
+        )
     included_count = len(derivations)
     if (
         candidate_count != summary.taxonomy_candidate_count

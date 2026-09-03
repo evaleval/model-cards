@@ -52,7 +52,7 @@ from .schema import (
 from .source_documents import SourceDocumentCatalog
 
 
-EXTRACTION_VERSION = "model-card-evidence-extraction/v8"
+EXTRACTION_VERSION = "model-card-evidence-extraction/v9"
 EXTRACTION_SCHEMA_NAME = "model_card_quote_evidence_extraction_v2"
 USE_RISK_EXTRACTION_SCHEMA_NAME = "model_card_use_risk_quote_extraction_v1"
 DETERMINISTIC_PUBLISHER_CONTEXT_VERSION = (

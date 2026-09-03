@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from contextlib import redirect_stderr, redirect_stdout
+from copy import deepcopy
 from dataclasses import replace
+import hashlib
 import importlib.util
 import io
+import json
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -16,12 +19,16 @@ from model_cards.risk_mapping import (
     NEXUS_PACKAGE_VERSION,
     NexusGenericRiskDetector,
     NexusSelection,
+    RISK_MAPPING_VERSION,
     RiskCatalog,
+    RiskCandidate,
     RiskMappingError,
+    RiskMappingReport,
     TaxonomyRisk,
     UseContext,
     load_pinned_nexus_catalog,
     map_candidate_risks,
+    replay_risk_mapping,
     unavailable_risk_report,
 )
 from model_cards.schema import validate_field_value
@@ -50,6 +57,18 @@ def context(identifier: str = "context:personal_assistant") -> UseContext:
         supporting_candidate_ids=("claim-" + "a" * 24,),
         source_refs=("src_" + "b" * 24,),
     )
+
+
+def digest(value) -> str:
+    return hashlib.sha256(
+        json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 class Detector:
@@ -333,6 +352,96 @@ class RiskMappingTests(unittest.TestCase):
         first, second = run(), run()
         self.assertEqual(first.report_sha256, second.report_sha256)
         self.assertEqual(first.included_risks, second.included_risks)
+
+    def test_full_typed_report_round_trips_and_replays_without_provider(self) -> None:
+        use_context = context()
+        report = map_candidate_risks(
+            (use_context,),
+            self.catalog,
+            Detector((NexusSelection(RISK.risk_id, (use_context.context_id,)),)),
+            Checker(),
+        )
+        encoded = report.to_dict()
+        self.assertEqual(1, len(encoded["candidates"]))
+        self.assertEqual(1, len(encoded["decisions"]))
+        typed = RiskMappingReport.from_dict(encoded)
+        self.assertEqual(report, typed)
+        self.assertEqual(
+            report,
+            replay_risk_mapping((use_context,), self.catalog, typed),
+        )
+
+    def test_replay_rejects_unknown_risk_and_catalog_drift(self) -> None:
+        use_context = context()
+        unknown = TaxonomyRisk(
+            risk_id="atlas-not-in-pinned-release",
+            name="Invented risk",
+            description="This risk is not part of the pinned taxonomy release.",
+            source_url=RISK.source_url,
+        )
+        candidate = RiskCandidate.build(
+            unknown, (use_context,), Detector(), self.catalog.release
+        )
+        decision = Checker().assess(candidate, (use_context,))
+        value = {
+            "mapping_version": RISK_MAPPING_VERSION,
+            "status": "completed",
+            "catalog_sha256": self.catalog.catalog_sha256,
+            "context_sha256": digest([use_context.to_dict()]),
+            "candidates": [candidate.to_dict()],
+            "decisions": [decision.to_dict()],
+            "included_risks": [candidate.public_value(decision, unknown)],
+            "reason": "applicability_gate_completed",
+        }
+        value["report_sha256"] = digest(value)
+        self_consistent_unknown = RiskMappingReport.from_dict(value)
+        with self.assertRaisesRegex(RiskMappingError, "outside the pinned release"):
+            replay_risk_mapping(
+                (use_context,), self.catalog, self_consistent_unknown
+            )
+
+        valid = map_candidate_risks(
+            (use_context,),
+            self.catalog,
+            Detector((NexusSelection(RISK.risk_id, (use_context.context_id,)),)),
+            Checker(),
+        )
+        drifted = RiskCatalog.build(
+            (
+                replace(RISK, description=RISK.description + " Drifted."),
+                OTHER_RISK,
+            )
+        )
+        with self.assertRaisesRegex(RiskMappingError, "pinned release"):
+            replay_risk_mapping((use_context,), drifted, valid)
+
+    def test_replay_rejects_altered_decision_or_included_public_risk(self) -> None:
+        use_context = context()
+        report = map_candidate_risks(
+            (use_context,),
+            self.catalog,
+            Detector((NexusSelection(RISK.risk_id, (use_context.context_id,)),)),
+            Checker(),
+        )
+        altered_decision = deepcopy(report.to_dict())
+        altered_decision["decisions"][0]["rationale"] += " Altered."
+        with self.assertRaisesRegex(RiskMappingError, "digest"):
+            RiskMappingReport.from_dict(altered_decision)
+
+        altered_public = deepcopy(report.to_dict())
+        altered_public["included_risks"][0]["name"] = "Altered name"
+        altered_public["report_sha256"] = digest(
+            {
+                key: value
+                for key, value in altered_public.items()
+                if key != "report_sha256"
+            }
+        )
+        self_consistent_public_tamper = RiskMappingReport.from_dict(altered_public)
+        with self.assertRaisesRegex(RiskMappingError, "public values"):
+            replay_risk_mapping(
+                (use_context,), self.catalog, self_consistent_public_tamper
+            )
 
 
 if __name__ == "__main__":

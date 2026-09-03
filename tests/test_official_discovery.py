@@ -13,6 +13,7 @@ from model_cards.official_discovery import (
     OfficialSourceKind,
     OfficialSourcePolicy,
     discover_official_sources,
+    exact_target_declaration_record_ids,
     load_official_discovery,
     replay_official_discovery,
     serialize_official_discovery,
@@ -155,6 +156,68 @@ class OfficialDiscoveryTests(unittest.TestCase):
         self.assertTrue(all(item.status is DiscoveryStatus.REJECTED for item in secondary))
         self.assertTrue(all(item.reason_code == "secondary_hint_only" for item in secondary))
         self.assertTrue(all(item.evidence_eligible is False for item in result.records))
+
+    def test_exact_relation_requires_explicit_unambiguous_revision_bound_declaration(
+        self,
+    ) -> None:
+        immutable_code = f"https://github.com/acme/Model/tree/{COMMIT}"
+        readme = RemoteObject(
+            FetchStatus.OK,
+            f"""# acme/Model
+
+[Technical report for acme/Model](https://arxiv.org/abs/2401.12345)
+[acme/Model technical report](https://arxiv.org/abs/2401.22222)
+[Family paper for acme/Model](https://arxiv.org/abs/2401.54321)
+[Technical report for acme/Model](https://arxiv.org/abs/2401.33333) and [Paper](https://arxiv.org/abs/2401.44444)
+[System card for acme/Model](https://openreview.net/forum?id=system-card)
+[Code repository for acme/Model]({immutable_code})
+[Code repository for acme/Model](https://github.com/acme/Model)
+[Code repository for acme/Model](https://github.com/acme/Model/tree/main)
+[Code repository for acme/Model and acme/Model-Instruct](https://github.com/acme/shared/tree/{COMMIT})
+""".encode(),
+        )
+        bundle = self.frozen_bundle(FrozenBundleAdapter(readme=readme))
+        discovery = discover_official_sources(bundle)
+        exact_ids = set(exact_target_declaration_record_ids(bundle, discovery))
+        by_url = {
+            item.normalized_url: item
+            for item in discovery.records
+            if item.status is DiscoveryStatus.DISCOVERED
+        }
+        self.assertIn(
+            by_url["https://arxiv.org/abs/2401.12345"].record_id,
+            exact_ids,
+        )
+        self.assertNotIn(
+            by_url["https://arxiv.org/abs/2401.54321"].record_id,
+            exact_ids,
+        )
+        self.assertNotIn(
+            by_url["https://arxiv.org/abs/2401.22222"].record_id,
+            exact_ids,
+        )
+        self.assertIn(
+            by_url["https://arxiv.org/abs/2401.33333"].record_id,
+            exact_ids,
+        )
+        self.assertNotIn(
+            by_url["https://arxiv.org/abs/2401.44444"].record_id,
+            exact_ids,
+        )
+        self.assertIn(
+            by_url["https://openreview.net/forum?id=system-card"].record_id,
+            exact_ids,
+        )
+        self.assertIn(
+            by_url[immutable_code].record_id,
+            exact_ids,
+        )
+        for unresolved_code in (
+            "https://github.com/acme/Model",
+            "https://github.com/acme/Model/tree/main",
+            f"https://github.com/acme/shared/tree/{COMMIT}",
+        ):
+            self.assertNotIn(by_url[unresolved_code].record_id, exact_ids)
 
     def test_untrusted_hosts_wrong_owners_and_unsupported_schemes_are_rejected(self) -> None:
         readme = RemoteObject(

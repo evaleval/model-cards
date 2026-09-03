@@ -69,6 +69,11 @@ class BindingPolicyTests(unittest.TestCase):
         for revision, expected, reason in (
             ("main", Disposition.REJECTED, "developer_code_revision_unresolved"),
             ("a" * 40, Disposition.ACCEPTED, "exact_target_supported"),
+            (
+                "sha256:" + "b" * 64,
+                Disposition.ACCEPTED,
+                "exact_target_supported",
+            ),
         ):
             with self.subTest(revision=revision):
                 source = SourceDocument(

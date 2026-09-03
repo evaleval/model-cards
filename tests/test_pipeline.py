@@ -39,6 +39,7 @@ from model_cards.official_discovery import discover_official_sources
 from model_cards.official_sources import (
     OfficialFetchStatus,
     OfficialRemoteObject,
+    RelationAssertion,
     collect_official_sources,
 )
 from model_cards.policy import decide_binding
@@ -93,6 +94,21 @@ First exact summary. Second exact summary.
 
 /Users/alice/private-model-note
 """
+
+
+def exact_relation_assertions(discovery):
+    return tuple(
+        RelationAssertion(
+            candidate.record_id,
+            discovery.target.model_id,
+            RelationToTarget.EXACT_TARGET,
+            candidate.declaring_source_id,
+            candidate.declaration_locator,
+            discovery.target.revision,
+        )
+        for candidate in discovery.records
+        if candidate.status.value == "discovered"
+    )
 OFFICIAL_PASSAGE = (
     "This official developer document states the exact target supports careful "
     "multilingual instruction following for production assistants."
@@ -459,6 +475,14 @@ class PipelineTests(unittest.TestCase):
         decisions = (
             ProseCheckerDecision.for_candidate(
                 candidate,
+                gate=GateName.ENTITY_SCOPE,
+                checker="tests/prose_checker",
+                method="bounded_semantic_entity_review",
+                status=DecisionStatus.ACCEPTED,
+                reason="fixture_entity_scope",
+            ),
+            ProseCheckerDecision.for_candidate(
+                candidate,
                 gate=GateName.FIELD_FIT,
                 checker="tests/prose_checker",
                 method="bounded_semantic_field_review",
@@ -602,6 +626,7 @@ class PipelineTests(unittest.TestCase):
             discovery,
             official_bundle,
             OfficialFixtureAdapter(),
+            relation_assertions=exact_relation_assertions(discovery),
         )
 
         result = run_offline_pipeline(
@@ -777,6 +802,7 @@ class PipelineTests(unittest.TestCase):
             discovery,
             official_bundle,
             OfficialContextFixtureAdapter(),
+            relation_assertions=exact_relation_assertions(discovery),
         )
 
         first = run_offline_pipeline(
@@ -871,6 +897,7 @@ class PipelineTests(unittest.TestCase):
             discovery,
             official_bundle,
             OfficialFixtureAdapter(),
+            relation_assertions=exact_relation_assertions(discovery),
         )
         source_state = load_source_state(
             hf_bundle,
@@ -907,6 +934,11 @@ class PipelineTests(unittest.TestCase):
                 reason=reason,
             )
             for gate, method, reason in (
+                (
+                    GateName.ENTITY_SCOPE,
+                    "bounded_semantic_entity_review",
+                    "fixture_entity_scope",
+                ),
                 (
                     GateName.FIELD_FIT,
                     "bounded_semantic_field_review",

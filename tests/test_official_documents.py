@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from model_cards.models import RelationToTarget, SourceRole, TargetIdentity
 from model_cards.official_discovery import (
@@ -15,7 +16,6 @@ from model_cards.official_discovery import (
 )
 from model_cards.official_documents import (
     HTML_TEXT_PARSER_VERSION,
-    OfficialDocumentCatalog,
     OfficialDocumentError,
     OfficialDocumentMode,
     OfficialLoadStatus,
@@ -35,12 +35,21 @@ from model_cards.official_sources import (
     collect_official_sources,
     replay_official_sources,
 )
+from model_cards.pdf_extraction import (
+    PDF_EXTRACTOR_VERSION,
+    PDF_PARSER_NAME,
+    PDF_PARSER_VERSION,
+    PdfExtractionLimits,
+    PdfExtractionResult,
+    PdfExtractionStatus,
+)
 from model_cards.source_bundle import (
     FetchStatus,
     RemoteObject,
     collect_hf_source_bundle,
     replay_source_bundle,
 )
+from tests.test_pdf_extraction import encrypted_pdf, image_only_pdf, text_pdf
 
 
 COMMIT = "e" * 40
@@ -133,6 +142,19 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         destination = Path(temporary.name) / "official"
+        if "relation_assertions" not in kwargs:
+            kwargs["relation_assertions"] = tuple(
+                RelationAssertion(
+                    candidate.record_id,
+                    discovery.target.model_id,
+                    RelationToTarget.EXACT_TARGET,
+                    candidate.declaring_source_id,
+                    candidate.declaration_locator,
+                    discovery.target.revision,
+                )
+                for candidate in discovery.records
+                if candidate.status is DiscoveryStatus.DISCOVERED
+            )
         collect_official_sources(
             discovery,
             destination,
@@ -176,9 +198,11 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
         for uri, body in bodies.items():
             document = by_uri[uri]
             self.assertEqual(TargetIdentity("acme/Model", COMMIT), document.target)
-            self.assertEqual(COMMIT, document.source_revision)
-            self.assertEqual(hashlib.sha256(body).hexdigest(), document.sha256)
+            digest = hashlib.sha256(body).hexdigest()
+            self.assertEqual(f"sha256:{digest}", document.source_revision)
+            self.assertEqual(digest, document.sha256)
             record = catalog.records_by_id[document.source_id]
+            self.assertEqual(document.source_revision, record.source_revision)
             self.assertEqual(OfficialLoadStatus.LOADED, record.status)
             self.assertEqual("verified_primary_source", record.collection_reason_code)
             self.assertEqual(SourceAuthority.PRIMARY, record.authority)
@@ -256,6 +280,9 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
             OfficialLoadStatus.DISCOVERY_ONLY,
             by_uri["https://example.org/discovered-paper"].status,
         )
+        self.assertTrue(
+            all(record.source_revision == "unresolved" for record in by_uri.values())
+        )
         self.assertEqual(len(replayed.manifest.sources), len(catalog.records))
         self.assertFalse(catalog.documents)
 
@@ -274,6 +301,7 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
                 RelationToTarget.EXACT_TARGET,
                 candidate.declaring_source_id,
                 candidate.declaration_locator,
+                discovery.target.revision,
             ),
             RelationAssertion(
                 candidate.record_id,
@@ -281,6 +309,7 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
                 RelationToTarget.BASE_MODEL,
                 candidate.declaring_source_id,
                 candidate.declaration_locator,
+                discovery.target.revision,
             ),
         )
         catalog = build_official_document_catalog(
@@ -312,7 +341,7 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
         self.assertEqual(OfficialLoadStatus.CONFLICTING, drift.status)
         self.assertEqual("source_drift", drift.collection_reason_code)
 
-    def test_declared_nonexact_relation_is_preserved_without_relabeling(self) -> None:
+    def test_declared_nonexact_relation_is_audited_but_not_loaded(self) -> None:
         code = "https://github.com/acme/base-model"
         discovery = self.discovery(f"[Code]({code})\n")
         candidate = next(
@@ -326,6 +355,7 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
             RelationToTarget.BASE_MODEL,
             candidate.declaring_source_id,
             candidate.declaration_locator,
+            discovery.target.revision,
         )
         catalog = build_official_document_catalog(
             self.replay(
@@ -335,13 +365,44 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
             )
         )
         record = next(item for item in catalog.records if item.source_uri == code)
-        self.assertEqual(OfficialLoadStatus.LOADED, record.status)
+        self.assertEqual(OfficialLoadStatus.BLOCKED, record.status)
+        self.assertEqual("related_source_not_exact_target", record.reason_code)
+        self.assertFalse(record.evidence_eligible)
         self.assertEqual(1, len(record.relations))
         self.assertEqual(RelationToTarget.BASE_MODEL, record.relations[0].relation_to_target)
         self.assertEqual(RelationState.DECLARED, record.relations[0].state)
-        # The immutable bundle target remains explicit; consumers must use the
-        # preserved relation rather than silently promote the source's subject.
-        self.assertEqual(TargetIdentity("acme/Model", COMMIT), catalog.by_id[record.source_id].target)
+        self.assertNotIn(record.source_id, catalog.by_id)
+        with self.assertRaisesRegex(
+            OfficialDocumentError, "declared exact-target relation"
+        ):
+            replace(
+                record,
+                status=OfficialLoadStatus.LOADED,
+                reason_code="loaded",
+                evidence_eligible=True,
+                document_mode=OfficialDocumentMode.TEXT,
+                rendered_sha256=record.source_sha256,
+            )
+
+    def test_unasserted_source_keeps_unresolved_audit_record_without_document(self) -> None:
+        code = "https://github.com/acme/model"
+        discovery = self.discovery(f"[Code]({code})\n")
+        catalog = build_official_document_catalog(
+            self.replay(
+                discovery,
+                {code: response(code, b"Unasserted source", "text/plain")},
+                relation_assertions=(),
+            )
+        )
+
+        record = next(item for item in catalog.records if item.source_uri == code)
+        self.assertEqual(OfficialLoadStatus.CONFLICTING, record.status)
+        self.assertEqual("relation_unresolved", record.reason_code)
+        self.assertFalse(record.evidence_eligible)
+        self.assertEqual(1, len(record.relations))
+        self.assertEqual(RelationToTarget.UNKNOWN, record.relations[0].relation_to_target)
+        self.assertEqual(RelationState.UNRESOLVED, record.relations[0].state)
+        self.assertNotIn(record.source_id, catalog.by_id)
 
     def test_json_rejects_duplicate_nonfinite_overflow_and_null_roots(self) -> None:
         urls = {
@@ -410,32 +471,215 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
         self.assertEqual(OfficialLoadStatus.INVALID_HTML, by_uri[urls["html"]].status)
         self.assertFalse(catalog.documents)
 
-    def test_pdf_and_unknown_media_are_explicitly_unsupported(self) -> None:
+    def test_valid_pdf_loads_as_versioned_text_from_frozen_bytes(self) -> None:
         paper = "https://arxiv.org/pdf/2401.01234.pdf"
-        code = "https://github.com/acme/binary"
-        discovery = self.discovery(
-            f"[Paper]({paper})\n[Code]({code})\n"
+        pdf_body = text_pdf("Exact model limitation", "References: Smith 2026")
+        discovery = self.discovery(f"[Paper]({paper})\n")
+        replayed = self.replay(
+            discovery,
+            {paper: response(paper, pdf_body, "application/pdf")},
         )
-        pdf_body = b"%PDF-1.7\nReadable-looking text must not become evidence."
+        first = build_official_document_catalog(replayed)
+        second = build_official_document_catalog(replayed)
+
+        document = next(item for item in first.documents if item.source_uri == paper)
+        record = first.records_by_id[document.source_id]
+        source_digest = hashlib.sha256(pdf_body).hexdigest()
+        self.assertEqual(OfficialLoadStatus.LOADED, record.status)
+        self.assertEqual("loaded_pdf_text", record.reason_code)
+        self.assertEqual(OfficialDocumentMode.PDF_TEXT, record.document_mode)
+        self.assertEqual("Exact model limitation\n\nReferences: Smith 2026", document.text)
+        self.assertEqual(source_digest, document.sha256)
+        self.assertEqual(f"sha256:{source_digest}", document.source_revision)
+        self.assertEqual(
+            hashlib.sha256((document.text or "").encode("utf-8")).hexdigest(),
+            record.rendered_sha256,
+        )
+        self.assertEqual(PDF_EXTRACTOR_VERSION, first.pdf_extractor_version)
+        self.assertEqual(PDF_PARSER_NAME, first.pdf_parser_name)
+        self.assertEqual(PDF_PARSER_VERSION, first.pdf_parser_version)
+        self.assertEqual(PdfExtractionLimits(), first.pdf_extraction_limits)
+        self.assertEqual(first.catalog_sha256, second.catalog_sha256)
+        serialized = json.loads(serialize_official_document_catalog(first))
+        self.assertEqual(PDF_EXTRACTOR_VERSION, serialized["pdf_extractor_version"])
+        self.assertEqual(PDF_PARSER_NAME, serialized["pdf_parser_name"])
+        self.assertEqual(PDF_PARSER_VERSION, serialized["pdf_parser_version"])
+        self.assertEqual(
+            PdfExtractionLimits().to_dict(),
+            serialized["pdf_extraction_limits"],
+        )
+        with self.assertRaisesRegex(OfficialDocumentError, "PDF parser identity"):
+            replace(first, pdf_parser_version="different-parser/v1")
+        with self.assertRaisesRegex(OfficialDocumentError, "digest"):
+            replace(
+                first,
+                pdf_extraction_limits=PdfExtractionLimits(max_pages=1),
+            )
+
+    def test_pdf_nontext_outcomes_are_explicit_and_never_create_documents(self) -> None:
+        urls = {
+            "malformed": "https://arxiv.org/pdf/2401.01234.pdf",
+            "encrypted": "https://arxiv.org/pdf/2401.01235.pdf",
+            "image": "https://arxiv.org/pdf/2401.01236.pdf",
+            "limited": "https://arxiv.org/pdf/2401.01237.pdf",
+        }
+        discovery = self.discovery(
+            "\n".join(f"[Paper]({url})" for url in urls.values())
+        )
+        catalog = build_official_document_catalog(
+            self.replay(
+                discovery,
+                {
+                    urls["malformed"]: response(
+                        urls["malformed"],
+                        b"%PDF-1.7\nnot a complete PDF",
+                        "application/pdf",
+                    ),
+                    urls["encrypted"]: response(
+                        urls["encrypted"], encrypted_pdf(), "application/pdf"
+                    ),
+                    urls["image"]: response(
+                        urls["image"], image_only_pdf(), "application/pdf"
+                    ),
+                    urls["limited"]: response(
+                        urls["limited"],
+                        text_pdf("longer than five characters"),
+                        "application/pdf",
+                    ),
+                },
+            ),
+            pdf_extraction_limits=PdfExtractionLimits(max_text_characters=5),
+        )
+        by_uri = {item.source_uri: item for item in catalog.records if item.source_uri}
+        expected = {
+            "malformed": (OfficialLoadStatus.INVALID_PDF, "malformed_pdf"),
+            "encrypted": (OfficialLoadStatus.ENCRYPTED_PDF, "encrypted_pdf"),
+            "image": (OfficialLoadStatus.IMAGE_ONLY_PDF, "image_only_pdf"),
+            "limited": (
+                OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+                "text_character_limit",
+            ),
+        }
+        for name, (status, reason) in expected.items():
+            with self.subTest(name=name):
+                record = by_uri[urls[name]]
+                self.assertEqual(status, record.status)
+                self.assertEqual(reason, record.reason_code)
+                self.assertIsNone(record.document_mode)
+                self.assertIsNone(record.rendered_sha256)
+                self.assertNotIn(record.source_id, catalog.by_id)
+        self.assertFalse(catalog.documents)
+
+    def test_pdf_unavailable_failure_and_time_limit_map_to_closed_outcomes(self) -> None:
+        paper = "https://arxiv.org/pdf/2401.01234.pdf"
+        pdf_body = text_pdf("Exact model report")
+        discovery = self.discovery(f"[Paper]({paper})\n")
+        replayed = self.replay(
+            discovery,
+            {paper: response(paper, pdf_body, "application/pdf")},
+        )
+        source_digest = hashlib.sha256(pdf_body).hexdigest()
+        cases = (
+            (
+                PdfExtractionStatus.PARSER_UNAVAILABLE,
+                "parser_not_installed",
+                OfficialLoadStatus.PDF_EXTRACTION_UNAVAILABLE,
+            ),
+            (
+                PdfExtractionStatus.FAILED,
+                "unexpected_extraction_failure",
+                OfficialLoadStatus.PDF_EXTRACTION_FAILED,
+            ),
+            (
+                PdfExtractionStatus.TIME_LIMIT,
+                "wall_time_limit",
+                OfficialLoadStatus.PDF_LIMIT_EXCEEDED,
+            ),
+        )
+        for extraction_status, reason, expected_status in cases:
+            with self.subTest(status=extraction_status.value):
+                result = PdfExtractionResult(
+                    status=extraction_status,
+                    reason_code=reason,
+                    source_sha256=source_digest,
+                    source_byte_size=len(pdf_body),
+                    limits=PdfExtractionLimits(),
+                )
+                with patch(
+                    "model_cards.official_documents.extract_pdf_text",
+                    return_value=result,
+                ):
+                    catalog = build_official_document_catalog(replayed)
+                record = next(item for item in catalog.records if item.source_uri == paper)
+                self.assertEqual(expected_status, record.status)
+                self.assertEqual(reason, record.reason_code)
+                self.assertFalse(catalog.documents)
+
+    def test_pdf_result_must_match_the_catalog_parser_profile(self) -> None:
+        paper = "https://arxiv.org/pdf/2401.01234.pdf"
+        pdf_body = text_pdf("Exact model report")
+        discovery = self.discovery(f"[Paper]({paper})\n")
+        replayed = self.replay(
+            discovery,
+            {paper: response(paper, pdf_body, "application/pdf")},
+        )
+        mismatched = PdfExtractionResult(
+            status=PdfExtractionStatus.PARSER_UNAVAILABLE,
+            reason_code="parser_not_installed",
+            source_sha256=hashlib.sha256(pdf_body).hexdigest(),
+            source_byte_size=len(pdf_body),
+            limits=PdfExtractionLimits(max_pages=1),
+        )
+        with patch(
+            "model_cards.official_documents.extract_pdf_text",
+            return_value=mismatched,
+        ), self.assertRaisesRegex(OfficialDocumentError, "profile"):
+            build_official_document_catalog(replayed)
+
+    def test_nonexact_pdf_relation_is_rejected_before_parser_invocation(self) -> None:
+        paper = "https://arxiv.org/pdf/2401.01234.pdf"
+        discovery = self.discovery(f"[Paper]({paper})\n")
+        candidate = next(
+            item for item in discovery.records
+            if item.status is DiscoveryStatus.DISCOVERED
+        )
+        assertion = RelationAssertion(
+            candidate.record_id,
+            "acme/Base",
+            RelationToTarget.BASE_MODEL,
+            candidate.declaring_source_id,
+            candidate.declaration_locator,
+            discovery.target.revision,
+        )
+        replayed = self.replay(
+            discovery,
+            {paper: response(paper, text_pdf("Base report"), "application/pdf")},
+            relation_assertions=(assertion,),
+        )
+        with patch("model_cards.official_documents.extract_pdf_text") as extractor:
+            catalog = build_official_document_catalog(replayed)
+        extractor.assert_not_called()
+        record = next(item for item in catalog.records if item.source_uri == paper)
+        self.assertEqual(OfficialLoadStatus.BLOCKED, record.status)
+        self.assertEqual("related_source_not_exact_target", record.reason_code)
+        self.assertFalse(catalog.documents)
+
+    def test_unknown_media_type_remains_explicitly_unsupported(self) -> None:
+        code = "https://github.com/acme/binary"
+        discovery = self.discovery(f"[Code]({code})\n")
         binary_body = b"not interpreted"
         catalog = build_official_document_catalog(
             self.replay(
                 discovery,
                 {
-                    paper: response(paper, pdf_body, "application/pdf"),
                     code: response(code, binary_body, "application/octet-stream"),
                 },
             )
         )
         by_uri = {item.source_uri: item for item in catalog.records if item.source_uri}
-        self.assertEqual(OfficialLoadStatus.UNSUPPORTED_PDF, by_uri[paper].status)
-        self.assertEqual(
-            "pdf_extraction_unsupported", by_uri[paper].reason_code
-        )
         self.assertEqual(
             OfficialLoadStatus.UNSUPPORTED_MEDIA_TYPE, by_uri[code].status
         )
-        self.assertNotIn(by_uri[paper].source_id, catalog.by_id)
         self.assertNotIn(by_uri[code].source_id, catalog.by_id)
 
     def test_forged_replay_and_catalog_tampering_are_rejected(self) -> None:
@@ -515,7 +759,7 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
         with self.assertRaises(OfficialDocumentError):
             serialize_official_document_catalog(object())  # type: ignore[arg-type]
 
-    def test_catalog_rejects_record_target_drift(self) -> None:
+    def test_record_rejects_external_revision_drift(self) -> None:
         code = "https://github.com/acme/model"
         discovery = self.discovery(f"[Code]({code})\n")
         catalog = build_official_document_catalog(
@@ -524,18 +768,10 @@ class OfficialDocumentBridgeTests(unittest.TestCase):
                 {code: response(code, b"source", "text/plain")},
             )
         )
-        records = list(catalog.records)
-        records[0] = replace(records[0], source_revision="f" * 40)
-        with self.assertRaises(OfficialDocumentError):
-            OfficialDocumentCatalog(
-                catalog_version=catalog.catalog_version,
-                html_parser_version=catalog.html_parser_version,
-                official_bundle_id=catalog.official_bundle_id,
-                source_bundle_id=catalog.source_bundle_id,
-                target=catalog.target,
-                records=tuple(records),
-                documents=catalog.documents,
-                catalog_sha256=catalog.catalog_sha256,
+        with self.assertRaisesRegex(OfficialDocumentError, "frozen byte state"):
+            replace(
+                catalog.records[0],
+                source_revision="sha256:" + "f" * 64,
             )
 
 

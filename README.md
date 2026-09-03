@@ -52,12 +52,18 @@ The vector [PDF](assets/model-card-pipeline.pdf) and
 
 ## Install
 
-The core package supports Python 3.9 or newer.
+The core package supports Python 3.10 or newer.
 
 ```sh
 python3 -m pip install -e .
 modelcards --help
 ```
+
+The core install pins `pypdf==6.4.0`. Official PDF sources are interpreted only
+from their frozen response bytes in a child process with byte, page, text,
+wall-time, CPU-time, file-output, and descriptor limits; the parser does not fetch
+resources or perform OCR. The portable isolation profile does not claim a hard
+address-space ceiling.
 
 The optional AI Atlas Nexus integration is pinned to `ai-atlas-nexus==1.2.4`.
 It requires Python 3.11 or newer and the `risk` extra:
@@ -93,7 +99,13 @@ from an accepted exact-target intended-use or out-of-scope-use claim. Accepted
 model properties, limitations, and known biases may qualify that core statement;
 their field paths, candidate IDs, and frozen source IDs remain attached to the
 context. Qualifiers alone never trigger risk inference, and an empty or withheld
-applicability decision is not replaced with generic top-ranked risks.
+applicability decision is not replaced with generic top-ranked risks. The private
+`risk-mapping.json` retains every typed Nexus candidate and applicability decision,
+not just their hashes. Quality replay loads the exact Nexus 1.2.4 catalog, rebuilds
+the effective contexts and deterministic public-risk projection without provider
+calls, and rejects catalog, candidate, decision, mitigation, or included-value
+drift. Provider-assisted runs must use the same catalog hash admitted before any
+provider call.
 
 Publisher context has two evidence paths. A conservative deterministic pass accepts
 only complete statements with an explicit model subject under closed use, limitation,
@@ -119,15 +131,30 @@ artifacts to that exact target.
 modelcards generate MODEL[@REVISION] --output RUN_DIR
 ```
 
-The normal networked command performs two bounded collection steps:
+The normal networked command performs a bounded discovery-and-collection sequence:
 
 1. It freezes selected Hugging Face metadata and files for the resolved revision.
-2. It discovers links declared in that frozen material and attempts bounded HTTPS
+2. It discovers links declared in that frozen material.
+3. It makes exactly one credential-free query to each of OpenAlex and Semantic
+   Scholar, considers at most five results from each response, and retains at most
+   eight normalized arXiv or DOI locators as discovery-only hints.
+4. It attempts bounded HTTPS
    collection from the allowlisted publication, code, and declared publisher hosts.
 
-Official-source discovery is declaration-driven. It is not a general web or
-scholarly search. Unsafe URLs, redirects, media types, ownership mismatches, size
-limits, and unavailable responses are recorded rather than treated as evidence.
+Verified publisher declarations are considered first. The scholarly searches use
+fixed public endpoints, a 512,000-byte response cap, no credentials, no redirects,
+and no retries. Their response bodies are not retained. Search results are never
+fetched or promoted automatically: only normalized `arxiv.org/abs/...` and
+`doi.org/...` URLs plus content-free per-service status telemetry are frozen, and the
+official bundle records every such URL as non-evidence `discovery_only`. A separate
+exact-target authority and relation check is required before a discovered paper can
+be collected as evidence. Automatic relation admission requires an unambiguous
+resource-to-model declaration in the frozen revision; a model name merely appearing
+beside “paper” or “code” is insufficient. Code links must name a full immutable
+40-hex commit, so bare repositories and branch URLs remain non-evidence. Unsafe
+URLs, redirects, media types, ownership mismatches,
+size limits, malformed search responses, and unavailable services are recorded
+rather than treated as evidence.
 
 Generation without `--provider` does not make paid calls. If the FactReasoner
 checker required for the composed claims is unavailable, that gate is recorded as
@@ -206,6 +233,7 @@ files are:
 | --- | --- |
 | `source-bundle/manifest.json` | Exact-revision Hugging Face source inventory |
 | `official-discovery.json` | Declared official-source candidates from a networked run |
+| `scholarly-discovery.json` | Content-free OpenAlex/Semantic Scholar status and discovery-only primary locators |
 | `official-source-bundle/manifest.json` | Ancestry-bound official collection inventory, when used |
 | `source-state.json`, `source-catalog.json` | Immutable combined source identity and extractable document catalog |
 | `extraction.json`, `claim-gates.json` | Candidate claims and the four-part support gate |
@@ -264,8 +292,49 @@ modelcards review INPUT_ARTIFACT.json BINDING_ID \
 ```
 
 `accept`, `withhold`, and evidence-preserving `reassign` actions are supported.
-Appending a decision does not by itself claim that an entire card was human-reviewed
-or released.
+`reassign` additionally requires `--gate-record` and `--source-bundle` (plus
+`--official-bundle` when the gate used official evidence). The replacement must be
+the exact candidate named by that record, all four gates must pass, and the gate is
+replayed against the frozen sources before the event is appended. Any review change
+invalidates the inherited card-level validation state. Recompute the immediate
+schema, gate, and omission surface with:
+
+```sh
+modelcards audit-review REVIEWED_ARTIFACT.json \
+  --source-bundle FROZEN/source-bundle \
+  --prior-omissions RUN/omissions.json \
+  --output REVIEW_AUDIT.json
+```
+
+That default audit is provisional: original semantic claim gates and downstream
+publication, FactReasoner, risk, and privacy results remain unavailable. A
+projection-neutral review retains its replay-bound publication snapshot; a review
+that changes the publication projection drops the stale snapshot. To request the
+fail-closed sealed verdict, supply the complete current evidence set together:
+
+```sh
+modelcards audit-review REVIEWED_ARTIFACT.json \
+  --source-bundle FROZEN/source-bundle \
+  --prior-omissions RUN/omissions.json \
+  --claim-gates RUN/claim-gates.json \
+  --publication-factreasoner RERUN/factreasoner-publication-original.json \
+  --publication-validation RERUN/publication-validation.json \
+  --final-factreasoner RERUN/factreasoner.json \
+  --risk-mapping RERUN/risk-mapping.json \
+  --privacy RERUN/privacy.json \
+  --output REVIEW_AUDIT.json
+```
+
+The closure inputs are all-or-none. The CLI replays the original and replacement
+claim gates, frozen-source publication enrichment, publication validation, and the
+privacy/source-overlap scan over the actual final card. The risk lane seals only its
+provider-free, no-grounded-context path by replaying the pinned taxonomy; a retained
+provider-produced mapping remains unavailable without an execution replay. A
+non-empty review history and passing schema, omission, FactReasoner, risk, and privacy
+checks are all required for `reviewed_candidate_closed`; unavailable or stale inputs
+remain explicitly provisional. Appending a decision alone never claims whole-card
+review or release. The current FactReasoner records do not retain the IBM/NLI
+execution binding, so checker identity alone cannot pass that closure check.
 
 ## Batch generation and aggregate reports
 
@@ -288,7 +357,7 @@ modelcards batch targets.json --provider Together --output BATCH_A \
   --offline-official-bundle 'MODEL@COMMIT=OFFICIAL_BUNDLE'
 ```
 
-The `model-card-quality-report/v3` report verifies each typed artifact before
+The `model-card-quality-report/v4` report verifies each typed artifact before
 aggregating claim outcomes,
 withholding, omissions, risk-stage status, usage, cost/latency, and paired replay
 stability. Provider-assisted reports include validated usage ledgers retained by
@@ -358,10 +427,13 @@ PYTHONPATH=src python3 scripts/regenerate_frozen_examples.py \
 
 ## Scope and current limitations
 
-- Official discovery follows declarations in the frozen Hugging Face material; it
-  does not independently search the literature.
-- Bounded official collection can freeze supported HTTPS responses, but the current
-  official-document bridge does not extract text from PDFs.
+- Official discovery follows declarations in the frozen Hugging Face material and
+  records bounded OpenAlex/Semantic Scholar results as discovery-only hints. It does
+  not promote a search result to evidence without separate exact-target authority
+  and relation proof.
+- The official-document bridge extracts text-bearing PDFs, but encrypted,
+  malformed, image-only, or over-limit PDFs remain explicit non-evidence records;
+  image OCR is intentionally out of scope.
 - Missing provider credentials or an unavailable FactReasoner backend are reported;
   they are not replaced with invented validation results.
 - The example cards are automated candidates. This repository reports no human study,

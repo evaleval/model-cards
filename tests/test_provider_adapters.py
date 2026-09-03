@@ -12,7 +12,7 @@ from unittest import mock
 from jsonschema import ValidationError
 
 from model_cards.bindings import quote_binding
-from model_cards.claim_gate import ClaimCandidate, GateName
+from model_cards.claim_gate import ClaimCandidate, DecisionStatus, GateName
 from model_cards.extraction import ExtractionBatch
 from model_cards.factreasoner import (
     ATOM_VERSION,
@@ -406,23 +406,63 @@ class ProviderAdapterTests(unittest.TestCase):
 
     def test_claim_checker_runs_independent_closed_decisions(self) -> None:
         fake = FakeCalls(
+            {"status": "accepted", "reason": "semantic_entity_scope"},
             {"status": "accepted", "reason": "semantic_field_fit"},
             {"status": "accepted", "reason": "semantic_value_support"},
         )
         checker = OpenRouterClaimChecker(**self.kwargs(fake))
         item = candidate()
+        entity = checker.decide(item, GateName.ENTITY_SCOPE)
         field = checker.decide(item, GateName.FIELD_FIT)
         value = checker.decide(item, GateName.VALUE_SUPPORT)
+        self.assertEqual(GateName.ENTITY_SCOPE, entity.gate)
         self.assertEqual(GateName.FIELD_FIT, field.gate)
         self.assertEqual(GateName.VALUE_SUPPORT, value.gate)
+        self.assertNotEqual(entity.request_sha256, field.request_sha256)
         self.assertNotEqual(field.request_sha256, value.request_sha256)
-        self.assertEqual(2, len(fake.specs))
+        self.assertEqual(3, len(fake.specs))
         for spec in fake.specs:
             payload = json.loads(spec.user_prompt)
             self.assertEqual(MAX_CLAIM_OUTPUT_TOKENS, spec.max_output_tokens)
             self.assertEqual(item.candidate_id, payload["candidate_id"])
             self.assertEqual(item.value, payload["value"])
             self.assertNotIn("corrected_value", spec.json_schema["properties"])
+        entity_payload = json.loads(fake.specs[0].user_prompt)
+        self.assertIn("containing document", entity_payload["task"])
+        self.assertIn("sibling checkpoint", entity_payload["task"])
+        self.assertEqual(
+            item.target.to_dict(), entity_payload["evidence"][0]["source_target"]
+        )
+
+    def test_claim_checker_can_withhold_same_document_sibling_attribution(self) -> None:
+        document = source(
+            "# Exact Model\n\n## Sibling Checkpoint\n\n"
+            "example-lab/sibling-model has 13B parameters."
+        )
+        binding = quote_binding(
+            target=TARGET,
+            source=document,
+            field_path="identity.summary",
+            value="example-lab/sibling-model has 13B parameters.",
+            quote="example-lab/sibling-model has 13B parameters.",
+            claim_entity=f"{TARGET.model_id}@{TARGET.revision}",
+            relation=RelationToTarget.EXACT_TARGET,
+            section_path=("Exact Model", "Sibling Checkpoint"),
+        )
+        item = ClaimCandidate.from_binding(TARGET, binding)
+        fake = FakeCalls({"status": "withheld", "reason": "wrong_entity"})
+
+        decision = OpenRouterClaimChecker(**self.kwargs(fake)).decide(
+            item, GateName.ENTITY_SCOPE
+        )
+
+        self.assertEqual(DecisionStatus.WITHHELD, decision.status)
+        self.assertEqual("wrong_entity", decision.reason)
+        payload = json.loads(fake.specs[0].user_prompt)
+        self.assertEqual(
+            ["Exact Model", "Sibling Checkpoint"],
+            payload["evidence"][0]["section_path"],
+        )
 
     def test_claim_checker_rejects_mismatched_status_reason(self) -> None:
         fake = FakeCalls({"status": "accepted", "reason": "wrong_field"})

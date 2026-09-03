@@ -45,8 +45,20 @@ class ClaimSupportGateTests(unittest.TestCase):
 
     def accepting_prose_checks(
         self, candidate: ClaimCandidate
-    ) -> tuple[ProseCheckerDecision, ProseCheckerDecision]:
+    ) -> tuple[
+        ProseCheckerDecision,
+        ProseCheckerDecision,
+        ProseCheckerDecision,
+    ]:
         return (
+            ProseCheckerDecision.for_candidate(
+                candidate,
+                gate=GateName.ENTITY_SCOPE,
+                checker="tests/explicit-prose-checker-v1",
+                method="bounded_semantic_entity_review",
+                status=DecisionStatus.ACCEPTED,
+                reason="semantic_entity_scope",
+            ),
             ProseCheckerDecision.for_candidate(
                 candidate,
                 gate=GateName.FIELD_FIT,
@@ -181,10 +193,14 @@ class ClaimSupportGateTests(unittest.TestCase):
                 record.checker_decisions,
             )
 
-    def test_prose_requires_two_explicit_bounded_checker_decisions(self) -> None:
+    def test_prose_requires_three_explicit_bounded_checker_decisions(self) -> None:
         candidate = self.candidate("identity.summary")
         missing = evaluate_claim_gate(candidate, self.sources)
         self.assertFalse(missing.projection_eligible)
+        self.assertEqual(
+            self.outcome(missing, GateName.ENTITY_SCOPE).reason,
+            "prose_entity_checker_unavailable",
+        )
         self.assertEqual(
             self.outcome(missing, GateName.FIELD_FIT).reason,
             "prose_field_checker_unavailable",
@@ -482,6 +498,14 @@ class ClaimSupportGateTests(unittest.TestCase):
             evidence=summary.evidence,
         )
         checks = (
+            ProseCheckerDecision.for_candidate(
+                wrong,
+                gate=GateName.ENTITY_SCOPE,
+                checker="tests/explicit-prose-checker-v1",
+                method="bounded_semantic_entity_review",
+                status=DecisionStatus.ACCEPTED,
+                reason="semantic_entity_scope",
+            ),
             ProseCheckerDecision.for_candidate(
                 wrong,
                 gate=GateName.FIELD_FIT,

@@ -38,7 +38,7 @@ from .models import RelationToTarget
 from .source_bundle import TargetIdentity
 
 
-OFFICIAL_BUNDLE_VERSION = "official-source-bundle/v1"
+OFFICIAL_BUNDLE_VERSION = "official-source-bundle/v2"
 EVALEVAL_JOIN_SHAPE = "evaleval-exact-model-join/v1"
 DEFAULT_MAX_SOURCES = 32
 DEFAULT_MAX_SOURCE_BYTES = 8_000_000
@@ -205,13 +205,22 @@ class OfficialCollectionLimits:
 
 @dataclass(frozen=True)
 class RelationAssertion:
-    """One explicit publisher relation assertion for a discovered source."""
+    """One revision-bound publisher relation assertion for a discovered source.
+
+    ``target_revision`` is deliberately kept on this in-memory collection
+    input rather than added to the serialized relation graph.  The enclosing
+    official-source manifest already serializes the exact target identity;
+    checking this independent assertion value prevents a declaration observed
+    at one Hugging Face revision from being reused for another revision while
+    preserving the v2 bundle wire format.
+    """
 
     candidate_record_id: str
     subject_model_id: str
     relation_to_target: RelationToTarget
     declaring_source_id: str
     declaration_locator: str
+    target_revision: str
 
     def __post_init__(self) -> None:
         if not _DISCOVERY_RECORD_ID_RE.fullmatch(self.candidate_record_id):
@@ -226,6 +235,12 @@ class RelationAssertion:
         if not _HF_SOURCE_ID_RE.fullmatch(self.declaring_source_id):
             raise OfficialSourceError("relation declaring_source_id is invalid")
         _validate_locator(self.declaration_locator)
+        if not isinstance(self.target_revision, str) or not _COMMIT_RE.fullmatch(
+            self.target_revision
+        ):
+            raise OfficialSourceError(
+                "relation target_revision must be an exact lowercase commit"
+            )
 
 
 @dataclass(frozen=True)
@@ -1129,9 +1144,12 @@ def _fetch_candidate(
         (item.subject_model_id, item.relation_to_target) for item in assertions
     }
     conflicting_relation = len(unique_assertions) > 1
-    unresolved_relation = any(
+    unresolved_relation = not unique_assertions or any(
         relation is RelationToTarget.UNKNOWN for _, relation in unique_assertions
     )
+    exact_target_relation = unique_assertions == {
+        (discovery.target.model_id, RelationToTarget.EXACT_TARGET)
+    }
     drift = pin is not None and pin.expected_sha256 != digest
     status = (
         OfficialSourceStatus.CONFLICTING
@@ -1142,9 +1160,12 @@ def _fetch_candidate(
         "source_drift" if drift else
         "conflicting_official_declarations" if conflicting_relation else
         "relation_unresolved" if unresolved_relation else
-        "verified_primary_source"
+        "verified_primary_source" if exact_target_relation else
+        "verified_related_source"
     )
-    eligible = status is OfficialSourceStatus.COLLECTED
+    eligible = (
+        status is OfficialSourceStatus.COLLECTED and exact_target_relation
+    )
     return _build_source(
         candidate_record_id=candidate.record_id, kind=candidate.kind,
         authority=SourceAuthority.PRIMARY, status=status, requested_url=requested,
@@ -1245,9 +1266,10 @@ def _source_relations(
             RelationAssertion(
                 candidate_record_id=source.candidate_record_id or "",
                 subject_model_id=target.model_id,
-                relation_to_target=RelationToTarget.EXACT_TARGET,
+                relation_to_target=RelationToTarget.UNKNOWN,
                 declaring_source_id=source.declaring_source_id or "",
                 declaration_locator=source.declaration_locator,
+                target_revision=target.revision,
             ),
         )
     unique = {
@@ -1355,11 +1377,20 @@ def _index_assertions(
             raise OfficialSourceError("relation assertion references an unfetchable candidate")
         if assertion.declaring_source_id != candidate.declaring_source_id:
             raise OfficialSourceError("relation assertion declaration source is inconsistent")
+        if assertion.declaration_locator != candidate.declaration_locator:
+            raise OfficialSourceError("relation assertion declaration locator is inconsistent")
+        if assertion.target_revision != discovery.target.revision:
+            raise OfficialSourceError("relation assertion target revision is inconsistent")
+        if (
+            assertion.relation_to_target is RelationToTarget.EXACT_TARGET
+            and assertion.subject_model_id != discovery.target.model_id
+        ):
+            raise OfficialSourceError("exact-target relation assertion subject is inconsistent")
         result.setdefault(assertion.candidate_record_id, []).append(assertion)
     return {
         key: tuple(sorted(values, key=lambda item: (
             item.subject_model_id, item.relation_to_target.value,
-            item.declaration_locator,
+            item.declaration_locator, item.target_revision,
         )))
         for key, values in result.items()
     }

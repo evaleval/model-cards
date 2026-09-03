@@ -10,11 +10,13 @@ from model_cards.combined_sources import (
     CombinedSourceError,
     combine_source_document_catalogs,
 )
+from model_cards.models import RelationToTarget
 from model_cards.official_discovery import discover_official_sources
 from model_cards.official_documents import build_official_document_catalog
 from model_cards.official_sources import (
     OfficialFetchStatus,
     OfficialRemoteObject,
+    RelationAssertion,
     collect_official_sources,
     replay_official_sources,
 )
@@ -88,7 +90,24 @@ class CombinedSourceTests(unittest.TestCase):
         replayed_hf = replay_source_bundle(hf_root)
         discovery = discover_official_sources(replayed_hf)
         official_root = root / "official"
-        collect_official_sources(discovery, official_root, OfficialAdapter())
+        assertions = tuple(
+            RelationAssertion(
+                candidate.record_id,
+                discovery.target.model_id,
+                RelationToTarget.EXACT_TARGET,
+                candidate.declaring_source_id,
+                candidate.declaration_locator,
+                discovery.target.revision,
+            )
+            for candidate in discovery.records
+            if candidate.normalized_url == CODE_URL
+        )
+        collect_official_sources(
+            discovery,
+            official_root,
+            OfficialAdapter(),
+            relation_assertions=assertions,
+        )
         return (
             build_source_document_catalog(replayed_hf),
             build_official_document_catalog(replay_official_sources(official_root)),

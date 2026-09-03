@@ -194,6 +194,11 @@ class RunSummaryTests(unittest.TestCase):
                 reason=reason,
             )
             for gate, method, reason in (
+                (
+                    GateName.ENTITY_SCOPE,
+                    "bounded_semantic_entity_review",
+                    "fixture_entity_scope",
+                ),
                 (GateName.FIELD_FIT, "bounded_semantic_field_review", "fixture_field_fit"),
                 (
                     GateName.VALUE_SUPPORT,

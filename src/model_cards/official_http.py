@@ -29,7 +29,7 @@ from .official_sources import (
 )
 
 
-DETERMINISTIC_USER_AGENT = "evaleval-model-cards/0.1 official-source-bundle/v1"
+DETERMINISTIC_USER_AGENT = "evaleval-model-cards/0.1 official-source-bundle/v2"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 

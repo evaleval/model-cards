@@ -116,17 +116,34 @@ collected, missing, gated, or unavailable source and binds all stored bytes to t
 exact target and collection limits. Replay rehashes the objects and reconstructs the
 manifest identity.
 
-For a normal networked generation, `official_discovery.py` examines declarations in
-the frozen Hub material. It normalizes URLs, restricts them to configured publication,
-code, and publisher-owned hosts, and records candidates without treating discovery as
-evidence. `official_http.py` performs bounded, credential-free HTTPS retrieval with
-manual redirect validation. `official_sources.py` checks authority, ownership,
-relation, media type, byte bounds, redirect trace, and ancestry before collected
-official material becomes evidence-eligible.
+For a normal networked generation, `official_discovery.py` first examines declarations
+in the frozen Hub material. It normalizes URLs, restricts them to configured
+publication, code, and publisher-owned hosts, and records candidates without treating
+discovery as evidence. `scholarly_discovery.py` then makes one credential-free request
+to each fixed OpenAlex and Semantic Scholar endpoint. Each response is capped at
+512,000 bytes and five results; the combined result is capped at eight deduplicated
+arXiv/DOI URLs. Search bodies are discarded, per-service failures remain explicit,
+and the normalized URLs enter the official bundle only as `discovery_only` hints.
+They are never fetched or made evidence-eligible without a separate exact-target
+authority and relation admission. That admission is bound to the frozen target
+revision and requires explicit, unambiguous resource-to-model prose; code also needs
+a full immutable commit URL. Bare repositories, moving branches, family wording,
+and same-line name/resource co-occurrence do not establish the relation.
+`official_http.py` performs bounded,
+credential-free HTTPS retrieval of publisher-declared candidates with manual redirect
+validation. `official_sources.py` checks authority, ownership, relation, media type,
+byte bounds, redirect trace, and ancestry before collected official material becomes
+evidence-eligible.
 
-`official_documents.py` converts eligible JSON, HTML, Markdown, and plain text into
-typed documents. Unsupported PDFs and malformed or unavailable material remain
-explicit load records. The current bridge does not extract PDF text.
+`official_documents.py` converts eligible JSON, HTML, Markdown, plain text, and
+text-bearing PDFs into typed documents. PDF extraction consumes only the already
+frozen bytes, uses the exact pinned parser in a child process with byte, page, text,
+wall-time, CPU-time, file-output, and descriptor limits, and records its parser
+identity, limits, and output digest in the versioned catalog. Encrypted, malformed,
+image-only, over-limit, or unavailable PDFs remain explicit load records; there is
+no network access or OCR at this boundary. The portable profile does not claim a
+hard address-space ceiling; parser transient allocation remains a documented
+residual despite bounded input and retained output.
 
 ## 2. One immutable source state
 
@@ -172,10 +189,13 @@ contexts but do not add fields to the seven-section public card.
 3. `field_fit` checks that the evidence belongs in the proposed contract field.
 4. `value_support` checks that the complete proposed value follows from that evidence.
 
-The first two gates are deterministic. Structured values also receive deterministic
-field and value checks. Provider-assisted quote candidates receive normalized semantic
-decisions for the latter gates. A withheld gate remains in `claim-gates.json` but
-cannot enter the composition plan.
+Coordinate integrity and the closed source-relation policy are deterministic.
+Structured values also receive deterministic entity, field, and value checks.
+Every provider-assisted quote candidate receives three separately bound semantic
+decisions for entity scope, field fit, and value support; document-level target
+identity cannot substitute for evidence that the quoted section or table is about the
+target. A missing, malformed, or failed decision withholds the candidate. A withheld
+gate remains in `claim-gates.json` but cannot enter the composition plan.
 
 ## 4. Composition, audits, and repair
 
@@ -263,9 +283,9 @@ target of a provider-assisted `batch` run. The CLI, adapters, and orchestration
 admission reject every other provider; every assisted call uses exactly
 `deepseek/deepseek-v4-flash-0731` through OpenRouter. It extracts bounded quote
 candidates in one per-document extraction stage, using one general request and at
-most one dedicated use/risk request, obtains normalized field-fit and value-support
-decisions, supplies a FactReasoner checker, and, when the pinned risk dependency is
-available, supplies the Nexus risk interfaces.
+most one dedicated use/risk request, obtains separately normalized entity-scope,
+field-fit, and value-support decisions, supplies a FactReasoner checker, and, when the
+pinned risk dependency is available, supplies the Nexus risk interfaces.
 
 `provider.py` and `run_ledger.py` enforce an append-only per-target `usage.jsonl`
 ledger, the USD 25 and 300-call target caps, route freshness, structured JSON output,
@@ -335,7 +355,7 @@ privacy, and cost/latency surfaces.
 | `contract.py`, `schema.py` | Rich local audit contract, absence values, and audit validation |
 | `publication_contract.py`, `publication_schema.py`, `publication.py`, `publication_sources.py`, `publication_validation.py` | Exact 33-field public contract, allowlisted projection, frozen-source enrichment/provenance replay, and deletion-only validation |
 | `source_bundle.py`, `hf_adapter.py` | Exact-revision Hugging Face collection and replay |
-| `official_discovery.py`, `official_http.py`, `official_sources.py`, `official_documents.py` | Declared official-source boundary |
+| `official_discovery.py`, `scholarly_discovery.py`, `official_http.py`, `official_sources.py`, `official_documents.py` | Declared and bounded scholarly discovery plus official-source boundary |
 | `source_state.py`, `combined_sources.py`, `source_documents.py` | Immutable source state and typed catalogs |
 | `extraction.py`, `claim_gate.py`, `composer.py` | Candidate extraction, support checks, and evidence-only projection |
 | `factreasoner.py`, `findings.py`, `field_repair.py` | Atomic factuality, omission/conflict audits, and targeted repair |

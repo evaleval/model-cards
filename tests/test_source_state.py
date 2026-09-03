@@ -7,10 +7,12 @@ import tempfile
 import unittest
 
 from model_cards.combined_sources import CombinedSourceDocumentCatalog
+from model_cards.models import RelationToTarget
 from model_cards.official_discovery import discover_official_sources
 from model_cards.official_sources import (
     OfficialFetchStatus,
     OfficialRemoteObject,
+    RelationAssertion,
     collect_official_sources,
     replay_official_sources,
 )
@@ -123,7 +125,24 @@ class ImmutableSourceStateTests(unittest.TestCase):
         replayed = replay_source_bundle(hf_bundle)
         discovery = discover_official_sources(replayed)
         destination = self.root / name
-        collect_official_sources(discovery, destination, OfficialAdapter())
+        assertions = tuple(
+            RelationAssertion(
+                candidate.record_id,
+                discovery.target.model_id,
+                RelationToTarget.EXACT_TARGET,
+                candidate.declaring_source_id,
+                candidate.declaration_locator,
+                discovery.target.revision,
+            )
+            for candidate in discovery.records
+            if candidate.normalized_url == CODE_URL
+        )
+        collect_official_sources(
+            discovery,
+            destination,
+            OfficialAdapter(),
+            relation_assertions=assertions,
+        )
         return destination
 
     def pair(self, prefix: str = "primary") -> tuple[Path, Path]:

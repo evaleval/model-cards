@@ -16,21 +16,35 @@ from typing import Any, Sequence
 
 from .artifact import CardArtifact, project_card
 from .bindings import build_artifact
+from .claim_gate import ClaimGateRecord, verify_claim_gate_record
 from .models import RelationToTarget, ReviewAction
 from .field_repair import FieldRepairRecord
+from .findings import OmissionAudit
 from .hf_adapter import HuggingFaceHubAdapter
 from .official_discovery import (
     discover_official_sources,
+    exact_target_declaration_record_ids,
     replay_official_discovery,
 )
 from .official_http import StdlibOfficialSourceAdapter
-from .official_sources import collect_official_sources, replay_official_sources
+from .official_sources import (
+    DEFAULT_MAX_SOURCES,
+    RelationAssertion,
+    collect_official_sources,
+    replay_official_sources,
+)
 from .orchestration import (
     ORCHESTRATION_MANIFEST_FILENAME,
     OrchestrationError,
     run_provider_assisted_pipeline,
 )
-from .pipeline import PipelineResult, run_offline_pipeline, verify_pipeline_result
+from .factreasoner import FactReasonerRecord
+from .pipeline import (
+    PipelineResult,
+    PrivacyScanReport,
+    run_offline_pipeline,
+    verify_pipeline_result,
+)
 from .provider import (
     MissingCredentialError,
     PINNED_PROVIDER,
@@ -48,10 +62,14 @@ from .quality_report import (
     write_quality_report,
 )
 from .public_export import export_public_card
+from .publication import project_publication_card
 from .publication_contract import build_publication_schema
 from .publication_schema import publication_coverage, validate_publication_card
 from .render import save_html, save_json
 from .review import append_review, load_artifact, save_artifact
+from .publication_validation import PublicationValidationReport
+from .review_audit import ReviewClosureEvidence, audit_reviewed_candidate
+from .risk_mapping import load_pinned_nexus_catalog
 from .run_ledger import BudgetCapError, LedgerError, UncertainSendError
 from .run_summary import (
     AUDIT_VIEW_FILENAME,
@@ -67,12 +85,20 @@ from .schema import (
     validate_field_path,
     validate_public_card,
 )
+from .scholarly_discovery import (
+    DEFAULT_MAX_HINTS as DEFAULT_MAX_SCHOLARLY_HINTS,
+    SCHOLARLY_DISCOVERY_FILENAME,
+    StdlibScholarlyDiscoveryTransport,
+    discover_scholarly_sources,
+    load_scholarly_discovery,
+)
 from .source_bundle import (
     BundleManifest,
     collect_hf_source_bundle,
     parse_target_request,
     replay_source_bundle,
 )
+from .source_state import load_source_state
 
 
 _EXACT_REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -80,6 +106,9 @@ _SAFE_CODE_RE = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 _PROVIDER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._:/+()-]{0,127}$")
 _AGGREGATE_BUDGET_FILENAME = "aggregate-budget.jsonl"
 _AGGREGATE_BUDGET_SUMMARY_FILENAME = "aggregate-budget-summary.json"
+_MAX_OFFICIAL_SOURCES_WITH_SCHOLARLY_HINTS = (
+    DEFAULT_MAX_SOURCES + DEFAULT_MAX_SCHOLARLY_HINTS
+)
 
 
 class CliCommandError(ValueError):
@@ -406,11 +435,13 @@ def _prepare_official_bundle(
 
     # Supplying a frozen HF bundle means fully offline unless the caller also
     # supplies its ancestry-bound official bundle. The normal online command
-    # performs bounded official discovery and collection automatically.
+    # performs bounded declared and scholarly discovery plus official
+    # collection automatically. Scholarly results remain discovery-only.
     if offline_hf:
         return None
 
     discovery_path = output / "official-discovery.json"
+    scholarly_path = output / SCHOLARLY_DISCOVERY_FILENAME
     try:
         if discovery_path.exists() or discovery_path.is_symlink():
             if discovery_path.is_symlink() or not discovery_path.is_file():
@@ -426,6 +457,23 @@ def _prepare_official_bundle(
                 discovery.to_dict(),
                 immutable=True,
             )
+        if scholarly_path.exists() or scholarly_path.is_symlink():
+            if scholarly_path.is_symlink() or not scholarly_path.is_file():
+                raise CliCommandError("scholarly_discovery_invalid")
+            scholarly = load_scholarly_discovery(
+                scholarly_path.read_bytes(),
+                expected_target=hf_bundle.manifest.target,
+            )
+        else:
+            scholarly = discover_scholarly_sources(
+                hf_bundle.manifest.target,
+                StdlibScholarlyDiscoveryTransport(),
+            )
+            _atomic_json_update(
+                scholarly_path,
+                scholarly.to_dict(),
+                immutable=True,
+            )
         allowed_hosts = tuple(
             sorted(
                 set(discovery.policy.publication_hosts)
@@ -433,10 +481,28 @@ def _prepare_official_bundle(
                 | set(discovery.policy.owned_hosts)
             )
         )
+        exact_record_ids = set(
+            exact_target_declaration_record_ids(hf_bundle, discovery)
+        )
+        relation_assertions = tuple(
+            RelationAssertion(
+                candidate_record_id=record.record_id,
+                subject_model_id=discovery.target.model_id,
+                relation_to_target=RelationToTarget.EXACT_TARGET,
+                declaring_source_id=record.declaring_source_id or "",
+                declaration_locator=record.declaration_locator,
+                target_revision=discovery.target.revision,
+            )
+            for record in discovery.records
+            if record.record_id in exact_record_ids
+        )
         collect_official_sources(
             discovery,
             destination,
             StdlibOfficialSourceAdapter(allowed_hosts),
+            relation_assertions=relation_assertions,
+            discovery_hints=scholarly.hints,
+            max_sources=_MAX_OFFICIAL_SOURCES_WITH_SCHOLARLY_HINTS,
         )
         replayed = replay_official_sources(
             destination,
@@ -462,6 +528,8 @@ def _pipeline_summary(result: PipelineResult, run_directory: Path) -> dict[str, 
         names.add("official-source-bundle/manifest.json")
     if (run_directory / "official-discovery.json").is_file():
         names.add("official-discovery.json")
+    if (run_directory / SCHOLARLY_DISCOVERY_FILENAME).is_file():
+        names.add(SCHOLARLY_DISCOVERY_FILENAME)
     if (run_directory / ORCHESTRATION_MANIFEST_FILENAME).is_file():
         names.add(ORCHESTRATION_MANIFEST_FILENAME)
     for name in (AUDIT_VIEW_FILENAME, USAGE_SUMMARY_FILENAME, "provider-result.json"):
@@ -993,12 +1061,45 @@ def _cmd_review(args: argparse.Namespace) -> int:
     destination = _new_path(args.output, inputs=(source,))
     artifact = load_artifact(source)
     corrected_value = None
+    gate_record = None
     if args.action == ReviewAction.REASSIGN.value:
-        if args.field is None or args.relation is None or args.value_json is None:
-            raise ValueError("reassign requires --field, --relation, and --value-json")
+        if any(
+            item is None
+            for item in (
+                args.field,
+                args.relation,
+                args.value_json,
+                args.gate_record,
+                args.source_bundle,
+            )
+        ):
+            raise ValueError(
+                "reassign requires --field, --relation, --value-json, "
+                "--gate-record, and --source-bundle"
+            )
         corrected_value = json.loads(args.value_json)
-    elif any(item is not None for item in (args.field, args.relation, args.value_json)):
-        raise ValueError("field, relation, and value are only valid with reassign")
+        gate_record = ClaimGateRecord.from_dict(
+            _read_object(Path(args.gate_record))
+        )
+        state = load_source_state(args.source_bundle, args.official_bundle)
+        if state.target != artifact.target:
+            raise ValueError("review source bundle target differs from the artifact")
+        verify_claim_gate_record(gate_record, state.documents)
+    elif any(
+        item is not None
+        for item in (
+            args.field,
+            args.relation,
+            args.value_json,
+            args.gate_record,
+            args.source_bundle,
+            args.official_bundle,
+        )
+    ):
+        raise ValueError(
+            "field, relation, value, gate record, and source bundles are only "
+            "valid with reassign"
+        )
     reviewed = append_review(
         artifact,
         binding_id=args.binding_id,
@@ -1007,9 +1108,92 @@ def _cmd_review(args: argparse.Namespace) -> int:
         field_path=args.field,
         relation=args.relation,
         corrected_value=corrected_value,
+        gate_record=gate_record,
     )
     save_artifact(reviewed, destination)
     print(f"wrote {destination}")
+    return 0
+
+
+def _cmd_audit_review(args: argparse.Namespace) -> int:
+    source = Path(args.artifact)
+    inputs = [source, Path(args.source_bundle)]
+    if args.official_bundle is not None:
+        inputs.append(Path(args.official_bundle))
+    if args.prior_omissions is not None:
+        inputs.append(Path(args.prior_omissions))
+    closure_names = (
+        "claim_gates",
+        "publication_factreasoner",
+        "publication_validation",
+        "final_factreasoner",
+        "risk_mapping",
+        "privacy",
+    )
+    closure_values = tuple(getattr(args, name) for name in closure_names)
+    if any(item is not None for item in closure_values) and not all(
+        item is not None for item in closure_values
+    ):
+        raise ValueError(
+            "sealed review audit requires all downstream closure artifacts"
+        )
+    inputs.extend(Path(item) for item in closure_values if item is not None)
+    destination = _new_path(args.output, inputs=tuple(inputs))
+    artifact = load_artifact(source)
+    state = load_source_state(args.source_bundle, args.official_bundle)
+    if state.target != artifact.target:
+        raise ValueError("review audit source bundle target differs from the artifact")
+    prior = (
+        None
+        if args.prior_omissions is None
+        else OmissionAudit.from_dict(_read_object(Path(args.prior_omissions)))
+    )
+    closure = None
+    if all(item is not None for item in closure_values):
+        gate_inventory = _read_object(Path(args.claim_gates))
+        if (
+            set(gate_inventory) != {"target", "extraction_sha256", "records"}
+            or gate_inventory["target"] != artifact.target.to_dict()
+            or not isinstance(gate_inventory["extraction_sha256"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", gate_inventory["extraction_sha256"])
+            is None
+            or not isinstance(gate_inventory["records"], list)
+        ):
+            raise ValueError("claim-gate inventory is malformed or targets another model")
+        closure = ReviewClosureEvidence(
+            claim_gate_records=tuple(
+                ClaimGateRecord.from_dict(item) for item in gate_inventory["records"]
+            ),
+            publication_catalog=state.hf_catalog,
+            publication_factreasoner=FactReasonerRecord.from_dict(
+                _read_object(Path(args.publication_factreasoner))
+            ),
+            publication_validation=PublicationValidationReport.from_dict(
+                _read_object(Path(args.publication_validation))
+            ),
+            final_factreasoner=FactReasonerRecord.from_dict(
+                _read_object(Path(args.final_factreasoner))
+            ),
+            risk_catalog=load_pinned_nexus_catalog(),
+            risk_mapping=_read_object(Path(args.risk_mapping)),
+            privacy=PrivacyScanReport.from_dict(
+                _read_object(Path(args.privacy))
+            ),
+        )
+    audit = audit_reviewed_candidate(
+        artifact,
+        state.documents,
+        prior_omission_audit=prior,
+        closure_evidence=closure,
+    )
+    _atomic_json_update(destination, audit.to_dict(), immutable=True)
+    _print_json(
+        {
+            "audit_sha256": audit.audit_sha256,
+            "source_present_omission_count": len(audit.source_present_omissions),
+            "verdict": audit.verdict,
+        }
+    )
     return 0
 
 
@@ -1190,8 +1374,37 @@ def build_parser() -> argparse.ArgumentParser:
     review.add_argument("--field")
     review.add_argument("--relation", choices=[item.value for item in RelationToTarget])
     review.add_argument("--value-json")
+    review.add_argument(
+        "--gate-record",
+        help="four-part Claim Support Gate record for the corrected candidate",
+    )
+    review.add_argument(
+        "--source-bundle",
+        help="frozen Hugging Face source bundle used to replay the gate",
+    )
+    review.add_argument(
+        "--official-bundle",
+        help="optional ancestry-bound official source bundle used to replay the gate",
+    )
     review.add_argument("--output", required=True)
     review.set_defaults(handler=_cmd_review)
+
+    audit_review = subparsers.add_parser(
+        "audit-review",
+        help="replay gates and omissions after append-only review events",
+    )
+    audit_review.add_argument("artifact")
+    audit_review.add_argument("--source-bundle", required=True)
+    audit_review.add_argument("--official-bundle")
+    audit_review.add_argument("--prior-omissions")
+    audit_review.add_argument("--claim-gates")
+    audit_review.add_argument("--publication-factreasoner")
+    audit_review.add_argument("--publication-validation")
+    audit_review.add_argument("--final-factreasoner")
+    audit_review.add_argument("--risk-mapping")
+    audit_review.add_argument("--privacy")
+    audit_review.add_argument("--output", required=True)
+    audit_review.set_defaults(handler=_cmd_audit_review)
 
     repair = subparsers.add_parser(
         "repair",

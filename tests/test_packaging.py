@@ -24,7 +24,7 @@ class PackagingTests(unittest.TestCase):
         destination = root / "dist"
         result = subprocess.run(
             (
-                "/usr/bin/python3",
+                sys.executable,
                 "setup.py",
                 "bdist_wheel",
                 "--dist-dir",
@@ -56,6 +56,11 @@ class PackagingTests(unittest.TestCase):
             self.assertIn("model_cards/contract.py", names)
             self.assertIn("model_cards/publication_schema.py", names)
             self.assertIn("Requires-Dist: jsonschema", metadata)
+            self.assertRegex(
+                metadata,
+                r"(?m)^Requires-Dist: pypdf(?: \(==6\.4\.0\)|==6\.4\.0)$",
+            )
+            self.assertIn("Requires-Python: >=3.10", metadata)
             self.assertIn("Provides-Extra: risk", metadata)
             self.assertIn("ai-atlas-nexus", metadata)
             self.assertIn("Provides-Extra: factreasoner", metadata)
@@ -85,7 +90,7 @@ class PackagingTests(unittest.TestCase):
             wheel = self._build_wheel(root)
             environment = root / "clean-venv"
             create = subprocess.run(
-                ("/usr/bin/python3", "-m", "venv", str(environment)),
+                (sys.executable, "-m", "venv", str(environment)),
                 text=True,
                 capture_output=True,
                 check=False,

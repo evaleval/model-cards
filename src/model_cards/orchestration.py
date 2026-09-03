@@ -68,7 +68,7 @@ from .run_ledger import path_sha256
 from .source_state import ImmutableSourceState, load_source_state
 
 
-ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v11"
+ORCHESTRATION_VERSION = "provider-assisted-model-card-orchestration/v13"
 ORCHESTRATION_SCOPE = "immutable_source_state_catalog"
 ORCHESTRATION_MANIFEST_FILENAME = "provider-orchestration.json"
 DEFAULT_MAX_RISKS = 5
@@ -356,13 +356,17 @@ def _build_risk_interfaces(
     # after loading it once in a batch runner), but the executable Nexus package
     # and its bundled snapshot still have to pass the same release/hash checks.
     try:
-        load_pinned_nexus_catalog()
+        installed_catalog = load_pinned_nexus_catalog()
     except RiskMappingError as exc:
         if "unavailable" in str(exc).casefold():
             return None, None, "nexus_dependency_unavailable"
         raise OrchestrationError(
             "the installed Nexus dependency or risk snapshot has drifted"
         ) from exc
+    if installed_catalog != catalog:
+        raise OrchestrationError(
+            "the admitted risk catalog differs from the exact installed snapshot"
+        )
     try:
         engine = build_nexus_openrouter_inference_engine(
             provider=provider,
@@ -514,9 +518,9 @@ class ProviderOrchestrationResult:
             not _DIGEST_RE.fullmatch(item) for item in decisions
         ):
             raise OrchestrationError("prose decision digests are invalid")
-        if len(decisions) != 2 * len(candidates):
+        if len(decisions) != 3 * len(candidates):
             raise OrchestrationError(
-                "every quote candidate requires two semantic decisions"
+                "every quote candidate requires three semantic decisions"
             )
         if not re.fullmatch(r"[a-z][a-z0-9_]{2,127}", self.risk_interface_status):
             raise OrchestrationError("risk interface status is invalid")
@@ -744,11 +748,16 @@ def run_provider_assisted_pipeline(
     quote_candidates = tuple(sorted(by_candidate.values(), key=lambda item: item.candidate_id))
 
     prose_decisions: list[ProseCheckerDecision] = []
+    semantic_gates = (
+        GateName.ENTITY_SCOPE,
+        GateName.FIELD_FIT,
+        GateName.VALUE_SUPPORT,
+    )
     for candidate in quote_candidates:
-        for gate in (GateName.FIELD_FIT, GateName.VALUE_SUPPORT):
+        for gate in semantic_gates:
             prose_decisions.append(_claim_decision(claim_checker, candidate, gate))
     prose_values = tuple(prose_decisions)
-    if len(prose_values) != 2 * len(quote_candidates):
+    if len(prose_values) != len(semantic_gates) * len(quote_candidates):
         raise OrchestrationError("provider claim-check coverage is incomplete")
 
     _verify_frozen_catalog(source_state)

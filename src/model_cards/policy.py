@@ -18,6 +18,9 @@ from .schema import canonical_field_path
 
 _STRUCTURED_IDENTITY = frozenset({"identity.model_id", "identity.revision"})
 _REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
+_IMMUTABLE_SOURCE_REVISION_RE = re.compile(
+    r"^(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$"
+)
 
 
 def _claim_target(claim_entity: str) -> tuple[str, str | None]:
@@ -101,7 +104,7 @@ def decide_binding(
             return Disposition.REJECTED, "source_revision_mismatch"
         if (
             item.source_role is SourceRole.DEVELOPER_CODE
-            and not _REVISION_RE.fullmatch(item.source_revision)
+            and not _IMMUTABLE_SOURCE_REVISION_RE.fullmatch(item.source_revision)
         ):
             return Disposition.REJECTED, "developer_code_revision_unresolved"
 

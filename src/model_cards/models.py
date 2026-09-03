@@ -743,6 +743,9 @@ class ReviewEvent:
     field_path: str | None = None
     relation: RelationToTarget | None = None
     corrected_value: JsonValue | None = None
+    replacement_candidate_id: str | None = None
+    replacement_candidate_sha256: str | None = None
+    gate_record_sha256: str | None = None
     _content_sha256: str = dataclass_field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -754,8 +757,17 @@ class ReviewEvent:
         if not isinstance(self.reason, str) or not _REASON_RE.fullmatch(self.reason):
             raise ValueError("review reason must be a stable lowercase reason code")
         if self.action is ReviewAction.REASSIGN:
-            if self.field_path is None or self.relation is None or self.corrected_value is None:
-                raise ValueError("reassign requires field_path, relation, and corrected_value")
+            if (
+                self.field_path is None
+                or self.relation is None
+                or self.corrected_value is None
+                or self.replacement_candidate_id is None
+                or self.replacement_candidate_sha256 is None
+                or self.gate_record_sha256 is None
+            ):
+                raise ValueError(
+                    "reassign requires a corrected value and a complete claim-gate reference"
+                )
             validate_field_path(self.field_path)
             object.__setattr__(
                 self,
@@ -764,10 +776,24 @@ class ReviewEvent:
             )
             validate_field_value(self.field_path, self.corrected_value)
             object.__setattr__(self, "corrected_value", deepcopy(self.corrected_value))
+            if not _CLAIM_ID_RE.fullmatch(self.replacement_candidate_id):
+                raise ValueError("review replacement candidate_id is invalid")
+            for name in ("replacement_candidate_sha256", "gate_record_sha256"):
+                value = getattr(self, name)
+                if not isinstance(value, str) or not _DIGEST_RE.fullmatch(value):
+                    raise ValueError(f"review {name} is invalid")
         elif any(
-            item is not None for item in (self.field_path, self.relation, self.corrected_value)
+            item is not None
+            for item in (
+                self.field_path,
+                self.relation,
+                self.corrected_value,
+                self.replacement_candidate_id,
+                self.replacement_candidate_sha256,
+                self.gate_record_sha256,
+            )
         ):
-            raise ValueError("only reassign may change field, relation, or value")
+            raise ValueError("only reassign may carry corrected claim-gate material")
         object.__setattr__(self, "_content_sha256", self._computed_sha256())
 
     @property
@@ -788,6 +814,17 @@ class ReviewEvent:
             "relation": self.relation.value if self.relation else None,
             "corrected_value": self.corrected_value,
         }
+        # Preserve the digest of legacy accept/withhold events.  The additional
+        # lineage material is meaningful only for a reassign event; old reassign
+        # events intentionally fail closed because they lack a replayed gate.
+        if self.action is ReviewAction.REASSIGN:
+            payload.update(
+                {
+                    "replacement_candidate_id": self.replacement_candidate_id,
+                    "replacement_candidate_sha256": self.replacement_candidate_sha256,
+                    "gate_record_sha256": self.gate_record_sha256,
+                }
+            )
         canonical = json.dumps(
             payload,
             allow_nan=False,
@@ -816,6 +853,9 @@ class ReviewEvent:
                     "field_path": self.field_path,
                     "relation": self.relation.value if self.relation else None,
                     "corrected_value": deepcopy(self.corrected_value),
+                    "replacement_candidate_id": self.replacement_candidate_id,
+                    "replacement_candidate_sha256": self.replacement_candidate_sha256,
+                    "gate_record_sha256": self.gate_record_sha256,
                 }
             )
         return value
@@ -830,6 +870,9 @@ class ReviewEvent:
             field_path=value.get("field_path"),
             relation=value.get("relation"),
             corrected_value=value.get("corrected_value"),
+            replacement_candidate_id=value.get("replacement_candidate_id"),
+            replacement_candidate_sha256=value.get("replacement_candidate_sha256"),
+            gate_record_sha256=value.get("gate_record_sha256"),
         )
         if value.get("event_id") != event.event_id:
             raise ValueError("serialized review event_id is inconsistent")

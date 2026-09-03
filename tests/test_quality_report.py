@@ -25,6 +25,7 @@ from model_cards.official_discovery import discover_official_sources
 from model_cards.official_sources import (
     OfficialFetchStatus,
     OfficialRemoteObject,
+    RelationAssertion,
     collect_official_sources,
 )
 from model_cards.quality_report import (
@@ -32,11 +33,13 @@ from model_cards.quality_report import (
     QualityReportError,
     _assert_body_free,
     _explicit_findings,
+    _load_exports,
     build_quality_report,
     load_quality_report,
     serialize_quality_report,
     write_quality_report,
 )
+from model_cards.pipeline import PipelineResult
 from model_cards.source_bundle import (
     FetchStatus,
     RemoteObject,
@@ -153,10 +156,23 @@ class QualityReportTests(unittest.TestCase):
         )
         cls.official_bundle = cls.root / "official-bundle"
         discovery = discover_official_sources(replay_source_bundle(cls.bundle))
+        assertions = tuple(
+            RelationAssertion(
+                candidate.record_id,
+                discovery.target.model_id,
+                RelationToTarget.EXACT_TARGET,
+                candidate.declaring_source_id,
+                candidate.declaration_locator,
+                discovery.target.revision,
+            )
+            for candidate in discovery.records
+            if candidate.status.value == "discovered"
+        )
         collect_official_sources(
             discovery,
             cls.official_bundle,
             _OfficialAdapter(),
+            relation_assertions=assertions,
         )
         cls.primary = cls.root / "batch-primary"
         cls.replay = cls.root / "batch-replay"
@@ -333,7 +349,7 @@ class QualityReportTests(unittest.TestCase):
     ) -> None:
         report = build_quality_report(self.conflict)
         value = report.to_dict()
-        self.assertEqual("model-card-quality-report/v3", QUALITY_REPORT_VERSION)
+        self.assertEqual("model-card-quality-report/v4", QUALITY_REPORT_VERSION)
         omissions = value["targets"][0]["metrics"]["omissions"]
         self.assertEqual(1, omissions["publication_conflict_count"])
         self.assertEqual(1, omissions["publication_conflict_field_count"])
@@ -428,6 +444,16 @@ class QualityReportTests(unittest.TestCase):
         noncanonical.write_text(json.dumps(report.to_dict(), indent=2) + "\n")
         with self.assertRaises(QualityReportError):
             load_quality_report(noncanonical)
+
+    def test_card_artifact_without_reassign_preserves_legacy_closed_shape(self) -> None:
+        artifact_path = next(self.primary.glob("targets/*/card-artifact.json"))
+        value = json.loads(artifact_path.read_text())
+        self.assertNotIn("review_gate_records", value)
+        pipeline_result = PipelineResult.from_dict(
+            json.loads((artifact_path.parent / "pipeline-result.json").read_text())
+        )
+        artifact, _public_card = _load_exports(artifact_path.parent, pipeline_result)
+        self.assertFalse(artifact.review_gate_records)
 
     def test_batch_artifact_tamper_and_result_order_drift_fail_closed(self) -> None:
         tampered = self.root / "tampered-batch"

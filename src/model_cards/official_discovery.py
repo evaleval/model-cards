@@ -53,6 +53,19 @@ _HTML_LINK_RE = re.compile(
     re.I | re.S,
 )
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
+_TEXT_MODEL_ID_RE = re.compile(
+    r"(?<![A-Za-z0-9._-])"
+    r"([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?/"
+    r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)"
+    r"(?![A-Za-z0-9._-])"
+)
+_FULL_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_AMBIGUOUS_DECLARATION_RE = re.compile(
+    r"\b(?:family|series|variants?|shared|multiple)\b|"
+    r"\ball\s+(?:of\s+)?(?:the\s+)?models\b|"
+    r"\bbase\s*(?:/|and|or|&)\s*instruct\b",
+    re.I,
+)
 
 
 class OfficialDiscoveryError(BundleIntegrityError):
@@ -434,6 +447,7 @@ class _Candidate:
     locator: str
     provenance: DiscoveryProvenance
     base_url: str | None
+    relation_context: str
 
 
 def discover_official_sources(
@@ -550,6 +564,39 @@ def replay_official_discovery(
     return manifest
 
 
+def exact_target_declaration_record_ids(
+    bundle: ReplayedSourceBundle,
+    manifest: OfficialDiscoveryManifest,
+) -> tuple[str, ...]:
+    """Return declarations that independently identify this exact checkpoint.
+
+    Transport allowlisting is not relation proof.  A link is admitted only
+    when its bounded publisher declaration uses an explicit resource-to-model
+    relation, names exactly one model identifier, and names this target.  Code
+    must additionally point at a full immutable commit URL.  Bare repository
+    paths, moving branches, family links, and mere same-line co-occurrence
+    deliberately remain unresolved.
+    """
+
+    if not isinstance(manifest, OfficialDiscoveryManifest):
+        raise OfficialDiscoveryError("relation inference requires a discovery manifest")
+    replayed = replay_official_discovery(bundle, serialize_official_discovery(manifest))
+    candidates, _, _ = _extract_candidates(bundle)
+    retained = {
+        item.record_id
+        for item in replayed.records
+        if item.status is DiscoveryStatus.DISCOVERED
+    }
+    result = {
+        evaluated.record_id
+        for candidate in candidates
+        for evaluated in (_evaluate_candidate(candidate, replayed.policy),)
+        if evaluated.record_id in retained
+        and _declaration_identifies_exact_target(candidate, replayed.target)
+    }
+    return tuple(sorted(result))
+
+
 def _extract_candidates(
     bundle: ReplayedSourceBundle,
 ) -> tuple[list[_Candidate], bool, bool]:
@@ -649,6 +696,7 @@ def _structured_candidates(
                     locator=f"{locator_prefix}.{key}[{index}]",
                     provenance=provenance,
                     base_url=None,
+                    relation_context=f"{locator_prefix}.{key}",
                 )
             )
     return candidates
@@ -688,6 +736,7 @@ def _metadata_tag_hints(metadata: dict[str, Any], source_id: str) -> list[_Candi
                     locator=f"metadata.tags[{index}]",
                     provenance=DiscoveryProvenance.SECONDARY_HINT,
                     base_url=None,
+                    relation_context="metadata.tags",
                 )
             )
     return candidates
@@ -716,6 +765,7 @@ def _markdown_candidates(
                 locator=f"{locator_prefix}.markdown_link[{index}]",
                 provenance=DiscoveryProvenance.PUBLISHER_DECLARED,
                 base_url=base_url,
+                relation_context=_markdown_relation_context(text, match, label),
             )
         )
     offset = len(candidates)
@@ -735,6 +785,7 @@ def _markdown_candidates(
                 locator=f"{locator_prefix}.html_link[{offset + index}]",
                 provenance=DiscoveryProvenance.PUBLISHER_DECLARED,
                 base_url=base_url,
+                relation_context=_markdown_relation_context(text, match, label),
             )
         )
     remaining = MAX_SCAN_LINKS - len(candidates)
@@ -777,6 +828,7 @@ def _frontmatter_candidates(
                 locator=f"{locator_prefix}.frontmatter[{index}]",
                 provenance=DiscoveryProvenance.PUBLISHER_DECLARED,
                 base_url=base_url,
+                relation_context=line[:512],
             )
         )
     return candidates
@@ -797,6 +849,159 @@ def _classify_link(label: str, raw_url: str) -> OfficialSourceKind | None:
     ):
         return OfficialSourceKind.CODE
     return None
+
+
+def _markdown_relation_context(text: str, match: re.Match[str], label: str) -> str:
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    line_end = text.find("\n", match.end())
+    if line_end < 0:
+        line_end = len(text)
+    line = text[line_start:line_end].strip()
+    # Do not use an enclosing heading as relation proof: a target README often
+    # lists family papers and independent comparisons under its own title.
+    # If a line contains more than one link, its surrounding prose cannot be
+    # attributed to any particular destination.  Keep only this link's label
+    # so an exact declaration beside it cannot accidentally promote a sibling.
+    link_count = len(_MARKDOWN_LINK_RE.findall(line)) + len(
+        _HTML_LINK_RE.findall(line)
+    )
+    if link_count > 1:
+        return label.strip()[:1024]
+    return "\n".join(item for item in (label.strip(), line) if item)[:1024]
+
+
+def _human_declaration_text(value: str) -> str:
+    """Remove link destinations before evaluating publisher prose.
+
+    A target-shaped repository URL is transport metadata, not a natural-
+    language assertion that the linked resource documents this checkpoint.
+    """
+
+    without_markdown_destinations = re.sub(
+        r"\]\(\s*[^)\s]+(?:\s+['\"][^'\"]*['\"])?\s*\)",
+        "]",
+        value,
+    )
+    without_html_destinations = re.sub(
+        r"\s+href\s*=\s*(['\"])[^'\"]*\1",
+        "",
+        without_markdown_destinations,
+        flags=re.I,
+    )
+    return re.sub(r"https?://[^\s<>)]+", "", without_html_destinations).casefold()
+
+
+def _explicit_resource_relation(
+    context: str,
+    *,
+    kind: OfficialSourceKind,
+    target_model_id: str,
+) -> bool:
+    declaration = _human_declaration_text(context)
+    ambiguity_context = declaration.replace(target_model_id.casefold(), " ")
+    if _AMBIGUOUS_DECLARATION_RE.search(ambiguity_context):
+        return False
+
+    mentioned_models = {
+        match.group(1).casefold() for match in _TEXT_MODEL_ID_RE.finditer(declaration)
+    }
+    if mentioned_models != {target_model_id.casefold()}:
+        return False
+
+    resources = {
+        OfficialSourceKind.PAPER: (
+            r"technical\s+report",
+            r"model\s+report",
+            r"paper",
+        ),
+        OfficialSourceKind.SYSTEM_CARD: (
+            r"system\s+card",
+            r"model\s+card",
+            r"safety\s+card",
+        ),
+        OfficialSourceKind.CODE: (
+            r"code\s+repository",
+            r"source\s+repository",
+            r"source\s+code",
+            r"repository",
+            r"codebase",
+            r"code",
+        ),
+    }[kind]
+    resource = "(?:" + "|".join(resources) + ")"
+    target = re.escape(target_model_id.casefold())
+    forward = re.compile(
+        rf"\b{resource}\b\s+(?:(?:published|released|provided)\s+)?(?:for|of)\s+"
+        rf"[`'\"]*{target}(?![A-Za-z0-9._-])"
+    )
+    reverse = re.compile(
+        rf"(?<![A-Za-z0-9._-]){target}[`'\"]*"
+        rf"(?:['’]s|\s+(?:has|provides|publishes|releases))\s+"
+        rf"(?:an?\s+|the\s+)?(?:official\s+)?{resource}\b"
+    )
+    return (
+        forward.search(declaration) is not None
+        or reverse.search(declaration) is not None
+    )
+
+
+def _immutable_code_commit_url(normalized_url: str) -> bool:
+    """Return whether a supported code URL is pinned to a full commit hash."""
+
+    if not isinstance(normalized_url, str):
+        return False
+    parsed = urlsplit(normalized_url)
+    host = (parsed.hostname or "").casefold()
+    parts = [unquote(item) for item in parsed.path.split("/") if item]
+
+    if host == "github.com" and len(parts) >= 4:
+        return parts[2].casefold() in {"blob", "commit", "tree"} and bool(
+            _FULL_COMMIT_RE.fullmatch(parts[3].casefold())
+        )
+    if host == "gitlab.com":
+        for index in range(len(parts) - 2):
+            if parts[index] == "-" and parts[index + 1].casefold() in {
+                "blob",
+                "commit",
+                "tree",
+            }:
+                return bool(_FULL_COMMIT_RE.fullmatch(parts[index + 2].casefold()))
+        return False
+    if host == "codeberg.org" and len(parts) >= 4:
+        if parts[2].casefold() == "commit":
+            return bool(_FULL_COMMIT_RE.fullmatch(parts[3].casefold()))
+        return (
+            len(parts) >= 5
+            and parts[2].casefold() == "src"
+            and parts[3].casefold() == "commit"
+            and bool(_FULL_COMMIT_RE.fullmatch(parts[4].casefold()))
+        )
+    if host == "huggingface.co" and len(parts) >= 4:
+        return parts[2].casefold() in {"blob", "resolve", "tree"} and bool(
+            _FULL_COMMIT_RE.fullmatch(parts[3].casefold())
+        )
+    return False
+
+
+def _declaration_identifies_exact_target(
+    candidate: _Candidate,
+    target: TargetIdentity,
+) -> bool:
+    if candidate.provenance is not DiscoveryProvenance.PUBLISHER_DECLARED:
+        return False
+    normalized_url, _, reason = _normalize_url(candidate.raw_url, candidate.base_url)
+    if reason is not None or normalized_url is None:
+        return False
+    if not _explicit_resource_relation(
+        candidate.relation_context,
+        kind=candidate.kind,
+        target_model_id=target.model_id,
+    ):
+        return False
+    return (
+        candidate.kind is not OfficialSourceKind.CODE
+        or _immutable_code_commit_url(normalized_url)
+    )
 
 
 def _evaluate_candidate(
@@ -1230,6 +1435,7 @@ __all__ = [
     "OfficialSourcePolicy",
     "OfficialSourceRecord",
     "discover_official_sources",
+    "exact_target_declaration_record_ids",
     "load_official_discovery",
     "replay_official_discovery",
     "serialize_official_discovery",

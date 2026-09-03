@@ -10,6 +10,7 @@ import re
 from typing import Any
 
 from .bindings import binding_id_for
+from .claim_gate import ClaimCandidate, ClaimGateRecord, correct_candidate
 from .models import (
     Binding,
     Disposition,
@@ -55,10 +56,15 @@ def fold_binding(
     target: TargetIdentity,
     binding: Binding,
     events: tuple[ReviewEvent, ...],
+    review_gate_records: tuple[ClaimGateRecord, ...] = (),
 ) -> Binding:
     """Fold ordered review events over one immutable generated binding."""
 
     current = binding
+    current_candidate = ClaimCandidate.from_binding(target, binding)
+    gates_by_sha256 = {
+        record.content_sha256: record for record in review_gate_records
+    }
     for event in events:
         if event.binding_id != binding.binding_id:
             continue
@@ -67,6 +73,29 @@ def fold_binding(
         elif event.action is ReviewAction.REASSIGN:
             assert event.field_path is not None
             assert event.relation is not None
+            corrected = correct_candidate(
+                current_candidate,
+                field_path=event.field_path,
+                value=event.corrected_value,
+                relation=event.relation,
+            )
+            if (
+                corrected.candidate_id != event.replacement_candidate_id
+                or corrected.content_sha256 != event.replacement_candidate_sha256
+            ):
+                raise ValueError(
+                    f"{event.event_id} replacement candidate does not match its review event"
+                )
+            gate = gates_by_sha256.get(event.gate_record_sha256 or "")
+            if gate is None:
+                raise ValueError(f"{event.event_id} has no retained claim-gate record")
+            if (
+                gate.candidate.to_dict() != corrected.to_dict()
+                or not gate.projection_eligible
+            ):
+                raise ValueError(
+                    f"{event.event_id} replacement did not pass all four claim gates"
+                )
             disposition, policy_reason = decide_binding(
                 target=target,
                 field_path=event.field_path,
@@ -84,6 +113,12 @@ def fold_binding(
                 disposition=disposition,
                 reason=policy_reason,
             )
+            if disposition is not Disposition.ACCEPTED:
+                raise ValueError(
+                    f"{event.event_id} replacement still fails binding policy: "
+                    f"{policy_reason}"
+                )
+            current_candidate = corrected
         else:
             disposition, policy_reason = decide_binding(
                 target=target,
@@ -114,6 +149,7 @@ class CardArtifact:
     target: TargetIdentity
     bindings: tuple[Binding, ...]
     reviews: tuple[ReviewEvent, ...] = ()
+    review_gate_records: tuple[ClaimGateRecord, ...] = ()
     validation_checks: tuple[ValidationCheck, ...] = ()
     lifecycle_status: LifecycleStatus = LifecycleStatus.GENERATED_UNREVIEWED
     generated_at: str = NOT_SPECIFIED
@@ -133,6 +169,7 @@ class CardArtifact:
     def __post_init__(self) -> None:
         object.__setattr__(self, "bindings", tuple(self.bindings))
         object.__setattr__(self, "reviews", tuple(self.reviews))
+        object.__setattr__(self, "review_gate_records", tuple(self.review_gate_records))
         object.__setattr__(self, "validation_checks", tuple(self.validation_checks))
         object.__setattr__(self, "derivations", tuple(self.derivations))
         object.__setattr__(
@@ -160,6 +197,10 @@ class CardArtifact:
             raise ValueError("artifact bindings must be Binding records")
         if not all(isinstance(item, ReviewEvent) for item in self.reviews):
             raise ValueError("artifact reviews must be ReviewEvent records")
+        if not all(
+            isinstance(item, ClaimGateRecord) for item in self.review_gate_records
+        ):
+            raise ValueError("artifact review_gate_records must be ClaimGateRecord records")
         if not all(isinstance(item, ValidationCheck) for item in self.validation_checks):
             raise ValueError("artifact validation_checks must be ValidationCheck records")
         if not all(isinstance(item, TaxonomyRiskDerivation) for item in self.derivations):
@@ -200,6 +241,20 @@ class CardArtifact:
         known = set(identifiers)
         if any(event.binding_id not in known for event in self.reviews):
             raise ValueError("review event references an unknown binding")
+        gate_digests = [item.content_sha256 for item in self.review_gate_records]
+        if len(gate_digests) != len(set(gate_digests)):
+            raise ValueError("artifact review gate records must be unique")
+        referenced_gate_digests = {
+            event.gate_record_sha256
+            for event in self.reviews
+            if event.action is ReviewAction.REASSIGN
+        }
+        if referenced_gate_digests != set(gate_digests):
+            raise ValueError("artifact review gate records and reassign events diverge")
+        for record in self.review_gate_records:
+            record.validate_integrity()
+            if record.candidate.target != self.target:
+                raise ValueError("review gate candidate target differs from artifact target")
 
         source_identities: dict[str, tuple[str, str, str, str]] = {}
         for binding in self.bindings:
@@ -236,7 +291,9 @@ class CardArtifact:
                 existing = source_identities.setdefault(evidence.source_id, identity)
                 if existing != identity:
                     raise ValueError(f"source identifier has conflicting identity: {evidence.source_id}")
-            fold_binding(self.target, binding, self.reviews)
+            fold_binding(
+                self.target, binding, self.reviews, self.review_gate_records
+            )
         derivation_ids = [item.derivation_id for item in self.derivations]
         derivation_paths = [item.field_path for item in self.derivations]
         if (
@@ -249,7 +306,9 @@ class CardArtifact:
         binding_paths = {
             item.field_path
             for item in self.bindings
-            if fold_binding(self.target, item, self.reviews).disposition
+            if fold_binding(
+                self.target, item, self.reviews, self.review_gate_records
+            ).disposition
             is Disposition.ACCEPTED
         }
         if binding_paths.intersection(derivation_paths):
@@ -274,7 +333,9 @@ class CardArtifact:
                 item.check_id: item for item in self.validation_checks
             }["privacy"]
             included = sum(
-                fold_binding(self.target, binding, self.reviews).disposition
+                fold_binding(
+                    self.target, binding, self.reviews, self.review_gate_records
+                ).disposition
                 is Disposition.ACCEPTED
                 for binding in self.bindings
             )
@@ -330,6 +391,13 @@ class CardArtifact:
             "validation_checks": [item.to_dict() for item in self.validation_checks],
             "derivations": [item.to_dict() for item in self.derivations],
         }
+        # Empty review-gate state is omitted so artifacts created before the
+        # safe-reassign extension retain their content address.  A reassign can
+        # never exist without at least one retained record (enforced above).
+        if self.review_gate_records:
+            payload["review_gate_records"] = [
+                record.to_dict() for record in self.review_gate_records
+            ]
         if self.publication_card is not None:
             payload["publication"] = _publication_snapshot_payload(self)
         return "card_" + hashlib.sha256(_canonical(payload).encode("utf-8")).hexdigest()[:24]
@@ -342,7 +410,12 @@ class CardArtifact:
 
     def effective_bindings(self) -> tuple[Binding, ...]:
         self.validate_integrity()
-        return tuple(fold_binding(self.target, binding, self.reviews) for binding in self.bindings)
+        return tuple(
+            fold_binding(
+                self.target, binding, self.reviews, self.review_gate_records
+            )
+            for binding in self.bindings
+        )
 
     def validate_integrity(self) -> None:
         """Detect mutation of nested values before projection or export."""
@@ -386,8 +459,21 @@ class CardArtifact:
                 raise ValueError(f"structured evidence mismatch: {binding.binding_id}")
         for event in self.reviews:
             event.validate_integrity()
+        for record in self.review_gate_records:
+            record.validate_integrity()
+        gate_digests = [item.content_sha256 for item in self.review_gate_records]
+        if len(gate_digests) != len(set(gate_digests)):
+            raise ValueError("artifact review gate records must be unique")
+        if {
+            event.gate_record_sha256
+            for event in self.reviews
+            if event.action is ReviewAction.REASSIGN
+        } != set(gate_digests):
+            raise ValueError("artifact review gate references changed")
         for binding in self.bindings:
-            fold_binding(self.target, binding, self.reviews)
+            fold_binding(
+                self.target, binding, self.reviews, self.review_gate_records
+            )
         for derivation in self.derivations:
             derivation.validate_integrity()
             if derivation.target != self.target:
@@ -415,6 +501,10 @@ class CardArtifact:
             "validation_checks": [item.to_dict() for item in self.validation_checks],
             "derivations": [item.to_dict() for item in self.derivations],
         }
+        if self.review_gate_records:
+            payload["review_gate_records"] = [
+                record.to_dict() for record in self.review_gate_records
+            ]
         if self.publication_card is not None:
             payload["publication"] = _publication_snapshot_payload(self)
         return payload
@@ -437,6 +527,10 @@ class CardArtifact:
             target=TargetIdentity.from_dict(value["target"]),
             bindings=tuple(Binding.from_dict(item) for item in value.get("bindings", [])),
             reviews=tuple(ReviewEvent.from_dict(item) for item in value.get("reviews", [])),
+            review_gate_records=tuple(
+                ClaimGateRecord.from_dict(item)
+                for item in value.get("review_gate_records", [])
+            ),
             validation_checks=tuple(
                 ValidationCheck.from_dict(item) for item in value.get("validation_checks", [])
             ),
@@ -630,7 +724,15 @@ def project_card(
     card = blank_card()
     card["identity"]["model_id"] = artifact.target.model_id
     card["identity"]["revision"] = artifact.target.revision
-    effective = tuple(fold_binding(artifact.target, item, artifact.reviews) for item in artifact.bindings)
+    effective = tuple(
+        fold_binding(
+            artifact.target,
+            item,
+            artifact.reviews,
+            artifact.review_gate_records,
+        )
+        for item in artifact.bindings
+    )
     accepted: dict[str, list[Binding]] = {}
     flagged: dict[str, list[dict[str, str]]] = {}
 

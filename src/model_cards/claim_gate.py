@@ -40,7 +40,7 @@ from .quote import normalize_ws
 from .schema import canonical_field_path, validate_field_value
 
 
-CLAIM_GATE_VERSION = "claim-support-gate/v1"
+CLAIM_GATE_VERSION = "claim-support-gate/v2"
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 _CANDIDATE_ID_RE = re.compile(r"^claim-[0-9a-f]{24}$")
@@ -59,6 +59,7 @@ _SCOPE_POLICY = {
     RelationToTarget.MODEL_FAMILY.value: (),
     RelationToTarget.DERIVATIVE_MODEL.value: (),
     RelationToTarget.UNKNOWN.value: (),
+    "quote_semantic_attribution": "required_after_closed_relation_policy",
 }
 _CONTEXT_FIELDS = frozenset(
     {
@@ -347,7 +348,7 @@ def _checker_request_sha256(candidate: ClaimCandidate, gate: GateName) -> str:
 
 @dataclass(frozen=True)
 class ProseCheckerDecision:
-    """Bounded field-fit or value-support attestation for quote evidence."""
+    """Bounded entity, field-fit, or value-support attestation for quote evidence."""
 
     gate: GateName
     checker: str
@@ -363,8 +364,14 @@ class ProseCheckerDecision:
             object.__setattr__(self, "status", DecisionStatus(self.status))
         except (TypeError, ValueError) as exc:
             raise ClaimGateError("prose checker decision enum is invalid") from exc
-        if self.gate not in {GateName.FIELD_FIT, GateName.VALUE_SUPPORT}:
-            raise ClaimGateError("prose checker may decide only field fit or value support")
+        if self.gate not in {
+            GateName.ENTITY_SCOPE,
+            GateName.FIELD_FIT,
+            GateName.VALUE_SUPPORT,
+        }:
+            raise ClaimGateError(
+                "prose checker may decide only entity scope, field fit, or value support"
+            )
         if not isinstance(self.checker, str) or not _CHECKER_RE.fullmatch(self.checker):
             raise ClaimGateError("prose checker name is invalid")
         if not isinstance(self.method, str) or not _METHOD_RE.fullmatch(self.method):
@@ -815,7 +822,10 @@ def _split_entity(entity: str) -> tuple[str, str | None]:
     return model_id, revision if _REVISION_RE.fullmatch(revision) else None
 
 
-def _entity_scope_decision(candidate: ClaimCandidate) -> GateDecision:
+def _entity_scope_decision(
+    candidate: ClaimCandidate,
+    checker_decisions: Mapping[GateName, ProseCheckerDecision],
+) -> GateDecision:
     base = canonical_field_path(candidate.field_path)
     relation = candidate.relation
     status = DecisionStatus.ACCEPTED
@@ -869,14 +879,36 @@ def _entity_scope_decision(candidate: ClaimCandidate) -> GateDecision:
     else:
         status, reason = DecisionStatus.WITHHELD, "relation_not_projection_eligible"
 
+    checker_name = _GATE_CHECKER
+    method = "closed_relation_scope_policy"
+    extra_inputs = {"scope_policy": _digest(_SCOPE_POLICY)}
+    evidence_kinds = {item.kind for item in candidate.evidence}
+    if evidence_kinds == {EvidenceKind.QUOTE}:
+        checker = _checker_for(checker_decisions, GateName.ENTITY_SCOPE)
+        if checker is None:
+            if status is DecisionStatus.ACCEPTED:
+                status = DecisionStatus.WITHHELD
+                reason = "prose_entity_checker_unavailable"
+        else:
+            # The closed relation policy is authoritative: a semantic checker can
+            # withhold an otherwise admissible assignment, but can never promote a
+            # forbidden relation or mismatched declared entity. Bind its immutable
+            # decision even when the local policy has already withheld the claim.
+            extra_inputs["checker_decision"] = checker.content_sha256
+            if status is DecisionStatus.ACCEPTED:
+                checker_name = checker.checker
+                method = checker.method
+                status = checker.status
+                reason = checker.reason
+
     return _decision(
         candidate,
         gate=GateName.ENTITY_SCOPE,
-        checker=_GATE_CHECKER,
-        method="closed_relation_scope_policy",
+        checker=checker_name,
+        method=method,
         status=status,
         reason=reason,
-        scope_policy=_digest(_SCOPE_POLICY),
+        **extra_inputs,
     )
 
 
@@ -1355,7 +1387,7 @@ def evaluate_claim_gate(
 
     decisions = (
         _coordinate_decision(candidate, source_values),
-        _entity_scope_decision(candidate),
+        _entity_scope_decision(candidate, check_map),
         _field_fit_decision(candidate, registry, check_map),
         _value_support_decision(candidate, check_map),
     )
