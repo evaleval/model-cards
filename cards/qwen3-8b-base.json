@@ -1,1 +1,395 @@
-{"access_and_adoption":{"access_type":"Public Hugging Face repository with declared weight files","downloads":"431,067 at frozen Hugging Face metadata snapshot","likes":"118 at frozen Hugging Face metadata snapshot"},"evaluation":{},"identity":{"developed_by":"Qwen","license":"apache-2.0","model_id":"Qwen/Qwen3-8B-Base","model_type":"text-generation","name":"Qwen3-8B-Base","summary":"Qwen3-8B-Base is listed with 8.2B parameters and a 32,768 context window; model class Causal Language Models; repository stage Pretraining.","version":"49e3418fbbbca6ecbdf9608b4d22e5a407081db4"},"lineage":{"model_family":"qwen3"},"links":{"citation":"@misc{qwen3technicalreport,\n      title={Qwen3 Technical Report}, \n      author={Qwen Team},\n      year={2025},\n      eprint={2505.09388},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2505.09388}, \n}","code_repository":"https://github.com/QwenLM/Qwen3","model_card":"https://huggingface.co/Qwen/Qwen3-8B-Base/blob/49e3418fbbbca6ecbdf9608b4d22e5a407081db4/README.md","tech_report":"https://arxiv.org/abs/2505.09388"},"specifications":{"architecture_type":"dense decoder-only","context_length":"32,768 tokens (README-declared context length)","input_output":["input: text","output: text","model stage: pretrained/base"],"model_size":"15.26 GiB estimated tensor payload (16,381,470,720 bytes; from safetensors dtype counts)","num_parameters":"8,190,735,360 total stored parameters (safetensors metadata)","precision":"bfloat16 stored tensor weights (safetensors parameter-count metadata)"},"training_context":{"training_data":"Pretraining scale: 36 trillion tokens; language coverage: 119; content areas include code, STEM, reasoning, books, multilingual, and synthetic material.","training_data_size":"36 trillion tokens"}}
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "428,960 downloads (Hub 30-day window, as of 2026-09-04)",
+    "likes": "118 likes on the Hub (as of 2026-09-04)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "76.89",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Redux",
+        "metric": "Not specified",
+        "score": "76.17",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "56.73",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "SuperGPQA",
+        "metric": "Not specified",
+        "score": "31.64",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "78.40",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA",
+        "metric": "Not specified",
+        "score": "44.44",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "89.84",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "60.80",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "EvalPlus",
+        "metric": "Not specified",
+        "score": "67.65",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MultiPL-E",
+        "metric": "Not specified",
+        "score": "58.75",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "69.80",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CRUX-O",
+        "metric": "Not specified",
+        "score": "62.00",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MGSM",
+        "metric": "Not specified",
+        "score": "76.02",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMMLU",
+        "metric": "Not specified",
+        "score": "75.72",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IINCLUDE",
+        "metric": "Not specified",
+        "score": "59.40",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Redux",
+        "metric": "Not specified",
+        "score": "87.5",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "GPQA-Diamond",
+        "metric": "Not specified",
+        "score": "62.0",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "83.4",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "LiveBench 2024-11-25",
+        "metric": "Not specified",
+        "score": "67.1",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "IFEval strict prompt",
+        "metric": "Not specified",
+        "score": "85.0",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "Arena-Hard",
+        "metric": "Not specified",
+        "score": "85.8",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "AlignBench v1.1",
+        "metric": "Not specified",
+        "score": "8.46",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "Creative Writing v3",
+        "metric": "Not specified",
+        "score": "75.0",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "WritingBench",
+        "metric": "Not specified",
+        "score": "7.59",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "MATH-500",
+        "metric": "Not specified",
+        "score": "97.4",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "AIME'24",
+        "metric": "Not specified",
+        "score": "76.0",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "AIME'25",
+        "metric": "Not specified",
+        "score": "67.3",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "ZebraLogic",
+        "metric": "Not specified",
+        "score": "84.8",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "AutoLogi",
+        "metric": "Not specified",
+        "score": "89.1",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "BFCL v3",
+        "metric": "Not specified",
+        "score": "68.1",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "LiveCodeBench v5",
+        "metric": "Not specified",
+        "score": "57.5",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "Multi-IF",
+        "metric": "Not specified",
+        "score": "71.2",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "INCLUDE",
+        "metric": "Not specified",
+        "score": "67.8",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "MMMLU 14 languages",
+        "metric": "Not specified",
+        "score": "74.4",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "MT-AIME2024",
+        "metric": "Not specified",
+        "score": "65.4",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "PolyMath",
+        "metric": "Not specified",
+        "score": "42.7",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "MLogiQA",
+        "metric": "Not specified",
+        "score": "69.0",
+        "setting": "Thinking"
+      },
+      {
+        "benchmark": "GPQA-Diamond C-Eval",
+        "metric": "Not specified",
+        "score": "77.9",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "LiveBench 2024-11-25",
+        "metric": "Not specified",
+        "score": "53.5",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "IFEval strict prompt",
+        "metric": "Not specified",
+        "score": "83.0",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "Arena-Hard",
+        "metric": "Not specified",
+        "score": "79.6",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "AlignBench v1.1",
+        "metric": "Not specified",
+        "score": "8.38",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "Creative Writing v3",
+        "metric": "Not specified",
+        "score": "64.5",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "WritingBench",
+        "metric": "Not specified",
+        "score": "7.15",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "MATH-500",
+        "metric": "Not specified",
+        "score": "87.4",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "AIME'24",
+        "metric": "Not specified",
+        "score": "29.1",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "AIME'25",
+        "metric": "Not specified",
+        "score": "20.9",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "ZebraLogic",
+        "metric": "Not specified",
+        "score": "26.7",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "AutoLogi",
+        "metric": "Not specified",
+        "score": "76.5",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "BFCL v3",
+        "metric": "Not specified",
+        "score": "60.2",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "LiveCodeBench v5",
+        "metric": "Not specified",
+        "score": "22.8",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "Multi-IF",
+        "metric": "Not specified",
+        "score": "69.2",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "INCLUDE",
+        "metric": "Not specified",
+        "score": "62.5",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "MMMLU 14 languages",
+        "metric": "Not specified",
+        "score": "66.9",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "MT-AIME2024",
+        "metric": "Not specified",
+        "score": "16.6",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "PolyMath",
+        "metric": "Not specified",
+        "score": "18.8",
+        "setting": "Non-thinking"
+      },
+      {
+        "benchmark": "MLogiQA",
+        "metric": "Not specified",
+        "score": "51.4",
+        "setting": "Non-thinking"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen3-8B-Base",
+    "model_type": "Causal Language Models",
+    "name": "Qwen3-8B-Base",
+    "release_date": "2025-04-28 (Hugging Face repository creation date)",
+    "summary": "Qwen3-8B-Base is an open-weighted dense model in the Qwen3 series, released under the Apache 2.0 license.",
+    "version": "49e3418fbbbca6ecbdf9608b4d22e5a407081db4"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen3"
+  },
+  "links": {
+    "citation": "@misc{qwen3technicalreport,\n      title={Qwen3 Technical Report}, \n      author={Qwen Team},\n      year={2025},\n      eprint={2505.09388},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2505.09388}, \n}",
+    "code_repository": "https://github.com/QwenLM/Qwen3",
+    "model_card": "https://huggingface.co/Qwen/Qwen3-8B-Base",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2505.09388"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.3 GiB of safetensors weights (16,381,516,776 bytes) in BF16",
+    "num_parameters": "8,190,735,360 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

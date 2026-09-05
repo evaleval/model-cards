@@ -1,1 +1,55 @@
-{"access_and_adoption":{"access_type":"Public Hugging Face repository with declared weight files","downloads":"2,999,981 at frozen Hugging Face metadata snapshot","likes":"2,834 at frozen Hugging Face metadata snapshot"},"evaluation":{},"identity":{"developed_by":"mistralai","license":"apache-2.0","model_id":"mistralai/Mistral-7B-Instruct-v0.3","model_type":"text-generation","name":"Mistral-7B-Instruct-v0.3","summary":"Mistral-7B-Instruct-v0.3 is the publisher-documented instruction-fine-tuned version of Mistral-7B-v0.3.","version":"c170c708c41dac9275d15a8fff4eca08d52bab71"},"lineage":{"base_models":[{"model_id":"mistralai/Mistral-7B-v0.3","relation":"base_model"}],"model_family":"mistral"},"links":{"code_repository":"https://github.com/mistralai/mistral-inference","model_card":"https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3/blob/c170c708c41dac9275d15a8fff4eca08d52bab71/README.md"},"specifications":{"architecture_type":"dense decoder-only","context_length":"32,768 positions (config max_position_embeddings; implementation limit, not an independently verified context window)","input_output":["input: text","output: text","model stage: instruction-tuned"],"model_size":"13.50 GiB estimated tensor payload (14,496,047,104 bytes; from safetensors dtype counts)","num_parameters":"7,248,023,552 total stored parameters (safetensors metadata)","precision":"bfloat16 stored tensor weights (safetensors parameter-count metadata)"},"training_context":{"adaptations":"Instruction fine-tuning was applied to Mistral-7B-v0.3."}}
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "2,648,636 downloads (Hub 30-day window, as of 2026-09-04)",
+    "likes": "2,835 likes on the Hub (as of 2026-09-04)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "It does not have any moderation mechanisms."
+  },
+  "identity": {
+    "developed_by": "mistralai (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+    "model_type": "instruct fine-tuned version of the Mistral-7B-v0.3 Large Language Model (LLM)",
+    "name": "Mistral-7B-Instruct-v0.3",
+    "release_date": "2024-05-22 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "c170c708c41dac9275d15a8fff4eca08d52bab71"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "mistralai/Mistral-7B-v0.3",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Mistral v0.3"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "https://github.com/mistralai/mistral-inference",
+    "model_card": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": "Not specified",
+    "model_size": "27.0 GiB of safetensors weights (28,992,159,440 bytes) in BF16",
+    "num_parameters": "7,248,023,552 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

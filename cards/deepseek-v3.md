@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [deepseek\-v3\.json](<./deepseek-v3.json>)<br>
-SHA-256: `c333b2a20a51e339e68d81c91f211f9264d0a2a2752c71cefe231224f144dc84`
+SHA-256: `a40e0b8a02603400bfd38d88eb0a57a58c4234abadbbbd6ba2db64be03947dd6`
 
 ## Identity
 
@@ -11,89 +11,93 @@ SHA-256: `c333b2a20a51e339e68d81c91f211f9264d0a2a2752c71cefe231224f144dc84`
 | --- | --- |
 | Model ID | deepseek\-ai/DeepSeek\-V3 |
 | Name | DeepSeek\-V3 |
-| Developed by | deepseek\-ai |
-| Model type | text\-generation |
-| License | the Model License; commercial use supported: https://huggingface\.co/deepseek\-ai/DeepSeek\-V3/blob/e815299b0bcbac849fa540c768ef21845365c9eb/LICENSE\-MODEL |
+| Developed by | deepseek\-ai \(Hub organization\) |
+| Model type | Mixture\-of\-Experts \(MoE\) language model |
+| Release date | 2024\-12\-25 \(Hugging Face repository creation date\) |
 | Version | e815299b0bcbac849fa540c768ef21845365c9eb |
-| Summary | DeepSeek\-V3 is listed with 671B total parameters, 37B activated parameters per token, 128K context length\. |
 
 ## Lineage
 
 | Field | Value |
 | --- | --- |
-| Model family | deepseek\_v3 |
+| Model family | DeepSeek V3 |
 
 ## Specifications
 
 | Field | Value |
 | --- | --- |
 | Architecture type | mixture\-of\-experts |
-| Num parameters | 684,531,386,000 total stored parameters \(safetensors metadata\); README architecture row reports 671B total model parameters, 37B activated per token |
-| Context length | 128K tokens \(README\-declared context length\) |
-| Precision | Predominantly FP8 E4M3 stored tensor weights; additional dtypes: bfloat16, float32 \(safetensors parameter\-count metadata\) |
-| Model size | 641\.29 GiB estimated tensor payload \(688,574,839,360 bytes; from safetensors dtype counts\) |
+| Num parameters | 684,531,386,000 parameters \(safetensors metadata\) |
+| Context length | 163,840 tokens \(config\.json max\_position\_embeddings\) |
+| Precision | F8\_E4M3 \(safetensors weight dtype\) |
+| Model size | 641\.3 GiB of safetensors weights \(688,586,727,753 bytes\) in F8\_E4M3 |
 | Input / output | input: text<br>output: text |
 
 ## Training Context
 
 | Field | Value |
 | --- | --- |
-| Training data | Publisher\-reported pretraining scale: 14\.8 trillion tokens; the corpus is described as diverse and quality\-filtered\. |
 | Training data size | 14\.8 trillion tokens |
-| Adaptations | Post\-training uses supervised fine\-tuning and reinforcement learning\. The README also describes distilling long\-chain\-of\-thought reasoning from a DeepSeek\-R1\-series model into DeepSeek\-V3\. |
+| Adaptations | DeepSeek\-V3 underwent Supervised Fine\-Tuning and Reinforcement Learning after pre\-training\. It also incorporates a methodology that distills reasoning capabilities from a long\-Chain\-of\-Thought model, specifically one of the DeepSeek R1 series models, into standard LLMs\. |
 
 ## Access and Adoption
 
 | Field | Value |
 | --- | --- |
-| Access type | Public Hugging Face repository with declared weight files |
-| Downloads | 1,078,839 at frozen Hugging Face metadata snapshot |
-| Likes | 4,177 at frozen Hugging Face metadata snapshot |
+| Access type | open\-weight |
+| Downloads | 1,047,667 downloads \(Hub 30\-day window, as of 2026\-09\-04\) |
+| Likes | 4,178 likes on the Hub \(as of 2026\-09\-04\) |
 
 ## Evaluation
 
 | Field | Value |
 | --- | --- |
-| Results summary | The frozen README provides 24 exact\-target benchmark scores; examples: MMLU: 88\.5; MMLU\-Redux: 89\.1; MMLU\-Pro: 75\.9\. |
+| Human evaluations | Note: English open\-ended conversation evaluations\. For AlpacaEval 2\.0, the length\-controlled win rate is used as the metric\. |
 
 ### Benchmark Scores
 
 | Benchmark | Metric | Score | Setting | Split |
 | --- | --- | ---: | --- | --- |
-| MMLU | EM | 88\.5 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| MMLU\-Redux | EM | 89\.1 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| MMLU\-Pro | EM | 75\.9 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| DROP \(3\-shot F1\) | README\-reported score | 91\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| IF\-Eval \(Prompt Strict\) | README\-reported score | 86\.1 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| GPQA\-Diamond | Pass@1 | 59\.1 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| SimpleQA \(Correct\) | README\-reported score | 24\.9 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| FRAMES | Acc\. | 73\.3 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| LongBench v2 | Acc\. | 48\.7 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| HumanEval\-Mul | Pass@1 | 82\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| LiveCodeBench \(Pass@1\-COT\) | README\-reported score | 40\.5 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| LiveCodeBench | Pass@1 | 37\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| Codeforces \(Percentile\) | README\-reported score | 51\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| SWE Verified \(Resolved\) | README\-reported score | 42\.0 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| Aider\-Edit | Acc\. | 79\.7 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| Aider\-Polyglot | Acc\. | 49\.6 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| AIME 2024 | Pass@1 | 39\.2 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| MATH\-500 | EM | 90\.2 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| CNMO 2024 | Pass@1 | 43\.2 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| CLUEWSC | EM | 90\.9 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| C\-Eval | EM | 86\.5 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| C\-SimpleQA \(Correct\) | README\-reported score | 64\.8 | Standard Benchmarks \(Models larger than 67B\); setting not stated | Not reported |
-| Arena\-Hard | README\-reported score | 85\.5 | Open Ended Generation Evaluation; setting not stated | Not reported |
-| AlpacaEval 2\.0 | README\-reported score | 70\.0 | Open Ended Generation Evaluation; setting not stated | Not reported |
+| Multilingual | Not specified | 79\.4 | Not specified | Not reported |
+| Arena\-Hard | Not specified | 85\.5 | Not specified | Not reported |
+| AlpacaEval 2\.0 | Not specified | 70\.0 | Not specified | Not reported |
+| MMLU | exact match | 88\.5 | Not specified | Not reported |
+| MMLU\-Redux | exact match | 89\.1 | Not specified | Not reported |
+| MMLU\-Pro | exact match | 75\.9 | Not specified | Not reported |
+| DROP | F1 | 91\.6 | 3\-shot | Not reported |
+| IF\-Eval | Not specified | 86\.1 | Not specified | Not reported |
+| GPQA\-Diamond | pass@1 | 59\.1 | Not specified | Not reported |
+| SimpleQA | Not specified | 24\.9 | Not specified | Not reported |
+| FRAMES | accuracy | 73\.3 | Not specified | Not reported |
+| LongBench v2 | accuracy | 48\.7 | Not specified | Not reported |
+| HumanEval\-Mul | pass@1 | 82\.6 | Not specified | Not reported |
+| LiveCodeBench | pass@1 | 40\.5 | COT | Not reported |
+| LiveCodeBench | pass@1 | 37\.6 | Not specified | Not reported |
+| Codeforces | Not specified | 51\.6 | Not specified | Not reported |
+| SWE Verified | Not specified | 42\.0 | Not specified | Not reported |
+| Aider\-Edit | accuracy | 79\.7 | Not specified | Not reported |
+| Aider\-Polyglot | accuracy | 49\.6 | Not specified | Not reported |
+| AIME 2024 | pass@1 | 39\.2 | Not specified | Not reported |
+| MATH\-500 | exact match | 90\.2 | Not specified | Not reported |
+| CNMO2024 | pass@1 | 43\.2 | Not specified | Not reported |
+| CLUEWSC | exact match | 90\.9 | Not specified | Not reported |
+| C\-Eval | exact match | 86\.5 | Not specified | Not reported |
+| C\-SimpleQA | Not specified | 64\.8 | Not specified | Not reported |
+| Chat | Not specified | 96\.9 | Not specified | Not reported |
+| Chat\-Hard | Not specified | 79\.8 | Not specified | Not reported |
+| Safety | Not specified | 87 | Not specified | Not reported |
+| Reasoning | Not specified | 84\.3 | Not specified | Not reported |
+| Average | Not specified | 87 | Not specified | Not reported |
 
 ## Links
 
 | Field | Value |
 | --- | --- |
-| Model card | [https://huggingface\.co/deepseek\-ai/DeepSeek\-V3/blob/e815299b0bcbac849fa540c768ef21845365c9eb/README\.md](<https://huggingface.co/deepseek-ai/DeepSeek-V3/blob/e815299b0bcbac849fa540c768ef21845365c9eb/README.md>) |
+| Model card | [https://huggingface\.co/deepseek\-ai/DeepSeek\-V3](<https://huggingface.co/deepseek-ai/DeepSeek-V3>) |
 | Technical report | [https://arxiv\.org/abs/2412\.19437](<https://arxiv.org/abs/2412.19437>) |
 | Code repository | [https://github\.com/deepseek\-ai/DeepSeek\-V3](<https://github.com/deepseek-ai/DeepSeek-V3>) |
 | Citation | @misc\{deepseekai2024deepseekv3technicalreport,<br>      title=\{DeepSeek\-V3 Technical Report\}, <br>      author=\{DeepSeek\-AI\},<br>      year=\{2024\},<br>      eprint=\{2412\.19437\},<br>      archivePrefix=\{arXiv\},<br>      primaryClass=\{cs\.CL\},<br>      url=\{https://arxiv\.org/abs/2412\.19437\}, <br>\} |
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `identity.license`, `identity.summary`, `lineage.base_models`, `lineage.derivatives`, `training_context.training_data`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.safety_evals`, `links.system_card`.

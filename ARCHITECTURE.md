@@ -1,408 +1,128 @@
 # Architecture
 
-The system generates one Model Card for one exact model revision. Its source state,
-stage inputs, decisions, and outputs are content-addressed so a completed run can be
-replayed without changing the evidence beneath the card. The canonical public output
-is an exact seven-section JSON object; repository publication derives a deterministic
-Markdown companion from those JSON bytes.
+One target, `model_id@revision`, becomes one card. Every stage below either produces a
+value with a source and an entity, or refuses one and says why.
 
-```text
-MODEL[@REVISION]
-        |
-        v
-exact Hugging Face bundle ---- declared official links
-        |                              |
-        |                       bounded collection
-        +---------------+--------------+
-                        v
-              immutable source state
-                        |
-                        v
-        structured extraction + optional quotes
-                        |
-                        v
-             four-part claim support gate
-                        |
-                        v
-               evidence-only composition
-                        |
-                        v
-       FactReasoner + omission + conflict checks
-                        |
-                        v
-             targeted repair / withholding
-                        |
-                        v
-             local risk gate + audit artifact
-                        |
-                        v
-                    CardArtifact
-                        |
-                        v
-          33-field allowlisted projection
-                        |
-                        v
-        frozen-source enrichment + provenance
-                        |
-                        v
-        pre-withhold publication FactReasoner
-                        |
-                        v
-        deletion-only field withholding + replay
-                        |
-                        v
-       final FactReasoner + schema + privacy
-                        |
-                        v
-                 public-card.json
-                        |
-              repository publisher
-                        |
-             paired JSON + Markdown
+```
+collect  ->  frame  ->  Stage A  ->  gates  ->  EAV  ->  Stage B  ->  checks  ->  export
+             (who is        (verbatim   (what a      (audit)  (write from   (leaf,      (33 fields,
+              who)           quotes)     field may             accepted      excerpt,    Markdown,
+                                         take)                 evidence)     factuality) inspector)
 ```
 
-## Invariants
+## collect
 
-- The target is a Hugging Face namespace/name plus a resolved 40-character commit.
-- Every populated source-derived field is backed by a replayable JSON pointer or
-  exact text coordinates in the frozen source state.
-- Each candidate names the entity it describes and its relation to the target.
-  Similar names do not establish an exact-target relation.
-- Claims must pass coordinate integrity, entity scope, field fit, and value support
-  before they can enter composition.
-- Composition receives accepted candidates, not an unrestricted source corpus.
-- Conflicting accepted values and conflicting publication-source values do not use
-  last-write-wins behavior; the affected field is withheld and the conflict remains
-  visible in a local, content-addressed record.
-- The local audit projection uses explicit absence values. The generated public
-  projection instead omits an agreed field when the retained sources do not support
-  a value; `Not applicable` is reserved for a field shown not to apply.
-- Provider-free and provider-assisted runs are different admitted modes and cannot
-  overwrite or resume one another.
-- Public cards contain only the 33 agreed fields. They never expose evidence or
-  provenance records, risk or environmental audit material, validation checks,
-  lifecycle state, frozen source bodies, credentials, prompts, raw provider payloads,
-  run paths, or journals.
+The Hugging Face snapshot at the pinned commit: README, `config.json`, model metadata
+including `createdAt`, the safetensors byte count, likes, downloads, tags, `base_model`
+tags and the model-index. Then the paper, then the developer's own GitHub README, then
+the developer pages the README links, then the Every Eval Ever record for this exact id.
 
-## Public contract and local audit boundary
+The paper is the part that goes wrong quietly. A derivative repository usually carries its
+base model's arXiv tag, and Hub tags are sometimes simply wrong: Qwen3-8B tags the YaRN
+paper. So every arXiv id the repository offers is a candidate, from its tags, from the
+BibTeX in its README, and from the links in its prose, and each is put through a title
+gate that asks whether the paper introduces this model, refers to its family, or is
+unrelated. An unrelated tag is dropped unread. Every candidate that was tried stays in
+the manifest with its verdict.
 
-The required public section objects and their complete field allowlist are:
+A gated repository degrades to what it will serve, usually the README alone, and the
+manifest names each absent channel with a reason. Paper text is cached per arXiv id, so a
+base checkpoint and its instruct variant extract their shared report once.
 
-| Section | Fields |
-| --- | --- |
-| `identity` | `model_id`, `name`, `developed_by`, `model_type`, `license`, `release_date`, `version`, `summary` |
-| `lineage` | `base_models`, `model_family`, `derivatives` |
-| `specifications` | `architecture_type`, `num_parameters`, `context_length`, `precision`, `model_size`, `input_output` |
-| `training_context` | `training_data`, `training_data_size`, `data_cutoff`, `adaptations` |
-| `access_and_adoption` | `access_type`, `downloads`, `likes` |
-| `evaluation` | `results_summary`, `benchmark_scores`, `human_evals`, `safety_evals` |
-| `links` | `model_card`, `system_card`, `tech_report`, `code_repository`, `citation` |
+The output is one replayable bundle per target, with a SHA-256 per file.
 
-Together these are exactly 33 fields. Unknown top-level sections and unknown fields
-inside a section are rejected. The local audit contract is intentionally richer so
-the pipeline can retain source bindings, risk and environmental material, validation,
-review events, lifecycle state, and operational provenance without extending the
-public schema. `publication.py` is the allowlisted audit-to-public bridge;
-`publication_sources.py` adds narrowly derived values from the verified frozen source
-catalog and records their provenance only in the local artifact. Guarded public prose
-must not reproduce 12 consecutive normalized words from any retained source; a match
-fails closed before the publication snapshot is created.
+## frame
 
-## 1. Exact source collection
+A typed graph of who is who: the target at its pinned revision with its name spellings,
+the base models from the structured tags, the family, sibling checkpoints, comparison
+models, benchmarks and metrics. Structured edges come from the Hub. Edges a language model
+proposes are kept only when the name occurs literally in a source. Each document declares
+a default referent: a README is about the target, a family paper is about the family.
 
-`source_bundle.py` parses `MODEL[@REVISION]`, resolves the requested revision once,
-and freezes a bounded set of Hugging Face inputs. The manifest records every
-collected, missing, gated, or unavailable source and binds all stored bytes to the
-exact target and collection limits. Replay rehashes the objects and reconstructs the
-manifest identity.
+## Stage A
 
-For a normal networked generation, `official_discovery.py` first examines declarations
-in the frozen Hub material. It normalizes URLs, restricts them to configured
-publication, code, and publisher-owned hosts, and records candidates without treating
-discovery as evidence. `scholarly_discovery.py` then makes one credential-free request
-to each fixed OpenAlex and Semantic Scholar endpoint. Each response is capped at
-512,000 bytes and five results; the combined result is capped at eight deduplicated
-arXiv/DOI URLs. Search bodies are discarded, per-service failures remain explicit,
-and the normalized URLs enter the official bundle only as `discovery_only` hints.
-They are never fetched or made evidence-eligible without a separate exact-target
-authority and relation admission. That admission is bound to the frozen target
-revision and requires explicit, unambiguous resource-to-model prose; code also needs
-a full immutable commit URL. Bare repositories, moving branches, family wording,
-and same-line name/resource co-occurrence do not establish the relation.
-`official_http.py` performs bounded,
-credential-free HTTPS retrieval of publisher-declared candidates with manual redirect
-validation. `official_sources.py` checks authority, ownership, relation, media type,
-byte bounds, redirect trace, and ancestry before collected official material becomes
-evidence-eligible.
+One structured extraction call per source and one bounded gap pass, each with a
+server-enforced schema and a token cap. Every quote is verified against the bundle's own
+bytes, and its section, region and table anchors are recomputed from offsets rather than
+taken from the model. Referent resolution is quote-first: a claimed target is corroborated
+against the quote, not obeyed.
 
-`official_documents.py` converts eligible JSON, HTML, Markdown, plain text, and
-text-bearing PDFs into typed documents. PDF extraction consumes only the already
-frozen bytes, uses the exact pinned parser in a child process with byte, page, text,
-wall-time, CPU-time, file-output, and descriptor limits, and records its parser
-identity, limits, and output digest in the versioned catalog. Encrypted, malformed,
-image-only, over-limit, or unavailable PDFs remain explicit load records; there is
-no network access or OCR at this boundary. The portable profile does not claim a
-hard address-space ceiling; parser transient allocation remains a documented
-residual despite bounded input and retained output.
+A reply cut off by the token cap never closes its array, so the complete objects in it are
+salvaged and the incomplete tail is discarded. A call that stopped on length is counted in
+the card's telemetry rather than read as an empty source.
 
-## 2. One immutable source state
+## deterministic channel
 
-`source_state.py` binds the Hugging Face bundle and, when supplied, the
-ancestry-matched official bundle into one immutable identity. `combined_sources.py`
-then combines their typed document catalogs. The same catalog digest is used by
-extraction, claim gates, composition, FactReasoner, omissions, risk mapping, and run
-verification.
+What does not need a language model does not get one: `config.json`, the safetensors
+metadata, the Hub manifest, the `base_model` tags, the README frontmatter, the BibTeX
+block, downloads and likes with their snapshot date. Score rows come from the tables
+directly, in both orientations: one row per model with the target's row read across, and
+one row per benchmark with the target's column read down, which is how technical reports
+write them. The cell is selected by exact match against the target's own aliases, so a
+neighbouring column belonging to a sibling is never read.
 
-An offline Hugging Face bundle alone creates `hf_only` state. Adding a verified
-official bundle creates `hf_and_official` state. Resume cannot switch between them.
-Provider-assisted orchestration re-verifies the complete source state after provider
-decisions and before pipeline composition.
+## gates
 
-## 3. Extraction and claim support
+Every evidence item gets its relation to the target: `exact_target`, `base`, `derivative`,
+`sibling_or_comparison`, `family` or `unknown`. Then the field decides what it can take.
 
-`extraction.py` creates structured candidates from exact metadata pointers and
-materializes optional quoted candidates against saved source coordinates. A
-schema-shaped provider response is normalized item by item: valid peers continue,
-while semantic-invalid, wrong-source, and duplicate items become index-and-digest-only
-rejection records in `extraction.json`; raw rejected content cannot enter pipeline or
-public artifacts. The private normalized decision sidecar still contains the
-schema-shaped response and is never exported. Wire-schema failures abort the
-extraction stage.
+Score fields keep `exact_target` only, and a benchmark score needs a row anchor naming the
+target. Numeric fields refuse `base`, `derivative`, `sibling_or_comparison` and `unknown`.
+A family statement is governed by a per-field policy: a base checkpoint whose own paper
+introduces the family may carry its training context, recorded as relation `family` so the
+scope stays visible on the binding; a derivative may not, and no numeric or score field is
+on that list. Lineage is structured-channel only.
 
-A deterministic publisher-context pass separately scans only the pinned root model
-README. It admits complete statements with an explicit model subject under closed
-use, limitation, bias, risk, or mitigation structure. Pronouns cannot serve as the
-model subject. It rejects legal, configuration, fragment, unrecognized nested-heading,
-and related-model text because deterministic coreference would be unsafe, and records
-exact quote coordinates. Verified official developer reports are handled only by the
-provider-assisted path and its semantic binding gates.
-One versioned stage-disambiguation rule selects an exact clause from a mixed
-base/Instruct intended-use sentence only when the exact Hugging Face root README,
-publisher family, target stage, and inline intended-use label agree. The generic
-mixed-variant guard remains fail-closed. These private candidates can form Nexus use
-contexts but do not add fields to the seven-section public card.
+Two rules exist because a benchmark-shaped resolver cannot see them. A sentence whose
+subject is a model deictic ("this model", "we release") belongs to the document's default
+referent, never to a model merely named later in it: without that guard, "Our model
+outperforms Llama 3.1 8B" has exactly one model name in it and rebinds to Llama. And a
+sentence naming the target and another model is a comparison, which is the target's own
+fact only when the target is the subject.
 
-`claim_gate.py` applies the same ordered interface to every candidate:
+Nothing is dropped to a counter. Every refusal becomes a withheld binding carrying the
+quote, the relation and the reason.
 
-1. `coordinate_integrity` replays the pointer or quote.
-2. `entity_scope` enforces the claimed entity and target relation.
-3. `field_fit` checks that the evidence belongs in the proposed contract field.
-4. `value_support` checks that the complete proposed value follows from that evidence.
+## EAV and Stage B
 
-Coordinate integrity and the closed source-relation policy are deterministic.
-Structured values also receive deterministic entity, field, and value checks.
-Every provider-assisted quote candidate receives three separately bound semantic
-decisions for entity scope, field fit, and value support; document-level target
-identity cannot substitute for evidence that the quoted section or table is about the
-target. A missing, malformed, or failed decision withholds the candidate. A withheld
-gate remains in `claim-gates.json` but cannot enter the composition plan.
+A second pass audits the high-stakes items, then the gates are reapplied. The writer sees
+only accepted evidence and the established deterministic values, never the sources, and a
+validator repair loop keeps it inside the contract.
 
-## 4. Composition, audits, and repair
+## checks
 
-`composer.py` builds a complete contract-shaped card from projection-eligible claims.
-It preserves field-scoped provenance and refuses conflicting values. The pre-repair
-projection is saved in `composition-original.json`.
+- **leaf support** every number and entity name in a value must appear in a cited quote or
+  in what the structured channel already fixed. This catches the quote that says 73.5
+  against a value that says 99.0 without a model call.
+- **source excerpt** a guarded prose field that reproduces twelve consecutive words of a
+  source, or twenty-four characters in a script that does not delimit words with spaces,
+  is withheld. It is a copy, not a synthesis.
+- **final claim** a FactReasoner pass over the prose fields against the frozen bundle,
+  non-blocking, contradiction withholds. It needs token logprobs, and it records that it
+  did not run, and why, when the serving route has none. A validation step that is quietly
+  absent reads exactly like one that passed.
 
-`factreasoner.py` records atomic claim checks against the same source catalog.
-Supported, contradicted, neutral, and unavailable outcomes remain distinct. If a
-checker is unavailable for claims that require it, the pipeline records that state and
-does not count those claims as passed.
+## ledger and export
 
-`findings.py` compares source-present candidate fields with the composed card and
-records omissions and conflicts. `field_repair.py` operates only on affected fields,
-replays all proposed evidence, and emits typed repair records. Contradicted or neutral
-claims are withheld without an additional semantic submission; unavailable checks
-remain visible for later review. The pipeline saves both the original and post-repair
-composition, FactReasoner, and omission artifacts. The post-repair audit-content
-record is `factreasoner-content.json`; it is distinct from the later checks of the
-33-field publication projection.
+One `BindingRecord` per value, accepted and withheld alike, with the target, the field,
+the value, the claim entity, the relation, the benchmark scope, the evidence span, the
+origin, the verifier action and the reason. The card is the projection of the accepted
+bindings and nothing else, which the artifact validator enforces in both directions.
 
-## 5. Local risk audit
+The export is the 33 public fields, validated against the published schema, with the
+Markdown companion carrying the SHA-256 of the exact JSON bytes, plus a static HTML
+inspector where every field links to its span.
 
-Publisher-reported uses, limitations, biases, risks, and mitigations use the normal
-evidence-binding path. They are not interchangeable with taxonomy inferences.
+## running many
 
-Model-family statements remain non-projectable. `model_family.py` permits a config
-`model_type` to establish exact-target family membership only through a closed,
-versioned rule that also binds the publisher namespace and model-ID pattern.
-`family_risk.py` then requires a separate checkpoint-applicability decision for each
-family statement, persists the complete decision chain in
-`family-risk-authorizations.json`, and reconstructs the resulting context during
-replay. Missing membership, unavailable applicability, ambiguous source linkage, or
-artifact drift yields no family-derived Nexus input.
+Each target composes in its own process under a deadline the runner enforces. This is not
+tidiness: a twelve-target run once stopped for six and a half hours with sockets to the
+provider still open and every worker blocked inside a raw SSL read, past the HTTP client's
+own read timeout, which never fired. A thread in that state cannot be interrupted from
+inside the process. Out of process also gives each target its own usage log by
+construction and keeps a crash in a native dependency from taking the run down.
 
-`risk_mapping.py` provides an optional adapter for AI Atlas Nexus 1.2.4 and its pinned
-IBM AI Risk Atlas snapshot. The Nexus dependency is loaded only when the exact package
-version is installed on Python 3.11 or newer. Taxonomy candidates require accepted use
-context, a valid risk identifier, an applicability rationale, supporting field
-references, and an applicability decision. They remain in local audit artifacts and
-cannot masquerade as publisher statements or confirmed harms. No risk or environmental
-field crosses the public-card allowlist. An unavailable dependency or checker produces
-an unavailable stage, not a replacement taxonomy result.
-
-## 6. Lifecycle and export
-
-`artifact.py` constructs the typed `CardArtifact` from accepted bindings, validation
-checks, optional taxonomy derivations, and append-only review events. The final
-lifecycle becomes `generated_validated` only when all of these automated conditions
-hold:
-
-- every included claim passes the claim-support gate;
-- required FactReasoner checks pass;
-- the public projection satisfies the JSON Schema;
-- the risk stage passes;
-- the privacy scan passes;
-- no unresolved conflict or source-present omission remains.
-
-Otherwise the lifecycle is `generated_unreviewed`. These values describe automated
-pipeline state, not human review or release approval.
-
-Lifecycle is local audit state and is not a public-card field. `publication.py`
-projects the typed artifact through the exact 33-field allowlist, and
-`publication_sources.py` adds only registered values replayed from the verified frozen
-catalog while keeping provenance local. The enriched pre-withhold card is checked in
-`factreasoner-publication-original.json`. `publication_validation.py` accounts for all
-33 fields and may only delete a field with a terminal `repair_or_withhold` action; it
-never rewrites a value, and immutable `identity.model_id` and `identity.version` cannot
-be withheld. It then recomputes registered derivations with the blocked fields and
-requires that replay to equal the deletion result exactly. The final public card is
-checked again in `factreasoner.json`; no actionable result may survive that pass.
-
-Publication enrichment also treats Hugging Face's base-model declarations as a
-consensus relation. When `/cardData/base_model` and `base_model:` tags are both
-present, their normalized identifier sets must agree; otherwise
-`lineage.base_models` is omitted instead of choosing one metadata surface. Likewise,
-two different scores at the same benchmark/metric/setting/split coordinates cause
-that benchmark relation to be omitted. Both cases are recorded in the local
-`publication-conflicts.json` artifact using source pointers and value hashes; neither
-the competing values nor conflict metadata enter the agreed public schema.
-
-`public_export.py` validates the resulting seven-section object against the packaged
-Draft 2020-12 publication schema. `public_markdown.py` renders a human-readable
-companion only from a validated public JSON object and the SHA-256 of the exact sibling
-JSON bytes. `privacy.py` independently audits proposed public files for schema drift,
-non-finite or ambiguous JSON, source bodies, credentials, authenticated URLs, machine
-paths, provider material, forbidden file types, and unsafe symlinks. The repository
-publisher preflights and audits the JSON/Markdown pair before writing either file.
-
-## 7. Provider-assisted orchestration
-
-`orchestration.py` is invoked by `generate --provider Together`, including each
-target of a provider-assisted `batch` run. The CLI, adapters, and orchestration
-admission reject every other provider; every assisted call uses exactly
-`deepseek/deepseek-v4-flash-0731` through OpenRouter. It extracts bounded quote
-candidates in one per-document extraction stage, using one general request and at
-most one dedicated use/risk request, obtains separately normalized entity-scope,
-field-fit, and value-support decisions, supplies a FactReasoner checker, and, when the
-pinned risk dependency is available, supplies the Nexus risk interfaces.
-
-`provider.py` and `run_ledger.py` enforce an append-only per-target `usage.jsonl`
-ledger, the USD 25 and 300-call target caps, route freshness, structured JSON output,
-and at most two retries after explicit 429/5xx responses. Provider-assisted batches
-also share an append-only aggregate journal capped at USD 25 or 300 paid calls,
-whichever comes first, for the entire cohort. It reserves one route-bounded cost and
-call slot before each fresh send and reconciles both commitments against the per-target
-ledgers after a crash. A transport outcome that may have sent a
-paid request becomes `uncertain` and cannot be sent again. There is no model or route
-fallback. Prompts and raw responses are not ledger fields; normalized decisions are
-stored separately in the private run directory and addressed by digest. The provider
-runtime version is part of each semantic request fingerprint and orchestration
-admission, so retry-policy or parsing changes cannot silently reuse an older attempt.
-
-Every attempted structured call yields a privacy-safe terminal execution binding.
-`provider-execution.json` deduplicates those bindings and closes the local execution
-chain over the exact target, source catalog, downstream pipeline, FactReasoner and
-risk records, adapter/orchestration/runtime versions, complete `usage.jsonl` bytes
-and event count, and exact normalized-sidecar inventory. A binding contains hashes,
-bounded context identifiers, the optional relative decision-sidecar name, and the
-settled success or failure receipt; it contains no prompt, source body, raw response,
-credential, or absolute path. A ledger with only failed attempts still requires this
-manifest. The manifest and all material it verifies remain local run artifacts.
-
-Route, identity, authorization, budget, ledger, and uncertain-send failures remain
-fatal. Safely recorded response failures during an individual claim or FactReasoner
-check become explicit unavailable outcomes, so the run can retain its audit trail but
-cannot claim full validation. Extraction and risk-interface response failures remain
-fatal because there is no safe local decision to substitute.
-
-Exact request-hash sidecars are reused across pipeline passes, and FactReasoner atoms
-are sent in deterministic batches of at most 64. Once any interrupted aggregate
-reservation has been reconciled, an ordinary replay reuses those sidecars before
-making a new reservation, so it adds neither a paid call nor a new aggregate-journal
-event.
-
-Sealed review replay is stricter than ordinary resume. The reviewer supplies the
-provider-assisted run root with the complete downstream closure set. The audit first
-verifies the manifest, ledger, sidecar inventory, receipts, and downstream hashes. It
-then re-executes the pinned IBM FactReasoner graph and Nexus selection/applicability
-path through a replay-only call interface that accepts neither a transport nor a paid
-send budget. Hash snapshots before and after must be identical; missing or stale
-execution evidence makes semantic closure unavailable or failed rather than silently
-trusting checker labels.
-
-## 8. Run state and replay
-
-`run_state.py` owns the immutable run manifest and append-only stage journal. Every
-stage records its input digests, output digest, status, reason code, and closed
-metrics. `pipeline-result.json` references the canonical stage artifacts, including
-the publication-conflict count and digest, and is verified against the journal and
-filesystem before reuse.
-
-`run_summary.py` produces `audit-view.json` and `usage-summary.json`. They expose stage
-counts, repair counts, validation status, and cost/latency totals without source text,
-prompts, or raw ledger rows. `quality_report.py` re-verifies complete batch artifact
-chains, replays publication enrichment/provenance/conflicts and deletion-only
-validation, and
-requires final FactReasoner coverage of the 33-field publication contract. With a
-paired replay it also compares value, artifact, decision, validation, risk, omission,
-privacy, and cost/latency surfaces.
-
-## Artifact layout
-
-| Artifact | Role | Public-card content? |
-| --- | --- | --- |
-| `source-bundle/`, `official-source-bundle/` | Frozen bytes and closed manifests | No |
-| `source-state.json`, `source-catalog.json` | Combined immutable source identity | No |
-| `extraction.json`, `claim-gates.json` | Candidates and support decisions | No |
-| `composition*.json`, `factreasoner-original.json`, `factreasoner-content.json`, `omissions*.json` | Before/after audit-content repair projections and checks | No |
-| `repairs.json`, `risk-mapping.json` | Local field repair and taxonomy audit | No |
-| `factreasoner-publication-original.json`, `publication-validation.json`, `publication-conflicts.json` | Enriched pre-withhold public check, deletion-only decisions, and hashed source conflicts | No |
-| `factreasoner.json`, `privacy.json` | Final public-card factuality and privacy checks | No |
-| `card-artifact.json` | Bindings, reviews, validation, and derived card | No |
-| `public-card.json` | Exact 33-field-allowlisted seven-section JSON projection | Yes |
-| `cards/NAME.json`, `cards/NAME.md` | Published canonical JSON and its deterministic human-readable companion | Yes |
-| `run-manifest.json`, `journal.jsonl`, `pipeline-result.json` | Run and artifact integrity chain | No |
-| `audit-view.json`, `usage-summary.json` | Body-free operational summaries | No |
-| `provider-orchestration.json`, `provider-result.json`, `provider-execution.json` | Provider admission/result and exact settled-call execution chain | No |
-| `usage.jsonl`, `provider-decisions/` | Private paid-call ledger and normalized semantic decisions | No |
-| `aggregate-budget.jsonl`, `aggregate-budget-summary.json` | Shared provider-batch cap and its batch-bound snapshot | No |
-| `quality-report.json` | Body-free batch or paired-replay aggregate | Separate publishable report |
-
-## Package map
-
-| Modules | Responsibility |
-| --- | --- |
-| `contract.py`, `schema.py` | Rich local audit contract, absence values, and audit validation |
-| `publication_contract.py`, `publication_schema.py`, `publication.py`, `publication_sources.py`, `publication_validation.py` | Exact 33-field public contract, allowlisted projection, frozen-source enrichment/provenance replay, and deletion-only validation |
-| `source_bundle.py`, `hf_adapter.py` | Exact-revision Hugging Face collection and replay |
-| `official_discovery.py`, `scholarly_discovery.py`, `official_http.py`, `official_sources.py`, `official_documents.py` | Declared and bounded scholarly discovery plus official-source boundary |
-| `source_state.py`, `combined_sources.py`, `source_documents.py` | Immutable source state and typed catalogs |
-| `extraction.py`, `claim_gate.py`, `composer.py` | Candidate extraction, support checks, and evidence-only projection |
-| `factreasoner.py`, `findings.py`, `field_repair.py` | Atomic factuality, omission/conflict audits, and targeted repair |
-| `risk_mapping.py` | Pinned taxonomy integration and applicability gate |
-| `provider.py`, `provider_adapters.py`, `provider_execution.py`, `run_ledger.py`, `orchestration.py` | Exact provider route, bounded calls, normalized decisions, accounting, and replay-bound execution receipts |
-| `artifact.py`, `review.py`, `public_export.py`, `public_markdown.py`, `privacy.py` | Typed artifact, append-only review, frozen-source replay-bound JSON export, deterministic Markdown, and publication boundary |
-| `run_state.py`, `pipeline.py`, `run_summary.py`, `quality_report.py` | End-to-end execution, resume, summaries, and batch aggregation |
-| `cli.py` | `collect`, `generate`, `batch`, `report`, inspection, review, repair-record, validation, and export commands |
-
-## Verification
-
-```sh
-PYTHONPATH=src python3 -m pytest -q
-PYTHONPATH=src python3 -m model_cards schema > build/model-card.schema.json
-PYTHONPATH=src python3 -m model_cards validate cards/NAME.json
-```
-
-The default suite uses fixtures and injected transports. It does not issue paid
-provider calls. The repository's example publishing path is described in
-[README.md](README.md) and implemented by `scripts/publish_examples.py`.
+The runner carries a per-card and a per-run spend ceiling computed from the handler's own
+usage records, resumes on a card that loads, and writes one run manifest with the bundle
+digests, the composer and pipeline commits, the serving route, the prompts fingerprint and
+the totals.

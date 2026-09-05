@@ -1,1 +1,299 @@
-{"access_and_adoption":{"access_type":"Gated Hugging Face repository with declared weight files","downloads":"74,127 at frozen Hugging Face metadata snapshot","likes":"160 at frozen Hugging Face metadata snapshot"},"evaluation":{"benchmark_scores":[{"benchmark":"HellaSwag","metric":"README-reported score","score":77.2,"setting":"10-shot"},{"benchmark":"BoolQ","metric":"README-reported score","score":72.3,"setting":"0-shot"},{"benchmark":"PIQA","metric":"README-reported score","score":79.6,"setting":"0-shot"},{"benchmark":"SocialIQA","metric":"README-reported score","score":51.9,"setting":"0-shot"},{"benchmark":"TriviaQA","metric":"README-reported score","score":65.8,"setting":"5-shot"},{"benchmark":"Natural Questions","metric":"README-reported score","score":20.0,"setting":"5-shot"},{"benchmark":"ARC-c","metric":"README-reported score","score":56.2,"setting":"25-shot"},{"benchmark":"ARC-e","metric":"README-reported score","score":82.4,"setting":"0-shot"},{"benchmark":"WinoGrande","metric":"README-reported score","score":64.7,"setting":"5-shot"},{"benchmark":"BIG-Bench Hard","metric":"README-reported score","score":50.9,"setting":"few-shot"},{"benchmark":"DROP","metric":"README-reported score","score":60.1,"setting":"1-shot"},{"benchmark":"MMLU","metric":"README-reported score","score":59.6,"setting":"5-shot"},{"benchmark":"MMLU (Pro COT)","metric":"README-reported score","score":29.2,"setting":"5-shot"},{"benchmark":"AGIEval","metric":"README-reported score","score":42.1,"setting":"3-5-shot"},{"benchmark":"MATH","metric":"README-reported score","score":24.2,"setting":"4-shot"},{"benchmark":"GSM8K","metric":"README-reported score","score":38.4,"setting":"8-shot"},{"benchmark":"GPQA","metric":"README-reported score","score":15.0,"setting":"5-shot"},{"benchmark":"MBPP","metric":"README-reported score","score":46.0,"setting":"3-shot"},{"benchmark":"HumanEval","metric":"README-reported score","score":36.0,"setting":"0-shot"},{"benchmark":"MGSM","metric":"README-reported score","score":34.7,"setting":"Benchmark Results; setting not stated"},{"benchmark":"Global-MMLU-Lite","metric":"README-reported score","score":57.0,"setting":"Benchmark Results; setting not stated"},{"benchmark":"WMT24++","metric":"ChrF","score":48.4,"setting":"Benchmark Results; setting not stated"},{"benchmark":"FloRes","metric":"README-reported score","score":39.2,"setting":"Benchmark Results; setting not stated"},{"benchmark":"XQuAD (all)","metric":"README-reported score","score":68.0,"setting":"Benchmark Results; setting not stated"},{"benchmark":"ECLeKTic","metric":"README-reported score","score":11.0,"setting":"Benchmark Results; setting not stated"},{"benchmark":"IndicGenBench","metric":"README-reported score","score":57.2,"setting":"Benchmark Results; setting not stated"},{"benchmark":"COCOcap","metric":"README-reported score","score":102,"setting":"Benchmark Results; setting not stated"},{"benchmark":"DocVQA","metric":"README-reported score","score":72.8,"setting":"Benchmark Results; setting not stated","split":"val"},{"benchmark":"InfoVQA","metric":"README-reported score","score":44.1,"setting":"Benchmark Results; setting not stated","split":"val"},{"benchmark":"MMMU (pt)","metric":"README-reported score","score":39.2,"setting":"Benchmark Results; setting not stated"},{"benchmark":"TextVQA","metric":"README-reported score","score":58.9,"setting":"Benchmark Results; setting not stated","split":"val"},{"benchmark":"RealWorldQA","metric":"README-reported score","score":45.5,"setting":"Benchmark Results; setting not stated"},{"benchmark":"ReMI","metric":"README-reported score","score":27.3,"setting":"Benchmark Results; setting not stated"},{"benchmark":"AI2D","metric":"README-reported score","score":63.2,"setting":"Benchmark Results; setting not stated"},{"benchmark":"ChartQA","metric":"README-reported score","score":63.6,"setting":"Benchmark Results; setting not stated"},{"benchmark":"VQAv2","metric":"README-reported score","score":63.9,"setting":"Benchmark Results; setting not stated"},{"benchmark":"BLINK","metric":"README-reported score","score":38.0,"setting":"Benchmark Results; setting not stated"},{"benchmark":"OKVQA","metric":"README-reported score","score":51.0,"setting":"Benchmark Results; setting not stated"},{"benchmark":"TallyQA","metric":"README-reported score","score":42.5,"setting":"Benchmark Results; setting not stated"},{"benchmark":"SpatialSense VQA","metric":"README-reported score","score":50.9,"setting":"Benchmark Results; setting not stated"},{"benchmark":"CountBenchQA","metric":"README-reported score","score":26.1,"setting":"Benchmark Results; setting not stated"}],"results_summary":"The frozen README provides 41 exact-target benchmark scores; examples: HellaSwag: 77.2; BoolQ: 72.3; PIQA: 79.6.","safety_evals":"The README reports Gemma-family, all-model-size improvements over earlier releases for child safety, content safety, representational harms, and ungrounded inference. The tests omitted safety filters and used English prompts; the source does not provide PT/IT- or checkpoint-specific results."},"identity":{"developed_by":"Google DeepMind","license":"gemma","model_id":"google/gemma-3-4b-pt","model_type":"image-text-to-text","name":"gemma-3-4b-pt","summary":"The publisher describes gemma-3-4b-pt as a pretrained, multimodal, open-weight model with text-and-image input and text output.","version":"cc012e0a6d0787b4adcc0fa2c4da74402494554d"},"lineage":{"model_family":"gemma3"},"links":{"citation":"@article{gemma_2025,\n    title={Gemma 3},\n    url={https://goo.gle/Gemma3Report},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2025}\n}","model_card":"https://huggingface.co/google/gemma-3-4b-pt/blob/cc012e0a6d0787b4adcc0fa2c4da74402494554d/README.md","tech_report":"https://goo.gle/Gemma3Report"},"specifications":{"architecture_type":"multimodal (topology unspecified)","context_length":"128K tokens (README-declared context length)","input_output":["input: image and text","output: text","model stage: pretrained/base"],"model_size":"8.01 GiB estimated tensor payload (8,600,158,944 bytes; from safetensors dtype counts)","num_parameters":"4,300,079,472 total stored parameters (safetensors metadata)","precision":"bfloat16 stored tensor weights (safetensors parameter-count metadata)"},"training_context":{"training_data":"Publisher-listed source categories: web documents, code, mathematics, images. Language coverage is reported above 140 languages.","training_data_size":"4B model: 4 trillion tokens"}}
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "75,826 downloads (Hub 30-day window, as of 2026-09-04)",
+    "likes": "160 likes on the Hub (as of 2026-09-04)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "[HellaSwag][hellaswag]",
+        "metric": "Not specified",
+        "score": "77.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[BoolQ][boolq]",
+        "metric": "Not specified",
+        "score": "72.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[PIQA][piqa]",
+        "metric": "Not specified",
+        "score": "79.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[SocialIQA][socialiqa]",
+        "metric": "Not specified",
+        "score": "51.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[TriviaQA][triviaqa]",
+        "metric": "Not specified",
+        "score": "65.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[Natural Questions][naturalq]",
+        "metric": "Not specified",
+        "score": "20.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[ARC-c][arc]",
+        "metric": "Not specified",
+        "score": "56.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[ARC-e][arc]",
+        "metric": "Not specified",
+        "score": "82.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[WinoGrande][winogrande]",
+        "metric": "Not specified",
+        "score": "64.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[BIG-Bench Hard][bbh]",
+        "metric": "Not specified",
+        "score": "50.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[DROP][drop]",
+        "metric": "Not specified",
+        "score": "60.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[MMLU][mmlu]",
+        "metric": "Not specified",
+        "score": "59.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[MMLU][mmlu]",
+        "metric": "Not specified",
+        "score": "29.2",
+        "setting": "COT"
+      },
+      {
+        "benchmark": "[AGIEval][agieval]",
+        "metric": "Not specified",
+        "score": "42.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[MATH][math]",
+        "metric": "Not specified",
+        "score": "24.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[GSM8K][gsm8k]",
+        "metric": "Not specified",
+        "score": "38.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[GPQA][gpqa]",
+        "metric": "Not specified",
+        "score": "15.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[MBPP][mbpp]",
+        "metric": "Not specified",
+        "score": "46.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[HumanEval][humaneval]",
+        "metric": "Not specified",
+        "score": "36.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[MGSM][mgsm]",
+        "metric": "Not specified",
+        "score": "34.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[Global-MMLU-Lite][global-mmlu-lite]",
+        "metric": "Not specified",
+        "score": "57.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[WMT24++][wmt24pp]",
+        "metric": "Not specified",
+        "score": "48.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[FloRes][flores]",
+        "metric": "Not specified",
+        "score": "39.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[XQuAD][xquad]",
+        "metric": "Not specified",
+        "score": "68.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[ECLeKTic][eclektic]",
+        "metric": "Not specified",
+        "score": "11.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[IndicGenBench][indicgenbench]",
+        "metric": "Not specified",
+        "score": "57.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[COCOcap][coco-cap]",
+        "metric": "Not specified",
+        "score": "102",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[DocVQA][docvqa]",
+        "metric": "Not specified",
+        "score": "72.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[InfoVQA][info-vqa]",
+        "metric": "Not specified",
+        "score": "44.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[MMMU][mmmu]",
+        "metric": "Not specified",
+        "score": "39.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[TextVQA][textvqa]",
+        "metric": "Not specified",
+        "score": "58.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[RealWorldQA][realworldqa]",
+        "metric": "Not specified",
+        "score": "45.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[ReMI][remi]",
+        "metric": "Not specified",
+        "score": "27.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[AI2D][ai2d]",
+        "metric": "Not specified",
+        "score": "63.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[ChartQA][chartqa]",
+        "metric": "Not specified",
+        "score": "63.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[VQAv2][vqav2]",
+        "metric": "Not specified",
+        "score": "63.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[BLINK][blinkvqa]",
+        "metric": "Not specified",
+        "score": "38.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[OKVQA][okvqa]",
+        "metric": "Not specified",
+        "score": "51.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[TallyQA][tallyqa]",
+        "metric": "Not specified",
+        "score": "42.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[SpatialSense VQA][ss-vqa]",
+        "metric": "Not specified",
+        "score": "50.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "[CountBenchQA][countbenchqa]",
+        "metric": "Not specified",
+        "score": "26.1",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/gemma-3-4b-pt",
+    "model_type": "Not specified",
+    "name": "gemma-3-4b-pt",
+    "release_date": "2025-02-20 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "cc012e0a6d0787b4adcc0fa2c4da74402494554d"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "gemma 3 pt"
+  },
+  "links": {
+    "citation": "@article{gemma_2025,\n    title={Gemma 3},\n    url={https://goo.gle/Gemma3Report},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2025}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/google/gemma-3-4b-pt",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2404.16816"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: image, text",
+      "output: text"
+    ],
+    "model_size": "8.0 GiB of safetensors weights (8,600,277,880 bytes) in BF16",
+    "num_parameters": "4,300,079,472 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

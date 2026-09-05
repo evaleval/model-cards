@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [gemma\-3\-4b\-pt\.json](<./gemma-3-4b-pt.json>)<br>
-SHA-256: `2ec90840b344d23ef03e8cb080220ee33b88bf301fc71cd54bf605168ec2d34b`
+SHA-256: `389111514504136abe7825f1b73d859e049e162f84b6c932df432b88c091ac96`
 
 ## Identity
 
@@ -11,105 +11,96 @@ SHA-256: `2ec90840b344d23ef03e8cb080220ee33b88bf301fc71cd54bf605168ec2d34b`
 | --- | --- |
 | Model ID | google/gemma\-3\-4b\-pt |
 | Name | gemma\-3\-4b\-pt |
-| Developed by | Google DeepMind |
-| Model type | image\-text\-to\-text |
+| Developed by | google \(Hub organization\) |
 | License | gemma |
+| Release date | 2025\-02\-20 \(Hugging Face repository creation date\) |
 | Version | cc012e0a6d0787b4adcc0fa2c4da74402494554d |
-| Summary | The publisher describes gemma\-3\-4b\-pt as a pretrained, multimodal, open\-weight model with text\-and\-image input and text output\. |
 
 ## Lineage
 
 | Field | Value |
 | --- | --- |
-| Model family | gemma3 |
+| Model family | gemma 3 pt |
 
 ## Specifications
 
 | Field | Value |
 | --- | --- |
-| Architecture type | multimodal \(topology unspecified\) |
-| Num parameters | 4,300,079,472 total stored parameters \(safetensors metadata\) |
-| Context length | 128K tokens \(README\-declared context length\) |
-| Precision | bfloat16 stored tensor weights \(safetensors parameter\-count metadata\) |
-| Model size | 8\.01 GiB estimated tensor payload \(8,600,158,944 bytes; from safetensors dtype counts\) |
-| Input / output | input: image and text<br>output: text<br>model stage: pretrained/base |
+| Num parameters | 4,300,079,472 parameters \(safetensors metadata\) |
+| Precision | BF16 \(safetensors weight dtype\) |
+| Model size | 8\.0 GiB of safetensors weights \(8,600,277,880 bytes\) in BF16 |
+| Input / output | input: image, text<br>output: text |
 
 ## Training Context
 
-| Field | Value |
-| --- | --- |
-| Training data | Publisher\-listed source categories: web documents, code, mathematics, images\. Language coverage is reported above 140 languages\. |
-| Training data size | 4B model: 4 trillion tokens |
+_No specified fields are available in the publication data._
 
 ## Access and Adoption
 
 | Field | Value |
 | --- | --- |
-| Access type | Gated Hugging Face repository with declared weight files |
-| Downloads | 74,127 at frozen Hugging Face metadata snapshot |
-| Likes | 160 at frozen Hugging Face metadata snapshot |
+| Access type | gated |
+| Downloads | 75,826 downloads \(Hub 30\-day window, as of 2026\-09\-04\) |
+| Likes | 160 likes on the Hub \(as of 2026\-09\-04\) |
 
 ## Evaluation
 
-| Field | Value |
-| --- | --- |
-| Results summary | The frozen README provides 41 exact\-target benchmark scores; examples: HellaSwag: 77\.2; BoolQ: 72\.3; PIQA: 79\.6\. |
-| Safety evaluations | The README reports Gemma\-family, all\-model\-size improvements over earlier releases for child safety, content safety, representational harms, and ungrounded inference\. The tests omitted safety filters and used English prompts; the source does not provide PT/IT\- or checkpoint\-specific results\. |
+_No specified fields are available in the publication data._
 
 ### Benchmark Scores
 
 | Benchmark | Metric | Score | Setting | Split |
 | --- | --- | ---: | --- | --- |
-| HellaSwag | README\-reported score | 77\.2 | 10\-shot | Not reported |
-| BoolQ | README\-reported score | 72\.3 | 0\-shot | Not reported |
-| PIQA | README\-reported score | 79\.6 | 0\-shot | Not reported |
-| SocialIQA | README\-reported score | 51\.9 | 0\-shot | Not reported |
-| TriviaQA | README\-reported score | 65\.8 | 5\-shot | Not reported |
-| Natural Questions | README\-reported score | 20\.0 | 5\-shot | Not reported |
-| ARC\-c | README\-reported score | 56\.2 | 25\-shot | Not reported |
-| ARC\-e | README\-reported score | 82\.4 | 0\-shot | Not reported |
-| WinoGrande | README\-reported score | 64\.7 | 5\-shot | Not reported |
-| BIG\-Bench Hard | README\-reported score | 50\.9 | few\-shot | Not reported |
-| DROP | README\-reported score | 60\.1 | 1\-shot | Not reported |
-| MMLU | README\-reported score | 59\.6 | 5\-shot | Not reported |
-| MMLU \(Pro COT\) | README\-reported score | 29\.2 | 5\-shot | Not reported |
-| AGIEval | README\-reported score | 42\.1 | 3\-5\-shot | Not reported |
-| MATH | README\-reported score | 24\.2 | 4\-shot | Not reported |
-| GSM8K | README\-reported score | 38\.4 | 8\-shot | Not reported |
-| GPQA | README\-reported score | 15\.0 | 5\-shot | Not reported |
-| MBPP | README\-reported score | 46\.0 | 3\-shot | Not reported |
-| HumanEval | README\-reported score | 36\.0 | 0\-shot | Not reported |
-| MGSM | README\-reported score | 34\.7 | Benchmark Results; setting not stated | Not reported |
-| Global\-MMLU\-Lite | README\-reported score | 57\.0 | Benchmark Results; setting not stated | Not reported |
-| WMT24\+\+ | ChrF | 48\.4 | Benchmark Results; setting not stated | Not reported |
-| FloRes | README\-reported score | 39\.2 | Benchmark Results; setting not stated | Not reported |
-| XQuAD \(all\) | README\-reported score | 68\.0 | Benchmark Results; setting not stated | Not reported |
-| ECLeKTic | README\-reported score | 11\.0 | Benchmark Results; setting not stated | Not reported |
-| IndicGenBench | README\-reported score | 57\.2 | Benchmark Results; setting not stated | Not reported |
-| COCOcap | README\-reported score | 102 | Benchmark Results; setting not stated | Not reported |
-| DocVQA | README\-reported score | 72\.8 | Benchmark Results; setting not stated | val |
-| InfoVQA | README\-reported score | 44\.1 | Benchmark Results; setting not stated | val |
-| MMMU \(pt\) | README\-reported score | 39\.2 | Benchmark Results; setting not stated | Not reported |
-| TextVQA | README\-reported score | 58\.9 | Benchmark Results; setting not stated | val |
-| RealWorldQA | README\-reported score | 45\.5 | Benchmark Results; setting not stated | Not reported |
-| ReMI | README\-reported score | 27\.3 | Benchmark Results; setting not stated | Not reported |
-| AI2D | README\-reported score | 63\.2 | Benchmark Results; setting not stated | Not reported |
-| ChartQA | README\-reported score | 63\.6 | Benchmark Results; setting not stated | Not reported |
-| VQAv2 | README\-reported score | 63\.9 | Benchmark Results; setting not stated | Not reported |
-| BLINK | README\-reported score | 38\.0 | Benchmark Results; setting not stated | Not reported |
-| OKVQA | README\-reported score | 51\.0 | Benchmark Results; setting not stated | Not reported |
-| TallyQA | README\-reported score | 42\.5 | Benchmark Results; setting not stated | Not reported |
-| SpatialSense VQA | README\-reported score | 50\.9 | Benchmark Results; setting not stated | Not reported |
-| CountBenchQA | README\-reported score | 26\.1 | Benchmark Results; setting not stated | Not reported |
+| \[HellaSwag\]\[hellaswag\] | Not specified | 77\.2 | Not specified | Not reported |
+| \[BoolQ\]\[boolq\] | Not specified | 72\.3 | Not specified | Not reported |
+| \[PIQA\]\[piqa\] | Not specified | 79\.6 | Not specified | Not reported |
+| \[SocialIQA\]\[socialiqa\] | Not specified | 51\.9 | Not specified | Not reported |
+| \[TriviaQA\]\[triviaqa\] | Not specified | 65\.8 | Not specified | Not reported |
+| \[Natural Questions\]\[naturalq\] | Not specified | 20\.0 | Not specified | Not reported |
+| \[ARC\-c\]\[arc\] | Not specified | 56\.2 | Not specified | Not reported |
+| \[ARC\-e\]\[arc\] | Not specified | 82\.4 | Not specified | Not reported |
+| \[WinoGrande\]\[winogrande\] | Not specified | 64\.7 | Not specified | Not reported |
+| \[BIG\-Bench Hard\]\[bbh\] | Not specified | 50\.9 | Not specified | Not reported |
+| \[DROP\]\[drop\] | Not specified | 60\.1 | Not specified | Not reported |
+| \[MMLU\]\[mmlu\] | Not specified | 59\.6 | Not specified | Not reported |
+| \[MMLU\]\[mmlu\] | Not specified | 29\.2 | COT | Not reported |
+| \[AGIEval\]\[agieval\] | Not specified | 42\.1 | Not specified | Not reported |
+| \[MATH\]\[math\] | Not specified | 24\.2 | Not specified | Not reported |
+| \[GSM8K\]\[gsm8k\] | Not specified | 38\.4 | Not specified | Not reported |
+| \[GPQA\]\[gpqa\] | Not specified | 15\.0 | Not specified | Not reported |
+| \[MBPP\]\[mbpp\] | Not specified | 46\.0 | Not specified | Not reported |
+| \[HumanEval\]\[humaneval\] | Not specified | 36\.0 | Not specified | Not reported |
+| \[MGSM\]\[mgsm\] | Not specified | 34\.7 | Not specified | Not reported |
+| \[Global\-MMLU\-Lite\]\[global\-mmlu\-lite\] | Not specified | 57\.0 | Not specified | Not reported |
+| \[WMT24\+\+\]\[wmt24pp\] | Not specified | 48\.4 | Not specified | Not reported |
+| \[FloRes\]\[flores\] | Not specified | 39\.2 | Not specified | Not reported |
+| \[XQuAD\]\[xquad\] | Not specified | 68\.0 | Not specified | Not reported |
+| \[ECLeKTic\]\[eclektic\] | Not specified | 11\.0 | Not specified | Not reported |
+| \[IndicGenBench\]\[indicgenbench\] | Not specified | 57\.2 | Not specified | Not reported |
+| \[COCOcap\]\[coco\-cap\] | Not specified | 102 | Not specified | Not reported |
+| \[DocVQA\]\[docvqa\] | Not specified | 72\.8 | Not specified | Not reported |
+| \[InfoVQA\]\[info\-vqa\] | Not specified | 44\.1 | Not specified | Not reported |
+| \[MMMU\]\[mmmu\] | Not specified | 39\.2 | Not specified | Not reported |
+| \[TextVQA\]\[textvqa\] | Not specified | 58\.9 | Not specified | Not reported |
+| \[RealWorldQA\]\[realworldqa\] | Not specified | 45\.5 | Not specified | Not reported |
+| \[ReMI\]\[remi\] | Not specified | 27\.3 | Not specified | Not reported |
+| \[AI2D\]\[ai2d\] | Not specified | 63\.2 | Not specified | Not reported |
+| \[ChartQA\]\[chartqa\] | Not specified | 63\.6 | Not specified | Not reported |
+| \[VQAv2\]\[vqav2\] | Not specified | 63\.9 | Not specified | Not reported |
+| \[BLINK\]\[blinkvqa\] | Not specified | 38\.0 | Not specified | Not reported |
+| \[OKVQA\]\[okvqa\] | Not specified | 51\.0 | Not specified | Not reported |
+| \[TallyQA\]\[tallyqa\] | Not specified | 42\.5 | Not specified | Not reported |
+| \[SpatialSense VQA\]\[ss\-vqa\] | Not specified | 50\.9 | Not specified | Not reported |
+| \[CountBenchQA\]\[countbenchqa\] | Not specified | 26\.1 | Not specified | Not reported |
 
 ## Links
 
 | Field | Value |
 | --- | --- |
-| Model card | [https://huggingface\.co/google/gemma\-3\-4b\-pt/blob/cc012e0a6d0787b4adcc0fa2c4da74402494554d/README\.md](<https://huggingface.co/google/gemma-3-4b-pt/blob/cc012e0a6d0787b4adcc0fa2c4da74402494554d/README.md>) |
-| Technical report | [https://goo\.gle/Gemma3Report](<https://goo.gle/Gemma3Report>) |
+| Model card | [https://huggingface\.co/google/gemma\-3\-4b\-pt](<https://huggingface.co/google/gemma-3-4b-pt>) |
+| Technical report | [https://arxiv\.org/abs/2404\.16816](<https://arxiv.org/abs/2404.16816>) |
 | Citation | @article\{gemma\_2025,<br>    title=\{Gemma 3\},<br>    url=\{https://goo\.gle/Gemma3Report\},<br>    publisher=\{Kaggle\},<br>    author=\{Gemma Team\},<br>    year=\{2025\}<br>\} |
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.release_date`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.human_evals`, `links.system_card`, `links.code_repository`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `identity.summary`, `lineage.base_models`, `lineage.derivatives`, `specifications.architecture_type`, `specifications.context_length`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.code_repository`.

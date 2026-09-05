@@ -1,58 +1,46 @@
-"""Evidence-bound model cards for exact model revisions."""
+"""Evidence-bound model cards for exact Hugging Face model revisions.
 
-from .artifact import CardArtifact, project_card
-from .bindings import build_artifact, verify_artifact_sources
-from .models import (
-    Binding,
-    Disposition,
-    LifecycleStatus,
-    RelationToTarget,
-    ReviewAction,
-    ReviewEvent,
-    SourceDocument,
-    SourceRole,
-    TargetIdentity,
-    ValidationCheck,
-    ValidationCheckStatus,
+The package has two halves that stay apart on purpose.
+
+The publication surface is what a reader of a card touches: the seven-section, 33-field
+contract, its JSON Schema, the deterministic Markdown renderer, the export guard that
+refuses to let a local path or a credential cross the boundary, and the Hugging Face
+source adapter that freezes a snapshot at an exact commit.
+
+`model_cards.core` is the generator: it collects the sources for one model_id@revision,
+extracts verbatim quotes, resolves what each quote is about, gates what may reach which
+field, writes the card from the accepted evidence only, and keeps one binding record per
+value it accepted AND per value it refused. It imports the contract from this package, so
+there is one definition of what a card is.
+"""
+
+from .hf_adapter import HuggingFaceAdapterError, HuggingFaceHubAdapter
+from .public_export import PublicExportError, assert_public_projection
+from .public_markdown import render_public_markdown
+from .publication_contract import (
+    FIELD_PATHS,
+    NOT_APPLICABLE,
+    NOT_SPECIFIED,
+    PUBLICATION_SECTIONS,
+    SECTION_FIELDS,
+    build_publication_schema,
 )
-from .orchestration import (
-    OrchestrationError,
-    ProviderOrchestrationResult,
-    run_provider_assisted_pipeline,
-)
-from .pipeline import PipelineError, PipelineResult, run_offline_pipeline
-from .quality_report import QualityReport, build_quality_report
-from .run_summary import RunSummaryArtifacts, write_run_summaries
-from .source_state import ImmutableSourceState, load_source_state
+from .publication_schema import blank_publication_card, validate_publication_card
 
 __all__ = [
-    "Binding",
-    "CardArtifact",
-    "Disposition",
-    "LifecycleStatus",
-    "ImmutableSourceState",
-    "OrchestrationError",
-    "PipelineError",
-    "PipelineResult",
-    "ProviderOrchestrationResult",
-    "QualityReport",
-    "RelationToTarget",
-    "ReviewAction",
-    "ReviewEvent",
-    "SourceDocument",
-    "SourceRole",
-    "TargetIdentity",
-    "ValidationCheck",
-    "ValidationCheckStatus",
-    "build_artifact",
-    "build_quality_report",
-    "load_source_state",
-    "project_card",
-    "run_offline_pipeline",
-    "run_provider_assisted_pipeline",
-    "verify_artifact_sources",
-    "RunSummaryArtifacts",
-    "write_run_summaries",
+    "FIELD_PATHS",
+    "HuggingFaceAdapterError",
+    "HuggingFaceHubAdapter",
+    "NOT_APPLICABLE",
+    "NOT_SPECIFIED",
+    "PUBLICATION_SECTIONS",
+    "PublicExportError",
+    "SECTION_FIELDS",
+    "assert_public_projection",
+    "blank_publication_card",
+    "build_publication_schema",
+    "render_public_markdown",
+    "validate_publication_card",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

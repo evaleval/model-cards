@@ -1,1 +1,58 @@
-{"access_and_adoption":{"access_type":"Gated Hugging Face repository with declared weight files","downloads":"1,526,070 at frozen Hugging Face metadata snapshot","likes":"1,467 at frozen Hugging Face metadata snapshot"},"evaluation":{"results_summary":"The frozen README reports family-level qualitative safety-evaluation results; see safety_evals.","safety_evals":"The README reports Gemma-family, all-model-size improvements over earlier releases for child safety, content safety, representational harms, and ungrounded inference. The tests omitted safety filters and used English prompts; the source does not provide PT/IT- or checkpoint-specific results."},"identity":{"developed_by":"Google DeepMind","license":"gemma","model_id":"google/gemma-3-4b-it","model_type":"image-text-to-text","name":"gemma-3-4b-it","summary":"The publisher describes gemma-3-4b-it as a multimodal, open-weight model with text-and-image input and text output.","version":"093f9f388b31de276ce2de164bdc2081324b9767"},"lineage":{"base_models":[{"model_id":"google/gemma-3-4b-pt","relation":"base_model"}],"model_family":"gemma3"},"links":{"citation":"@article{gemma_2025,\n    title={Gemma 3},\n    url={https://goo.gle/Gemma3Report},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2025}\n}","model_card":"https://huggingface.co/google/gemma-3-4b-it/blob/093f9f388b31de276ce2de164bdc2081324b9767/README.md","tech_report":"https://goo.gle/Gemma3Report"},"specifications":{"architecture_type":"multimodal (topology unspecified)","context_length":"128K tokens (README-declared context length)","input_output":["input: image and text","output: text","model stage: instruction-tuned"],"model_size":"8.01 GiB estimated tensor payload (8,600,158,944 bytes; from safetensors dtype counts)","num_parameters":"4,300,079,472 total stored parameters (safetensors metadata)","precision":"bfloat16 stored tensor weights (safetensors parameter-count metadata)"},"training_context":{"adaptations":"Instruction-tuned variant (the frozen README does not specify the tuning recipe).","training_data":"Publisher-described family/base pretraining context: Publisher-listed source categories: web documents, code, mathematics, images. Language coverage is reported above 140 languages.","training_data_size":"Publisher-described family/base pretraining scale: 4B model: 4 trillion tokens"}}
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "1,626,709 downloads (Hub 30-day window, as of 2026-09-04)",
+    "likes": "1,470 likes on the Hub (as of 2026-09-04)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/gemma-3-4b-it",
+    "model_type": "Not specified",
+    "name": "gemma-3-4b-it",
+    "release_date": "2025-02-20 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "093f9f388b31de276ce2de164bdc2081324b9767"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "google/gemma-3-4b-pt",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "gemma 3"
+  },
+  "links": {
+    "citation": "@article{gemma_2025,\n    title={Gemma 3},\n    url={https://goo.gle/Gemma3Report},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2025}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/google/gemma-3-4b-it",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2404.16816"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: image, text",
+      "output: text"
+    ],
+    "model_size": "8.0 GiB of safetensors weights (8,600,277,880 bytes) in BF16",
+    "num_parameters": "4,300,079,472 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is instruction-tuned, so chat templates must be used to process inputs before generation.",
+    "data_cutoff": "Not specified",
+    "training_data": "The 4B checkpoint was trained on a text dataset that includes a wide variety of sources: web documents in over 140 languages, code, mathematics, and images.",
+    "training_data_size": "Not specified"
+  }
+}

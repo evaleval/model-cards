@@ -1,0 +1,11 @@
+{
+  "repository": "../auto-benchmarkcard",
+  "commit": "fd2dc11e86e4de16d3438734813397a06a5517e1",
+  "interfaces": [
+    "auto_benchmarkcard.tools.composer.docstructure.build_index",
+    "auto_benchmarkcard.tools.composer.evidence.normalize_ws",
+    "auto_benchmarkcard.tools.composer.evidence.verify_quote",
+    "auto_benchmarkcard.tools.composer.field_spec.CardSchema"
+  ],
+  "policy": "The bridge refuses a different commit unless the caller explicitly allows it. The composer is used as a library (CardSchema, extraction, Stage B, validator); no benchmark schema or orchestration code is copied."
+}
