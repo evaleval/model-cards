@@ -673,3 +673,121 @@ def test_the_licence_comes_from_the_hub_or_the_frontmatter_never_from_prose(tmp_
     extras_path.write_text(json.dumps(extras))
     art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
     assert art.card["identity"]["license"] == "Not specified"
+
+
+def test_a_link_field_that_is_not_a_url_is_withheld(tmp_path):
+    """Failure class: prose_in_a_link_field. On Mistral-7B-Instruct-v0.2 the writer filled
+    links.code_repository with "The instructed model can be downloaded here." That is a
+    true sentence from the README, in a field that is supposed to be clickable, and the
+    published schema accepts any non-empty string there, so nothing downstream caught it."""
+    root = _write_bundle(tmp_path / "bundles")
+
+    class _Prosey(_ScriptedLLM):
+        def generate(self, prompt, response_format=None):
+            if "SOURCE TEXT (model card README)" in prompt:
+                return json.dumps({"evidence": [
+                    {"field": "links.code_repository",
+                     "quote": "Code: https://github.com/allenai/OLMo-core",
+                     "referent": "target", "claim_role": "primary_result"}]})
+            return _ScriptedLLM.generate(self, prompt, response_format)
+
+        def generate_with_meta(self, prompt, response_format=None, max_completion_tokens=None):
+            text, stop = _ScriptedLLM.generate_with_meta(self, prompt, response_format,
+                                                         max_completion_tokens)
+            if "evaluation, links" in prompt:
+                out = json.loads(text)
+                ids = {}
+                for line in prompt.splitlines():
+                    if line.startswith("- [E") and "]" in line:
+                        ids.setdefault(line.split("(", 1)[1].split(" |", 1)[0], []).append(
+                            line[3:line.index("]")])
+                out["links"]["code_repository"] = "The model can be downloaded here."
+                out["links"]["provenance"] = {"code_repository": {
+                    "source": "hf_readme", "evidence": "q",
+                    "evidence_ids": ids.get("links.code_repository", [])}}
+                return json.dumps(out), stop
+            return text, stop
+
+    art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _Prosey(), allow_unpinned=True)
+    assert art.card["links"]["code_repository"] == "Not specified"
+    refused = next(b for b in art.bindings
+                   if b.verifier_reason == "link_field_is_not_a_url")
+    assert refused.field_path == "links.code_repository"
+    assert refused.verifier_action is VerifierAction.WITHHOLD
+    assert CL.is_url("https://github.com/allenai/OLMo") is True
+    assert CL.is_url("see the repo") is False
+    assert CL.is_url("github.com/allenai/OLMo") is False
+
+
+def test_a_repository_with_no_readme_still_yields_a_card(tmp_path):
+    """Failure class: no_readme_no_card. ontocord/wide_3b_sft_stage1.2-ss1-expert_fictional_lyrical
+    has a config.json and four safetensors shards and no model card at all. Requiring a
+    README refused it outright, and a repository with weights and a config is still a
+    model: its card is the config and the Hub manifest."""
+    root = _write_bundle(tmp_path / "bundles")
+    slug = "allenai-olmo-2-1124-7b-7df9a82518af"
+    bundle_path = tmp_path / "bundles" / slug / "source_bundle" / "source-bundle.json"
+    sb = json.loads(bundle_path.read_text())
+    sb["files"] = [f for f in sb["files"] if f["name"] != "README.md"]
+    sb["metadata"]["available_files"] = ["config.json"]
+    sb["metadata"]["card_data"] = {}
+    bundle_path.write_text(json.dumps(sb))
+    hf_path = tmp_path / "bundles" / slug / "tool_output" / "hf" / f"{slug}.json"
+    hf = json.loads(hf_path.read_text())
+    hf["readme_markdown"] = ""
+    hf_path.write_text(json.dumps(hf))
+
+    art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
+    card = art.card
+    assert card["identity"]["model_id"] == MODEL
+    assert card["identity"]["name"] == "OLMo-2-1124-7B"          # the repo name
+    assert card["specifications"]["architecture_type"] == "dense decoder-only"
+    assert card["specifications"]["context_length"].startswith("4,096 tokens")
+    assert card["access_and_adoption"]["downloads"].startswith("84,552")
+    save_artifact(art, tmp_path / "card.json")
+    assert load_artifact(tmp_path / "card.json").artifact_id == art.artifact_id
+
+
+def test_a_family_name_has_to_be_one_the_sources_use(tmp_path):
+    """Failure class: repo_name_leftover_as_a_family. Deriving the family from the repo
+    name unconditionally gave jaspionjader/f-6-8b the family "f 6" and
+    JayHyeon/Qwen_0.5-IRPO_3e-6-2ep_1alp_0lam the family "Qwen 0.5 IRPO 3e 6 2ep 1alp
+    0lam", on 98.8% of the 2026-09-05 batch: noise presented as a fact. The build brief is
+    explicit that a family is a developer-stated name."""
+    from model_cards.core.compose_llm import family_is_developer_stated as stated
+
+    readme = "# OLMo 2\nWe present OLMo 2, a family of fully open models."
+    assert stated("OLMo 2", readme.lower()) is True
+    assert stated("Mistral v0.3", "model card for mistral-7b-v0.3") is True
+    assert stated("RomboUltima", "romboultima-32b is a merged model") is True
+    # a leftover of the repo name that nothing calls a family
+    assert stated("f 6", "") is False
+    assert stated("BiBo v0.3", "") is False
+    assert stated("Qwen 0.5 IRPO 3e 6 2ep 1alp 0lam", "qwen") is False
+    assert stated("qwen continued v2.1", "") is False
+
+    # end to end: the OLMo README names the family, so the card keeps it
+    root = _write_bundle(tmp_path / "bundles")
+    art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
+    assert art.card["lineage"]["model_family"] == "OLMo 2"
+
+    # strip every mention, in any casing (the BibTeX key is lowercase), and the field
+    # becomes Not specified rather than a repo-name leftover
+    import re as _re
+
+    slug = "allenai-olmo-2-1124-7b-7df9a82518af"
+    bundle_path = tmp_path / "bundles" / slug / "source_bundle" / "source-bundle.json"
+    sb = json.loads(bundle_path.read_text())
+    strip = lambda text: _re.sub(r"olmo", "Thing", text, flags=_re.IGNORECASE)
+    stripped = strip(README)
+    sb["files"][0] = _file("README.md", sb["files"][0]["source_uri"], stripped)
+    bundle_path.write_text(json.dumps(sb))
+    docling = (tmp_path / "bundles" / slug / "tool_output" / "docling" / f"{slug}.json")
+    docling.write_text(json.dumps({"success": True, "filtered_text": strip(PAPER),
+                                   "metadata": {}}))
+    hf_path = tmp_path / "bundles" / slug / "tool_output" / "hf" / f"{slug}.json"
+    hf = json.loads(hf_path.read_text())
+    hf["readme_markdown"] = stripped
+    hf_path.write_text(json.dumps(hf))
+    art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
+    assert art.card["lineage"]["model_family"] == "Not specified"

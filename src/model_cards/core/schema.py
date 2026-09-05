@@ -23,7 +23,6 @@ import re
 from typing import Any, Mapping, MutableMapping, Sequence
 
 
-
 SCHEMA_VERSION = "1"
 NOT_SPECIFIED = "Not specified"
 NOT_APPLICABLE = "Not applicable"

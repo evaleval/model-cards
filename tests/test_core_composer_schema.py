@@ -118,3 +118,26 @@ def test_blank_card_matches_section_models():
             if fname == "provenance" and sec != "provenance_and_quality":
                 continue
             assert fname in card[sec], (sec, fname)
+
+
+def test_stage_b_is_told_the_excerpt_rule_it_has_to_satisfy():
+    """Failure class: writer_copies_its_source. On the 2026-09-05 batch of 246 cards the
+    export guard caught a twelve-word verbatim run in a prose field on 176 of them, and
+    withheld the field. The guard is the published contract, so the writer has to be told
+    the rule rather than left to fail it: identity.summary landed on 19.5% of cards."""
+    from model_cards.core import composer_schema as CS
+    from model_cards.core.public import SOURCE_EXCERPT_MIN_WORDS
+
+    rules = CS.model_card_schema().stage_b_rules
+    assert "twelve consecutive words" in rules
+    assert SOURCE_EXCERPT_MIN_WORDS == 12
+    assert "discarded and the field is left empty" in rules
+    # the caps are part of what shapes an answer, so the fingerprint moves with the rules
+    first = CS.prompts_fingerprint()
+    original = CS.STAGE_B_RULES
+    try:
+        CS.STAGE_B_RULES = original.replace("twelve consecutive words", "many words")
+        assert CS.prompts_fingerprint() != first
+    finally:
+        CS.STAGE_B_RULES = original
+    assert CS.prompts_fingerprint() == first

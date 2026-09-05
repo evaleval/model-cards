@@ -201,3 +201,46 @@ def test_the_target_list_deduplicates_on_the_hubs_canonical_id(tmp_path, monkeyp
     assert len(ids) == len(set(ids))
     assert all("@" in row["target"] and row["target"].startswith(row["model_id"])
                for row in result["targets"])
+
+
+def test_the_summarizer_refuses_to_pool_two_instruments(tmp_path):
+    """Failure class: pooled_instruments. A reworded prompt is a different question, and
+    an average over both answers neither."""
+    for index, instrument in enumerate(("aaa", "bbb")):
+        (tmp_path / f"c{index}.json").write_text(json.dumps({
+            "target": f"org/m{index}@{'a' * 40}",
+            "instrument": {"id": instrument, "version": "v1"},
+            "verdict": {"field_verdicts": [{"path": "identity.summary",
+                                            "status": "supported",
+                                            "relation": "exact_target",
+                                            "info_in_source": "na", "note": ""}]},
+            "usage": {"cost_usd": 0.01}}))
+    done = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "run_eval.py"), "summarize",
+         "--results", str(tmp_path)], capture_output=True, text=True, cwd=str(ROOT))
+    assert done.returncode == 2
+    assert "refusing to pool" in done.stderr
+
+
+def test_the_summarizer_refuses_an_inputs_directory(tmp_path):
+    """A prepared input has no verdict; summarizing one would report zeros as findings."""
+    (tmp_path / "c0.json").write_text(json.dumps(
+        {"target": "org/m@" + "a" * 40, "fields": [], "sources": []}))
+    done = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "run_eval.py"), "summarize",
+         "--results", str(tmp_path)], capture_output=True, text=True, cwd=str(ROOT))
+    assert done.returncode == 2
+    assert "inputs directory" in done.stderr
+
+
+def test_the_screen_runner_caps_its_searches_and_its_spend():
+    """cost_tripwire_missing, screen side. The screen uses server-side web search, which
+    is billed on top of tokens, so both the search count and the spend are capped."""
+    text = (ROOT / "scripts" / "run_eval.py").read_text(encoding="utf-8")
+    assert '"type": "web_search_20250305"' in text
+    assert '"max_uses": args.max_searches' in text
+    assert "--max-searches" in text
+    screen = text[text.index("def cmd_screen("):text.index("def cmd_summarize(")]
+    assert "temperature=0" in screen
+    assert "if spent >= args.max_cost_usd" in screen
+    assert "no pricing entry" in screen

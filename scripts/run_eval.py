@@ -8,11 +8,15 @@
     python scripts/run_eval.py estimate --inputs eval/judge-inputs --model claude-sonnet-5
     python scripts/run_eval.py judge   --inputs eval/judge-inputs --out eval/judge-results \
         --model claude-sonnet-5 --max-cost-usd 5
+    python scripts/run_eval.py screen  --inputs eval/screen-inputs --out eval/screen-results \
+        --model claude-sonnet-5 --max-cost-usd 5 --max-searches 8
 
-prepare, probes, sample and estimate are free and offline. `judge` is the only paid
-command: it calls the Anthropic API once per card, with temperature 0, a pinned model, a
-per-run cost ceiling it refuses to cross, and the instrument id recorded in every result.
-Estimate first, and post the estimate before running it.
+prepare, probes, sample and estimate are free and offline. `judge` and `screen` are the
+paid commands: one Anthropic call per card, temperature 0, a pinned model, a per-run cost
+ceiling they refuse to cross, and the instrument id recorded in every result. The screen
+additionally uses server-side web search, capped per card, because its question is
+whether the card matches the public record and the frozen bundle cannot answer that.
+Estimate first, and post the estimate before running either.
 """
 
 from __future__ import annotations
@@ -204,6 +208,99 @@ def cmd_judge(args) -> int:
     return 1 if failed else 0
 
 
+def cmd_screen(args) -> int:
+    import anthropic
+
+    if args.model not in PRICING_USD_PER_MTOK:
+        print(f"no pricing entry for {args.model}; add one before spending", file=sys.stderr)
+        return 2
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("ANTHROPIC_API_KEY is not set", file=sys.stderr)
+        return 2
+    price = PRICING_USD_PER_MTOK[args.model]
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    client = anthropic.Anthropic(timeout=float(args.timeout), max_retries=2)
+    tools = [
+        {"type": "web_search_20250305", "name": "web_search",
+         "max_uses": args.max_searches},
+        {"name": "record_screen", "description": "Record the audit verdict.",
+         "input_schema": SC.SCREEN_SCHEMA},
+    ]
+    spent, done, failed = 0.0, 0, 0
+    for path in sorted(Path(args.inputs).glob("*.json")):
+        result_path = out / path.name
+        if args.resume and result_path.is_file():
+            continue
+        if spent >= args.max_cost_usd:
+            print(f"stopping: spent USD {spent:.4f} of the USD {args.max_cost_usd:.2f} cap")
+            break
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        message = (payload["prompt"] + "\n\nThe card under audit, and where it came from:\n"
+                   + json.dumps({"target": payload["target"], "hub_url": payload["hub_url"],
+                                 "card": payload["card"]}, ensure_ascii=False))
+        started = time.monotonic()
+        try:
+            reply = client.messages.create(
+                model=args.model, max_tokens=args.max_tokens, temperature=0,
+                tools=tools, messages=[{"role": "user", "content": message}])
+        except Exception as exc:
+            failed += 1
+            print(f"{path.stem}: {type(exc).__name__}: {exc}"[:200], file=sys.stderr)
+            continue
+        verdict = next((block.input for block in reply.content
+                        if getattr(block, "type", "") == "tool_use"
+                        and getattr(block, "name", "") == "record_screen"), None)
+        searches = sum(1 for block in reply.content
+                       if getattr(block, "type", "") == "server_tool_use")
+        cost = (reply.usage.input_tokens / 1e6 * price["input"]
+                + reply.usage.output_tokens / 1e6 * price["output"])
+        spent += cost
+        done += 1
+        result_path.write_text(json.dumps({
+            "target": payload["target"], "instrument": payload["instrument"],
+            "screen_model": args.model, "verdict": verdict, "web_searches": searches,
+            "usage": {"input_tokens": reply.usage.input_tokens,
+                      "output_tokens": reply.usage.output_tokens,
+                      "cost_usd": round(cost, 6),
+                      "wall_s": round(time.monotonic() - started, 2)},
+        }, indent=1, ensure_ascii=False), encoding="utf-8")
+    print(json.dumps({"screened": done, "failed": failed, "spent_usd": round(spent, 4),
+                      "cap_usd": args.max_cost_usd,
+                      "note": "web search is billed separately from tokens", "out": str(out)},
+                     indent=1))
+    return 1 if failed else 0
+
+
+def cmd_summarize(args) -> int:
+    """Aggregate a directory of judge or screen results. Free and offline."""
+    results = [json.loads(p.read_text(encoding="utf-8"))
+               for p in sorted(Path(args.results).glob("*.json"))]
+    results = [r for r in results if isinstance(r, dict) and "verdict" in r]
+    if not results:
+        print("no result files here: a result carries a 'verdict'; this looks like an "
+              "inputs directory", file=sys.stderr)
+        return 2
+    instruments = sorted({r["instrument"]["id"] for r in results if r.get("instrument")})
+    if len(instruments) > 1:
+        # a reworded prompt is a different instrument, and pooling the two would report a
+        # number that answers no single question
+        print(f"refusing to pool {len(instruments)} instruments: {instruments}",
+              file=sys.stderr)
+        return 2
+    if any("field_verdicts" in (r.get("verdict") or {}) for r in results):
+        merged = [v for r in results for v in (r["verdict"] or {}).get("field_verdicts", [])]
+        summary = {"kind": "judge", "cards": len(results), **J.summarize(merged)}
+    else:
+        summary = {"kind": "screen",
+                   **SC.summarize([r["verdict"] for r in results if r.get("verdict")])}
+    summary["instrument"] = instruments[0] if instruments else None
+    summary["total_cost_usd"] = round(sum((r.get("usage") or {}).get("cost_usd", 0.0)
+                                          for r in results), 6)
+    print(json.dumps(summary, indent=1))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="command", required=True)
@@ -234,6 +331,21 @@ def main() -> int:
     p.add_argument("--model", default="claude-sonnet-5")
     p.add_argument("--max-tokens", type=int, default=8000)
     p.set_defaults(handler=cmd_estimate)
+
+    p = sub.add_parser("screen")
+    p.add_argument("--inputs", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--model", default="claude-sonnet-5")
+    p.add_argument("--max-tokens", type=int, default=16000)
+    p.add_argument("--max-searches", type=int, default=8)
+    p.add_argument("--max-cost-usd", type=float, required=True)
+    p.add_argument("--timeout", type=int, default=900)
+    p.add_argument("--resume", action="store_true")
+    p.set_defaults(handler=cmd_screen)
+
+    p = sub.add_parser("summarize")
+    p.add_argument("--results", required=True)
+    p.set_defaults(handler=cmd_summarize)
 
     p = sub.add_parser("judge")
     p.add_argument("--inputs", required=True)

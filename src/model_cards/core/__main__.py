@@ -1,4 +1,4 @@
-"""Run BindCard as ``python -m model_card_system``."""
+"""Run BindCard as ``python -m model_cards.core``."""
 
 from .cli import main
 

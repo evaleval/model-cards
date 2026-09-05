@@ -320,6 +320,18 @@ def _stage_a(llm, schema, frame, doc_index, model_id: str, revision: str, source
     return items, telem
 
 
+# A link field holds a URL. Left unchecked, the writer filled links.code_repository with
+# "The instructed model can be downloaded here." on Mistral-7B-Instruct-v0.2: a true
+# sentence from the README, in a field that is supposed to be clickable.
+LINK_FIELDS = frozenset({"links.model_card", "links.system_card", "links.tech_report",
+                         "links.code_repository"})
+_URL_VALUE_RE = re.compile(r"^https?://[^\s<>\"']+$")
+
+
+def is_url(value: Any) -> bool:
+    return isinstance(value, str) and bool(_URL_VALUE_RE.match(value.strip()))
+
+
 _PIPELINE_MODALITIES = {
     "text-generation": ("input: text", "output: text"),
     "text2text-generation": ("input: text", "output: text"),
@@ -388,9 +400,31 @@ def _table_score_specs(bundle: SourceBundle, bridge: ComposerBridge, frame: Dict
     return rows, specs
 
 
+FAMILY_MAX_TOKENS = 4
+FAMILY_MIN_WORD_LEN = 3
+
+
+def family_is_developer_stated(family: str, corroborating_text: str) -> bool:
+    """Whether a family name derived from the repo name is one the sources actually use.
+
+    It has to be short enough to be a name, carry at least one real word, and have every
+    real word of it present in the model's own documentation. A hyperparameter string is
+    none of those things.
+    """
+    tokens = [t for t in re.split(r"[\s_-]+", family.strip()) if t]
+    if not tokens or len(tokens) > FAMILY_MAX_TOKENS:
+        return False
+    words = [t for t in tokens if len(t) >= FAMILY_MIN_WORD_LEN and any(c.isalpha() for c in t)]
+    if not words:
+        return False
+    low = corroborating_text.lower()
+    return all(word.lower() in low for word in words)
+
+
 def _det_facts(bundle: SourceBundle, hf: Dict[str, Any], paper_sidecar: Dict[str, Any],
                eee: Dict[str, Any], github: Optional[Dict[str, Any]], info_file: SourceFile,
-               extras: Dict[str, Any], extras_file: Optional[SourceFile]
+               extras: Dict[str, Any], extras_file: Optional[SourceFile],
+               paper_text: str = "", github_text: str = ""
                ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """Structured-channel values plus the binding specs that carry them.
 
@@ -473,7 +507,15 @@ def _det_facts(bundle: SourceBundle, hf: Dict[str, Any], paper_sidecar: Dict[str
         specs.append({"path": "identity.name", "value": repo_name,
                       "evidence": _target_manifest_evidence(bundle, "/target/repository_name",
                                                             repo_name)})
-    if fam and fam != repo_name:
+    # A family is a name the developer uses, not a leftover of the repo name. Deriving it
+    # unconditionally gave jaspionjader/f-6-8b the family "f 6" and
+    # JayHyeon/Qwen_0.5-IRPO_3e-6-2ep_1alp_0lam the family "Qwen 0.5 IRPO 3e 6 2ep 1alp
+    # 0lam": noise presented as a fact, on 98.8% of the 2026-09-05 batch. The derived name
+    # is kept only when the sources actually use it, which is the same rule the frame
+    # applies to any name a model proposes.
+    corroborating = " ".join(t for t in (readme_file.content if readme_file else "",
+                                         paper_text, github_text) if t).lower()
+    if fam and fam != repo_name and family_is_developer_stated(fam, corroborating):
         facts["lineage.model_family"] = fam
         specs.append({"path": "lineage.model_family", "value": fam,
                       "evidence": _target_manifest_evidence(bundle, "/target/repository_name", repo_name),
@@ -680,8 +722,8 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
     # the README the extractor reads and the verifier checks is the recorded plain
     # view (links to their text, markup removed); the raw README.md stays in the
     # bundle for the structured channel and the table rows anchor in the plain view
-    readme_raw = base_bundle.files[[f.name for f in base_bundle.files].index("README.md")]
-    readme_plain = markdown_plain(readme_raw.content or "")
+    readme_raw = next((f for f in base_bundle.files if f.name == "README.md"), None)
+    readme_plain = markdown_plain((readme_raw.content if readme_raw else "") or "")
     extras = b["extras"] or {}
     extras_text = json.dumps({k: extras.get(k) for k in ("safetensors_bytes", "readme_frontmatter",
                                                          "model_index_from_frontmatter")},
@@ -689,7 +731,9 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
     html_pages = [p for p in (b["html"] or {}).get("pages") or [] if (p.get("text") or "").strip()]
     html_text = "\n\n".join(f"# {p.get('title') or p['url']}\n{p['text']}" for p in html_pages)
     bundle = _extend_bundle(base_bundle, [
-        ("README.plain.md", f"{readme_raw.source_uri}#plain", "text/markdown", readme_plain),
+        ("README.plain.md",
+         f"{readme_raw.source_uri}#plain" if readme_raw
+         else f"https://huggingface.co/{model_id}#no-readme", "text/markdown", readme_plain),
         ("paper.md", paper_url or f"https://huggingface.co/{model_id}#paper", "text/markdown", paper_text),
         ("github_README.md", (github or {}).get("url") or "", "text/markdown", (github or {}).get("text") or ""),
         ("pages.md", html_pages[0]["url"] if html_pages else "", "text/markdown", html_text),
@@ -698,8 +742,10 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
         ("eee.json", "https://huggingface.co/datasets/evaleval/EEE_datastore", "application/json", eee_text),
     ])
     files = {f.name: f for f in bundle.files}
-    readme_file = files["README.md"]
-    files_by_doc = {DOC_README: files.get("README.plain.md", readme_file)}
+    files_by_doc = {}
+    plain = files.get("README.plain.md") or files.get("README.md")
+    if plain is not None:
+        files_by_doc[DOC_README] = plain
     if "paper.md" in files:
         files_by_doc[DOC_PAPER] = files["paper.md"]
     if "github_README.md" in files:
@@ -714,7 +760,9 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
                               llm_handler=llm)
 
     items_by_doc, quote_telem = _stage_a(llm, schema, frame, doc_index, model_id, rev, {
-        "hf_meta": hf, "readme": files_by_doc[DOC_README].content or "", "paper": paper_text,
+        "hf_meta": hf,
+        "readme": (files_by_doc[DOC_README].content or "") if DOC_README in files_by_doc else "",
+        "paper": paper_text,
         "github": (github or {}).get("text") or "", "html": html_text})
     gate_telem: Dict[str, Any] = {}
     items, _ = evidence.finalize_evidence(items_by_doc.get(DOC_PAPER, []), [], [],
@@ -738,7 +786,9 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
     items_by_id = {it["evidence_id"]: it for its in digest.values() for it in its}
 
     det_facts, det_specs = _det_facts(bundle, hf, b["paper_sidecar"], b["eee"], github,
-                                      files["model_info.json"], extras, files.get("extras.json"))
+                                      files["model_info.json"], extras, files.get("extras.json"),
+                                      paper_text=paper_text,
+                                      github_text=(github or {}).get("text") or "")
     score_rows, score_specs = _table_score_specs(bundle, bridge, frame, files_by_doc)
     score_conflicts = [spec["conflict"] for spec in score_specs if "conflict" in spec]
     if score_rows:
@@ -914,6 +964,10 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
             else:
                 entity = ClaimEntity(label=ref_node.get("name") or "unresolved referent")
                 relation, action, reason, origin = RelationToTarget.UNKNOWN, VerifierAction.WITHHOLD, "referent_unresolved", AssignmentOrigin.UNRESOLVED
+            if path in LINK_FIELDS and not is_url(value):
+                record(path, value, spans, relation, entity, VerifierAction.WITHHOLD,
+                       "link_field_is_not_a_url", AssignmentOrigin.LLM_INFERRED)
+                continue
             if missing:
                 # Stage B may rephrase, but it may not introduce a number or an entity
                 # name that no cited quote contains. That is the splice signature: the

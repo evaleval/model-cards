@@ -295,32 +295,47 @@ def _same_score(a: str, b: str) -> bool:
 
 
 def reconcile_rows(rows: List[Dict[str, Any]]) -> tuple:
-    """Reconcile score rows collected from more than one source.
+    """Reconcile score rows that more than one SOURCE reports for the same claim.
 
-    Returns (accepted, withheld). Rows sharing a benchmark and a setting are one claim:
-    identical scores collapse to one row that records both sources; different scores are
-    a contradiction the sources do not resolve, so both are withheld with a conflict
-    flag. Different settings are two different measurements and both are kept.
+    Returns (accepted, withheld). Two sources reporting one benchmark under one setting
+    make one claim: identical scores collapse to a single row recording both sources, and
+    different scores are a contradiction the sources do not resolve, so both are withheld
+    with a conflict flag.
+
+    Rows from the SAME source are never a conflict. A README often carries several results
+    tables (thinking and non-thinking mode, per-language breakdowns, a headline table and
+    a detailed one) whose rows share a benchmark name and state no setting. Treating those
+    as one claim withheld 279 real score rows across the 2026-09-05 batch, including
+    twenty-three per-language CER rows collapsed into a single contradiction.
     """
     by_scope: Dict[tuple, List[Dict[str, Any]]] = {}
     for row in rows:
         by_scope.setdefault(_scope(row), []).append(row)
     accepted: List[Dict[str, Any]] = []
     withheld: List[Dict[str, Any]] = []
-    for scope, group in by_scope.items():
+    for group in by_scope.values():
+        docs: List[str] = []
+        for row in group:
+            if row["source_doc"] not in docs:
+                docs.append(row["source_doc"])
+        if len(docs) == 1:
+            # one source: these are distinct rows of distinct tables, kept once each
+            seen_scores = set()
+            for row in group:
+                key = str(row["score"]).strip()
+                if key in seen_scores:
+                    continue
+                seen_scores.add(key)
+                accepted.append({**row, "source_docs": docs})
+            continue
         values = sorted({str(r["score"]).strip() for r in group})
         if all(_same_score(values[0], v) for v in values):
-            first = dict(group[0])
-            docs = []
-            for r in group:
-                if r["source_doc"] not in docs:
-                    docs.append(r["source_doc"])
-            first["source_docs"] = docs
-            accepted.append(first)
+            accepted.append({**group[0], "source_docs": docs})
             continue
-        for r in group:
-            withheld.append({**r, "withhold_reason": "score_conflict_between_sources",
+        for row in group:
+            withheld.append({**row, "withhold_reason": "score_conflict_between_sources",
                              "conflict": values,
                              "conflict_scope": {"benchmark": group[0]["benchmark"],
-                                                "setting": group[0].get("setting")}})
+                                                "setting": group[0].get("setting"),
+                                                "sources": docs}})
     return accepted, withheld

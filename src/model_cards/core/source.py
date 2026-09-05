@@ -128,10 +128,16 @@ class HfModelSourceAdapter:
             for name in ("README.md", "config.json")
             if (item := _read_text_file(snapshot, model_id, resolved_revision, name)) is not None
         )
-        if not any(item.name == "README.md" for item in files):
-            raise ModelSourceError(f"exact snapshot has no cached README.md: {target}")
+        if not files:
+            raise ModelSourceError(
+                f"exact snapshot has neither README.md nor config.json: {target}")
 
-        readme = next(item.content for item in files if item.name == "README.md") or ""
+        # A repository with weights and a config but no model card is still a model, and
+        # its card is the config and the Hub manifest. Requiring a README refused
+        # ontocord/wide_3b_sft_stage1.2-ss1-expert_fictional_lyrical outright, which has
+        # a config.json and four safetensors shards.
+        readme_file = next((item for item in files if item.name == "README.md"), None)
+        readme = (readme_file.content if readme_file is not None else "") or ""
         config: dict[str, Any] = {}
         config_file = next((item for item in files if item.name == "config.json"), None)
         if config_file is not None and config_file.content:

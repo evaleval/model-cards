@@ -177,11 +177,29 @@ def test_the_evaluation_setting_travels_with_the_score():
     accepted, conflicted = reconcile_rows([a, dict(a, source_doc="docling", row_text="r3")])
     assert len(accepted) == 1 and accepted[0]["source_docs"] == ["hf_readme", "docling"]
     assert conflicted == []
-    # same scope, different values: no evidence chooses, so neither is published
+    # two sources, same scope, different values: no evidence chooses, neither is published
     accepted, conflicted = reconcile_rows([a, dict(a, score="65.2", source_doc="docling")])
     assert accepted == [] and len(conflicted) == 2
     assert conflicted[0]["withhold_reason"] == "score_conflict_between_sources"
     assert conflicted[0]["conflict"] == ["63.7", "65.2"]
+
+
+def test_two_tables_in_one_readme_are_not_a_contradiction():
+    """Failure class: same_source_rows_read_as_a_conflict. A README carries several
+    results tables (thinking and non-thinking mode, per-language breakdowns, a headline
+    table and a detailed one) whose rows share a benchmark name and state no setting.
+    Treating those as one claim withheld 279 real score rows across the 2026-09-05 batch,
+    including twenty-three per-language CER rows collapsed into one contradiction."""
+    rows = [dict(benchmark="CER", score=score, metric="Not specified",
+                 setting="Not specified", source_doc="hf_readme", row_text=f"r{i}",
+                 header=[], caption=f"Table {i}")
+            for i, score in enumerate(("0.032", "0.041", "0.056"))]
+    accepted, conflicted = reconcile_rows(rows)
+    assert conflicted == []
+    assert sorted(r["score"] for r in accepted) == ["0.032", "0.041", "0.056"]
+    # an exact repeat within one source is still one row
+    accepted, _ = reconcile_rows(rows + [dict(rows[0], row_text="again")])
+    assert len(accepted) == 3
 
 
 # 6 ------------------------------------------------------------------------------------
