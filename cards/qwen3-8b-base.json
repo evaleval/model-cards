@@ -357,10 +357,10 @@
     "developed_by": "Qwen (Hub organization)",
     "license": "apache-2.0",
     "model_id": "Qwen/Qwen3-8B-Base",
-    "model_type": "Causal Language Models",
+    "model_type": "Causal language model",
     "name": "Qwen3-8B-Base",
     "release_date": "2025-04-28 (Hugging Face repository creation date)",
-    "summary": "Qwen3-8B-Base is an open-weighted dense model in the Qwen3 series, released under the Apache 2.0 license.",
+    "summary": "Qwen3-8B-Base is an open-weight dense model in the Qwen3 series, released under the Apache 2.0 license.",
     "version": "49e3418fbbbca6ecbdf9608b4d22e5a407081db4"
   },
   "lineage": {
@@ -387,9 +387,9 @@
     "precision": "BF16 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "Not specified",
+    "adaptations": "The model card states the training stage is pretraining, indicating no post-training or alignment is described for this checkpoint.",
     "data_cutoff": "Not specified",
-    "training_data": "Not specified",
+    "training_data": "The target checkpoint is a pretrained model; the cited pretraining corpus description refers to the Qwen3 family, not this checkpoint specifically, so it is not attributed as this model's own training data.",
     "training_data_size": "Not specified"
   }
 }

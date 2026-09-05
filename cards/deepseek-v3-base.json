@@ -38,17 +38,17 @@
       }
     ],
     "human_evals": "Not specified",
-    "results_summary": "Not specified",
+    "results_summary": "The developer reports that DeepSeek-V3 surpasses other open-source models and is on par with leading closed-source models in comprehensive evaluations.",
     "safety_evals": "Not specified"
   },
   "identity": {
     "developed_by": "deepseek-ai (Hub organization)",
     "license": "Not specified",
     "model_id": "deepseek-ai/DeepSeek-V3-Base",
-    "model_type": "Mixture-of-Experts (MoE) language model",
+    "model_type": "Not specified",
     "name": "DeepSeek-V3-Base",
     "release_date": "2024-12-25 (Hugging Face repository creation date)",
-    "summary": "Not specified",
+    "summary": "DeepSeek-V3 is a large Mixture-of-Experts language model with 671B total parameters and 37B activated per token.",
     "version": "afb92e1fa402c2be2a9eb085312bb02e0384d6c7"
   },
   "lineage": {
@@ -67,17 +67,17 @@
     "architecture_type": "mixture-of-experts",
     "context_length": "163,840 tokens (config.json max_position_embeddings)",
     "input_output": [
-      "text in",
-      "text out"
+      "Text input",
+      "Text output"
     ],
     "model_size": "641.3 GiB of safetensors weights (688,586,727,753 bytes) in F8_E4M3",
     "num_parameters": "684,531,386,000 parameters (safetensors metadata)",
     "precision": "F8_E4M3 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "DeepSeek-V3 underwent Supervised Fine-Tuning and Reinforcement Learning stages after pre-training. Additionally, reasoning capabilities were distilled from a DeepSeek R1 series long-Chain-of-Thought model into DeepSeek-V3.",
+    "adaptations": "Not specified",
     "data_cutoff": "Not specified",
-    "training_data": "Not specified",
+    "training_data": "The DeepSeek-V3 family was pre-trained on 14.8 trillion diverse and high-quality tokens in its tokenizer.",
     "training_data_size": "14.8 trillion tokens"
   }
 }

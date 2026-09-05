@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [qwen3\-8b\.json](<./qwen3-8b.json>)<br>
-SHA-256: `dc75ce02cd02ffb3c7751c9dd7f751c6f49cd014f79ba73af3f919212b1cda25`
+SHA-256: `281a767a87f245696445c08dce4692651e8deb9fd2ed1aa391590fd778776f11`
 
 ## Identity
 
@@ -12,11 +12,10 @@ SHA-256: `dc75ce02cd02ffb3c7751c9dd7f751c6f49cd014f79ba73af3f919212b1cda25`
 | Model ID | Qwen/Qwen3\-8B |
 | Name | Qwen3\-8B |
 | Developed by | Qwen \(Hub organization\) |
-| Model type | Causal Language Models |
 | License | apache\-2\.0 |
 | Release date | 2025\-04\-27 \(Hugging Face repository creation date\) |
 | Version | b968826d9c46dd6066d109eabc6255188de91218 |
-| Summary | Qwen3\-8B is a causal language model\. |
+| Summary | Qwen3\-8B is one of six open\-weighted dense models in the Qwen3 family, released under the Apache 2\.0 license\. |
 
 ## Lineage
 
@@ -38,9 +37,7 @@ SHA-256: `dc75ce02cd02ffb3c7751c9dd7f751c6f49cd014f79ba73af3f919212b1cda25`
 
 ## Training Context
 
-| Field | Value |
-| --- | --- |
-| Adaptations | The model card states its training stage as pretraining and post\-training, indicating that the released checkpoint underwent both stages\. |
+_No specified fields are available in the publication data._
 
 ## Access and Adoption
 
@@ -112,4 +109,4 @@ _No specified fields are available in the publication data._
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.

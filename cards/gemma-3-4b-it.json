@@ -7,7 +7,7 @@
   "evaluation": {
     "benchmark_scores": "Not specified",
     "human_evals": "Not specified",
-    "results_summary": "Not specified",
+    "results_summary": "The developer reports that the model was evaluated on a large collection of datasets and metrics covering different aspects of text generation.",
     "safety_evals": "Not specified"
   },
   "identity": {
@@ -50,9 +50,9 @@
     "precision": "BF16 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "The model is instruction-tuned, so chat templates must be used to process inputs before generation.",
+    "adaptations": "Instruction-tuned models require chat templates to process inputs first.",
     "data_cutoff": "Not specified",
-    "training_data": "The 4B checkpoint was trained on a text dataset that includes a wide variety of sources: web documents in over 140 languages, code, mathematics, and images.",
+    "training_data": "Not specified",
     "training_data_size": "Not specified"
   }
 }

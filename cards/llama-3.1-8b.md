@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [llama\-3\.1\-8b\.json](<./llama-3.1-8b.json>)<br>
-SHA-256: `5a0e1b90deec5b8039ef71c57c95b624222b961bc0db44f5b0c5b443f330a394`
+SHA-256: `332535c5f0e1431287e92c82e26d02dc126677c470b1cba439b9157ecb9060cd`
 
 ## Identity
 
@@ -15,7 +15,7 @@ SHA-256: `5a0e1b90deec5b8039ef71c57c95b624222b961bc0db44f5b0c5b443f330a394`
 | License | llama3\.1 |
 | Release date | 2024\-07\-14 \(Hugging Face repository creation date\) |
 | Version | d04e592bb4f6aa9cfee91e2e20afa771667e1d4b |
-| Summary | A pretrained and instruction\-tuned generative multilingual large language model in the 8B size of the Meta Llama 3\.1 collection, supporting text\-in/text\-out use\. |
+| Summary | A multilingual large language model from the Llama 3\.1 collection, available in 8B, 70B, and 405B sizes and supporting text in/text out\. |
 
 ## Lineage
 
@@ -36,8 +36,8 @@ SHA-256: `5a0e1b90deec5b8039ef71c57c95b624222b961bc0db44f5b0c5b443f330a394`
 
 | Field | Value |
 | --- | --- |
-| Training data | The model was trained on a new mix of publicly available online data\. |
-| Training data size | 15T\+ |
+| Training data | The checkpoint was trained on a new mix of publicly available online data\. |
+| Training data size | 15T\+ tokens |
 | Data cutoff | December 2023 |
 
 ## Access and Adoption
@@ -50,7 +50,9 @@ SHA-256: `5a0e1b90deec5b8039ef71c57c95b624222b961bc0db44f5b0c5b443f330a394`
 
 ## Evaluation
 
-_No specified fields are available in the publication data._
+| Field | Value |
+| --- | --- |
+| Results summary | The developer states that the Llama 3\.1 instruction\-tuned text\-only models, including the 8B variant, are optimized for multilingual dialogue and outperform many open\-source and closed chat models on common industry benchmarks\. |
 
 ## Links
 
@@ -61,4 +63,4 @@ _No specified fields are available in the publication data._
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `lineage.base_models`, `lineage.derivatives`, `specifications.architecture_type`, `specifications.context_length`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `lineage.base_models`, `lineage.derivatives`, `specifications.architecture_type`, `specifications.context_length`, `training_context.adaptations`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.

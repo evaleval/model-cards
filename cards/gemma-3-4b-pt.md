@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [gemma\-3\-4b\-pt\.json](<./gemma-3-4b-pt.json>)<br>
-SHA-256: `389111514504136abe7825f1b73d859e049e162f84b6c932df432b88c091ac96`
+SHA-256: `f9450489451d838a81888363ba647f8964e5501d8913e9374e0af3c81612ecf6`
 
 ## Identity
 
@@ -33,7 +33,10 @@ SHA-256: `389111514504136abe7825f1b73d859e049e162f84b6c932df432b88c091ac96`
 
 ## Training Context
 
-_No specified fields are available in the publication data._
+| Field | Value |
+| --- | --- |
+| Training data | The 4B checkpoint was trained on a text dataset assembled from a wide variety of sources\. |
+| Adaptations | The model is available as both a pre\-trained variant and an instruction\-tuned variant\. |
 
 ## Access and Adoption
 
@@ -45,7 +48,9 @@ _No specified fields are available in the publication data._
 
 ## Evaluation
 
-_No specified fields are available in the publication data._
+| Field | Value |
+| --- | --- |
+| Results summary | The developer reports a broad evaluation across text, multilingual, and multimodal benchmarks, with the model&\#x27;s scores listed in a table alongside other Gemma 3 variants\. |
 
 ### Benchmark Scores
 
@@ -103,4 +108,4 @@ _No specified fields are available in the publication data._
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `identity.summary`, `lineage.base_models`, `lineage.derivatives`, `specifications.architecture_type`, `specifications.context_length`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.code_repository`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `identity.summary`, `lineage.base_models`, `lineage.derivatives`, `specifications.architecture_type`, `specifications.context_length`, `training_context.training_data_size`, `training_context.data_cutoff`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.code_repository`.

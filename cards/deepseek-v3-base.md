@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [deepseek\-v3\-base\.json](<./deepseek-v3-base.json>)<br>
-SHA-256: `0196b8d42e40c7b5d5e6ee3252d798ac5946bd4fd315626f284524e0d5853c9f`
+SHA-256: `3e0272da3241c0457fcaec4d61b7479cf6b23387d549bacd229ac0241e5853d1`
 
 ## Identity
 
@@ -12,9 +12,9 @@ SHA-256: `0196b8d42e40c7b5d5e6ee3252d798ac5946bd4fd315626f284524e0d5853c9f`
 | Model ID | deepseek\-ai/DeepSeek\-V3\-Base |
 | Name | DeepSeek\-V3\-Base |
 | Developed by | deepseek\-ai \(Hub organization\) |
-| Model type | Mixture\-of\-Experts \(MoE\) language model |
 | Release date | 2024\-12\-25 \(Hugging Face repository creation date\) |
 | Version | afb92e1fa402c2be2a9eb085312bb02e0384d6c7 |
+| Summary | DeepSeek\-V3 is a large Mixture\-of\-Experts language model with 671B total parameters and 37B activated per token\. |
 
 ## Lineage
 
@@ -31,14 +31,14 @@ SHA-256: `0196b8d42e40c7b5d5e6ee3252d798ac5946bd4fd315626f284524e0d5853c9f`
 | Context length | 163,840 tokens \(config\.json max\_position\_embeddings\) |
 | Precision | F8\_E4M3 \(safetensors weight dtype\) |
 | Model size | 641\.3 GiB of safetensors weights \(688,586,727,753 bytes\) in F8\_E4M3 |
-| Input / output | text in<br>text out |
+| Input / output | Text input<br>Text output |
 
 ## Training Context
 
 | Field | Value |
 | --- | --- |
+| Training data | The DeepSeek\-V3 family was pre\-trained on 14\.8 trillion diverse and high\-quality tokens in its tokenizer\. |
 | Training data size | 14\.8 trillion tokens |
-| Adaptations | DeepSeek\-V3 underwent Supervised Fine\-Tuning and Reinforcement Learning stages after pre\-training\. Additionally, reasoning capabilities were distilled from a DeepSeek R1 series long\-Chain\-of\-Thought model into DeepSeek\-V3\. |
 
 ## Access and Adoption
 
@@ -50,7 +50,9 @@ SHA-256: `0196b8d42e40c7b5d5e6ee3252d798ac5946bd4fd315626f284524e0d5853c9f`
 
 ## Evaluation
 
-_No specified fields are available in the publication data._
+| Field | Value |
+| --- | --- |
+| Results summary | The developer reports that DeepSeek\-V3 surpasses other open\-source models and is on par with leading closed\-source models in comprehensive evaluations\. |
 
 ### Benchmark Scores
 
@@ -73,4 +75,4 @@ _No specified fields are available in the publication data._
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.license`, `identity.summary`, `lineage.base_models`, `lineage.derivatives`, `training_context.training_data`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `identity.license`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.

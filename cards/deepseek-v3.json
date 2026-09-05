@@ -7,6 +7,54 @@
   "evaluation": {
     "benchmark_scores": [
       {
+        "benchmark": "English",
+        "metric": "Not specified",
+        "score": "0.548",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "English",
+        "metric": "Not specified",
+        "score": "88.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Code",
+        "metric": "Not specified",
+        "score": "65.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Code",
+        "metric": "Not specified",
+        "score": "82.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Math",
+        "metric": "Not specified",
+        "score": "89.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Math",
+        "metric": "Not specified",
+        "score": "39.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Chinese",
+        "metric": "Not specified",
+        "score": "82.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Chinese",
+        "metric": "Not specified",
+        "score": "90.9",
+        "setting": "Not specified"
+      },
+      {
         "benchmark": "Multilingual",
         "metric": "Not specified",
         "score": "79.4",
@@ -187,18 +235,18 @@
         "setting": "Not specified"
       }
     ],
-    "human_evals": "Note: English open-ended conversation evaluations. For AlpacaEval 2.0, the length-controlled win rate is used as the metric.",
-    "results_summary": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that DeepSeek-V3 outperforms other open-source models and is competitive with leading closed-source models, describing it as the best-performing open-source model in standard evaluations.",
     "safety_evals": "Not specified"
   },
   "identity": {
     "developed_by": "deepseek-ai (Hub organization)",
     "license": "Not specified",
     "model_id": "deepseek-ai/DeepSeek-V3",
-    "model_type": "Mixture-of-Experts (MoE) language model",
+    "model_type": "Not specified",
     "name": "DeepSeek-V3",
     "release_date": "2024-12-25 (Hugging Face repository creation date)",
-    "summary": "Not specified",
+    "summary": "DeepSeek-V3 is a large Mixture-of-Experts language model that activates 37B of its 671B parameters for each token.",
     "version": "e815299b0bcbac849fa540c768ef21845365c9eb"
   },
   "lineage": {
@@ -225,9 +273,9 @@
     "precision": "F8_E4M3 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "DeepSeek-V3 underwent Supervised Fine-Tuning and Reinforcement Learning after pre-training. It also incorporates a methodology that distills reasoning capabilities from a long-Chain-of-Thought model, specifically one of the DeepSeek R1 series models, into standard LLMs.",
+    "adaptations": "After pre-training, DeepSeek-V3 underwent Supervised Fine-Tuning and Reinforcement Learning stages. It also incorporated a methodology that distills reasoning capabilities from a DeepSeek R1 series long-Chain-of-Thought model into standard LLMs, particularly DeepSeek-V3.",
     "data_cutoff": "Not specified",
-    "training_data": "Not specified",
+    "training_data": "DeepSeek-V3 was pre-trained on 14.8 trillion diverse and high-quality tokens in its tokenizer.",
     "training_data_size": "14.8 trillion tokens"
   }
 }

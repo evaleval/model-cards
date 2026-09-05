@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [olmo\-2\-1124\-7b\-instruct\.json](<./olmo-2-1124-7b-instruct.json>)<br>
-SHA-256: `aa6d1b2b7d4df2a784806c806ddf37e39432405595a3c5396ae67fc7b78a856c`
+SHA-256: `752b4f83a3c1ae794b03d8b538731055ae6f2fd5bcc121080a28af34080ad5bd`
 
 ## Identity
 
@@ -12,10 +12,11 @@ SHA-256: `aa6d1b2b7d4df2a784806c806ddf37e39432405595a3c5396ae67fc7b78a856c`
 | Model ID | allenai/OLMo\-2\-1124\-7B\-Instruct |
 | Name | OLMo\-2\-1124\-7B\-Instruct |
 | Developed by | allenai \(Hub organization\) |
-| Model type | text\-generation |
+| Model type | Text generation model\. |
 | License | apache\-2\.0 |
 | Release date | 2024\-12\-18 \(Hugging Face repository creation date\) |
 | Version | 470b1fba1ae01581f270116362ee4aa1b97f4c84 |
+| Summary | OLMo 2 7B Instruct is a post\-trained language model built from the OLMo\-2 7B November 2024 base through supervised finetuning, DPO, and RLVR\. |
 
 ## Lineage
 
@@ -37,9 +38,7 @@ SHA-256: `aa6d1b2b7d4df2a784806c806ddf37e39432405595a3c5396ae67fc7b78a856c`
 
 ## Training Context
 
-| Field | Value |
-| --- | --- |
-| Training data | The OLMo 2 7B Instruct November 2024 checkpoint was post\-trained on an OLMo\-specific variant of the Tülu 3 dataset, used for supervised finetuning, DPO, and RLVR training\. |
+_No specified fields are available in the publication data._
 
 ## Access and Adoption
 
@@ -53,7 +52,7 @@ SHA-256: `aa6d1b2b7d4df2a784806c806ddf37e39432405595a3c5396ae67fc7b78a856c`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The developer\-reported results for OLMo\-2\-7B\-1124\-Instruct include an average score of 54\.8, with notable scores on GSM8k \(85\.1\), IFEval \(72\.3\), MMLU \(61\.3\), DROP \(60\.5\), TruthQA \(56\.5\), MATH \(32\.5\), AlpacaEval \(29\.1\), and PopQA \(23\.2\)\. |
+| Results summary | The developer\-reported table lists the instruct model&\#x27;s scores across a set of benchmarks, with an average of 54\.8 and notable results such as 85\.1 on GSM8k and 72\.3 on IFEval\. |
 
 ### Benchmark Scores
 
@@ -85,4 +84,4 @@ SHA-256: `aa6d1b2b7d4df2a784806c806ddf37e39432405595a3c5396ae67fc7b78a856c`
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.summary`, `lineage.derivatives`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.

@@ -267,10 +267,10 @@
     "developed_by": "Qwen (Hub organization)",
     "license": "apache-2.0",
     "model_id": "Qwen/Qwen3-8B",
-    "model_type": "Causal Language Models",
+    "model_type": "Not specified",
     "name": "Qwen3-8B",
     "release_date": "2025-04-27 (Hugging Face repository creation date)",
-    "summary": "Qwen3-8B is a causal language model.",
+    "summary": "Qwen3-8B is one of six open-weighted dense models in the Qwen3 family, released under the Apache 2.0 license.",
     "version": "b968826d9c46dd6066d109eabc6255188de91218"
   },
   "lineage": {
@@ -303,7 +303,7 @@
     "precision": "BF16 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "The model card states its training stage as pretraining and post-training, indicating that the released checkpoint underwent both stages.",
+    "adaptations": "Not specified",
     "data_cutoff": "Not specified",
     "training_data": "Not specified",
     "training_data_size": "Not specified"

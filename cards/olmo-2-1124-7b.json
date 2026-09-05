@@ -81,10 +81,10 @@
     "developed_by": "allenai (Hub organization)",
     "license": "apache-2.0",
     "model_id": "allenai/OLMo-2-1124-7B",
-    "model_type": "A Transformer style autoregressive language model.",
+    "model_type": "A Transformer-style autoregressive language model.",
     "name": "OLMo-2-1124-7B",
     "release_date": "2024-10-29 (Hugging Face repository creation date)",
-    "summary": "OLMo 2 is a family of fully open 7B and 13B language models with evaluation improvements over the original OLMo 7B model.",
+    "summary": "OLMo 2 is the next generation of fully open language models, with 7B and 13B variants showing improved MMLU and other evaluation gains over the original OLMo 7B.",
     "version": "7df9a82518afdecae4e8c026b27adccc8c1f0032"
   },
   "lineage": {
@@ -111,9 +111,9 @@
     "precision": "F32 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "The base model was post-trained to produce an Instruct variant using SFT, DPO, and PPO. For the 7B model, three runs on 50B high-quality tokens with different data orders were averaged (weight soup) to produce the final model.",
+    "adaptations": "Not specified",
     "data_cutoff": "Dec. 2023.",
-    "training_data": "The OLMo 2 family was trained in two stages: first on OLMo-mix-1124, approximately 3.9 trillion tokens with over 95% web data, then on Dolmino-mix-1124, a smaller mixture of quality-filtered web data and domain-specific high-quality data, much of it synthetic.",
+    "training_data": "The model was trained on OLMo-mix-1124 and Dolmino-mix-1124 datasets using a staged training approach. Pretraining Stage 1 used OLMo-Mix-1124 with 4 trillion tokens (1 epoch), and Pretraining Stage 2 used Dolmino-Mix-1124 with 50B tokens (3 runs) merged.",
     "training_data_size": "Not specified"
   }
 }

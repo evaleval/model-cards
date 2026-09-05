@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [mistral\-7b\-v0\.3\.json](<./mistral-7b-v0.3.json>)<br>
-SHA-256: `ba2cd413392580dbe0ca0abe2c21035afcfb90cebf051f078dae1f1861103c74`
+SHA-256: `34077fb1d837061e84f501b1fd49d4759c35ab0cd208641ab28d9199c25eeb25`
 
 ## Identity
 
@@ -12,11 +12,10 @@ SHA-256: `ba2cd413392580dbe0ca0abe2c21035afcfb90cebf051f078dae1f1861103c74`
 | Model ID | mistralai/Mistral\-7B\-v0\.3 |
 | Name | Mistral\-7B\-v0\.3 |
 | Developed by | mistralai \(Hub organization\) |
-| Model type | Large Language Model \(LLM\) |
 | License | apache\-2\.0 |
 | Release date | 2024\-05\-22 \(Hugging Face repository creation date\) |
 | Version | caa1feb0e54d415e2df31207e5f4e273e33509b1 |
-| Summary | Mistral\-7B\-v0\.3 is a Mistral\-7B\-v0\.2 with extended vocabulary\. |
+| Summary | Mistral\-7B\-v0\.3 is a large language model based on Mistral\-7B\-v0\.2 with an extended vocabulary\. |
 
 ## Lineage
 
@@ -62,4 +61,4 @@ _No specified fields are available in the publication data._
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `lineage.base_models`, `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `lineage.base_models`, `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.

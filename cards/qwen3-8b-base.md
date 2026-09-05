@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [qwen3\-8b\-base\.json](<./qwen3-8b-base.json>)<br>
-SHA-256: `34a69b99539ee70c4087c0412e32609660d19f01f482b026f1b8c18025dff45e`
+SHA-256: `7fc6a791a70a998e75233720e93ff3d6c586f2322812647238bc5003278414c8`
 
 ## Identity
 
@@ -12,11 +12,11 @@ SHA-256: `34a69b99539ee70c4087c0412e32609660d19f01f482b026f1b8c18025dff45e`
 | Model ID | Qwen/Qwen3\-8B\-Base |
 | Name | Qwen3\-8B\-Base |
 | Developed by | Qwen \(Hub organization\) |
-| Model type | Causal Language Models |
+| Model type | Causal language model |
 | License | apache\-2\.0 |
 | Release date | 2025\-04\-28 \(Hugging Face repository creation date\) |
 | Version | 49e3418fbbbca6ecbdf9608b4d22e5a407081db4 |
-| Summary | Qwen3\-8B\-Base is an open\-weighted dense model in the Qwen3 series, released under the Apache 2\.0 license\. |
+| Summary | Qwen3\-8B\-Base is an open\-weight dense model in the Qwen3 series, released under the Apache 2\.0 license\. |
 
 ## Lineage
 
@@ -37,7 +37,10 @@ SHA-256: `34a69b99539ee70c4087c0412e32609660d19f01f482b026f1b8c18025dff45e`
 
 ## Training Context
 
-_No specified fields are available in the publication data._
+| Field | Value |
+| --- | --- |
+| Training data | The target checkpoint is a pretrained model; the cited pretraining corpus description refers to the Qwen3 family, not this checkpoint specifically, so it is not attributed as this model&\#x27;s own training data\. |
+| Adaptations | The model card states the training stage is pretraining, indicating no post\-training or alignment is described for this checkpoint\. |
 
 ## Access and Adoption
 
@@ -124,4 +127,4 @@ _No specified fields are available in the publication data._
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `lineage.base_models`, `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `lineage.base_models`, `lineage.derivatives`, `training_context.training_data_size`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.

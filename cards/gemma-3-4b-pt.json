@@ -254,7 +254,7 @@
       }
     ],
     "human_evals": "Not specified",
-    "results_summary": "Not specified",
+    "results_summary": "The developer reports a broad evaluation across text, multilingual, and multimodal benchmarks, with the model's scores listed in a table alongside other Gemma 3 variants.",
     "safety_evals": "Not specified"
   },
   "identity": {
@@ -291,9 +291,9 @@
     "precision": "BF16 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "Not specified",
+    "adaptations": "The model is available as both a pre-trained variant and an instruction-tuned variant.",
     "data_cutoff": "Not specified",
-    "training_data": "Not specified",
+    "training_data": "The 4B checkpoint was trained on a text dataset assembled from a wide variety of sources.",
     "training_data_size": "Not specified"
   }
 }

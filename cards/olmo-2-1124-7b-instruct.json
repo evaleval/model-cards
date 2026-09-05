@@ -92,17 +92,17 @@
       }
     ],
     "human_evals": "Not specified",
-    "results_summary": "The developer-reported results for OLMo-2-7B-1124-Instruct include an average score of 54.8, with notable scores on GSM8k (85.1), IFEval (72.3), MMLU (61.3), DROP (60.5), TruthQA (56.5), MATH (32.5), AlpacaEval (29.1), and PopQA (23.2).",
+    "results_summary": "The developer-reported table lists the instruct model's scores across a set of benchmarks, with an average of 54.8 and notable results such as 85.1 on GSM8k and 72.3 on IFEval.",
     "safety_evals": "Not specified"
   },
   "identity": {
     "developed_by": "allenai (Hub organization)",
     "license": "apache-2.0",
     "model_id": "allenai/OLMo-2-1124-7B-Instruct",
-    "model_type": "text-generation",
+    "model_type": "Text generation model.",
     "name": "OLMo-2-1124-7B-Instruct",
     "release_date": "2024-12-18 (Hugging Face repository creation date)",
-    "summary": "Not specified",
+    "summary": "OLMo 2 7B Instruct is a post-trained language model built from the OLMo-2 7B November 2024 base through supervised finetuning, DPO, and RLVR.",
     "version": "470b1fba1ae01581f270116362ee4aa1b97f4c84"
   },
   "lineage": {
@@ -137,7 +137,7 @@
   "training_context": {
     "adaptations": "Not specified",
     "data_cutoff": "Not specified",
-    "training_data": "The OLMo 2 7B Instruct November 2024 checkpoint was post-trained on an OLMo-specific variant of the Tülu 3 dataset, used for supervised finetuning, DPO, and RLVR training.",
+    "training_data": "Not specified",
     "training_data_size": "Not specified"
   }
 }

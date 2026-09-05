@@ -7,7 +7,7 @@
   "evaluation": {
     "benchmark_scores": "Not specified",
     "human_evals": "Not specified",
-    "results_summary": "Not specified",
+    "results_summary": "The developer states that the Llama 3.1 instruction-tuned text-only models, including the 8B variant, are optimized for multilingual dialogue and outperform many open-source and closed chat models on common industry benchmarks.",
     "safety_evals": "Not specified"
   },
   "identity": {
@@ -17,7 +17,7 @@
     "model_type": "Not specified",
     "name": "Llama-3.1-8B",
     "release_date": "2024-07-14 (Hugging Face repository creation date)",
-    "summary": "A pretrained and instruction-tuned generative multilingual large language model in the 8B size of the Meta Llama 3.1 collection, supporting text-in/text-out use.",
+    "summary": "A multilingual large language model from the Llama 3.1 collection, available in 8B, 70B, and 405B sizes and supporting text in/text out.",
     "version": "d04e592bb4f6aa9cfee91e2e20afa771667e1d4b"
   },
   "lineage": {
@@ -46,7 +46,7 @@
   "training_context": {
     "adaptations": "Not specified",
     "data_cutoff": "December 2023",
-    "training_data": "The model was trained on a new mix of publicly available online data.",
-    "training_data_size": "15T+"
+    "training_data": "The checkpoint was trained on a new mix of publicly available online data.",
+    "training_data_size": "15T+ tokens"
   }
 }

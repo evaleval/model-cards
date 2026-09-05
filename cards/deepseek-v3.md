@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [deepseek\-v3\.json](<./deepseek-v3.json>)<br>
-SHA-256: `a40e0b8a02603400bfd38d88eb0a57a58c4234abadbbbd6ba2db64be03947dd6`
+SHA-256: `1c7e8f8dc400140af528a07b4fda1148f9e9f7f208e8cf71df9209ce5da1b03b`
 
 ## Identity
 
@@ -12,9 +12,9 @@ SHA-256: `a40e0b8a02603400bfd38d88eb0a57a58c4234abadbbbd6ba2db64be03947dd6`
 | Model ID | deepseek\-ai/DeepSeek\-V3 |
 | Name | DeepSeek\-V3 |
 | Developed by | deepseek\-ai \(Hub organization\) |
-| Model type | Mixture\-of\-Experts \(MoE\) language model |
 | Release date | 2024\-12\-25 \(Hugging Face repository creation date\) |
 | Version | e815299b0bcbac849fa540c768ef21845365c9eb |
+| Summary | DeepSeek\-V3 is a large Mixture\-of\-Experts language model that activates 37B of its 671B parameters for each token\. |
 
 ## Lineage
 
@@ -37,8 +37,9 @@ SHA-256: `a40e0b8a02603400bfd38d88eb0a57a58c4234abadbbbd6ba2db64be03947dd6`
 
 | Field | Value |
 | --- | --- |
+| Training data | DeepSeek\-V3 was pre\-trained on 14\.8 trillion diverse and high\-quality tokens in its tokenizer\. |
 | Training data size | 14\.8 trillion tokens |
-| Adaptations | DeepSeek\-V3 underwent Supervised Fine\-Tuning and Reinforcement Learning after pre\-training\. It also incorporates a methodology that distills reasoning capabilities from a long\-Chain\-of\-Thought model, specifically one of the DeepSeek R1 series models, into standard LLMs\. |
+| Adaptations | After pre\-training, DeepSeek\-V3 underwent Supervised Fine\-Tuning and Reinforcement Learning stages\. It also incorporated a methodology that distills reasoning capabilities from a DeepSeek R1 series long\-Chain\-of\-Thought model into standard LLMs, particularly DeepSeek\-V3\. |
 
 ## Access and Adoption
 
@@ -52,12 +53,20 @@ SHA-256: `a40e0b8a02603400bfd38d88eb0a57a58c4234abadbbbd6ba2db64be03947dd6`
 
 | Field | Value |
 | --- | --- |
-| Human evaluations | Note: English open\-ended conversation evaluations\. For AlpacaEval 2\.0, the length\-controlled win rate is used as the metric\. |
+| Results summary | The developer reports that DeepSeek\-V3 outperforms other open\-source models and is competitive with leading closed\-source models, describing it as the best\-performing open\-source model in standard evaluations\. |
 
 ### Benchmark Scores
 
 | Benchmark | Metric | Score | Setting | Split |
 | --- | --- | ---: | --- | --- |
+| English | Not specified | 0\.548 | Not specified | Not reported |
+| English | Not specified | 88\.5 | Not specified | Not reported |
+| Code | Not specified | 65\.2 | Not specified | Not reported |
+| Code | Not specified | 82\.6 | Not specified | Not reported |
+| Math | Not specified | 89\.3 | Not specified | Not reported |
+| Math | Not specified | 39\.2 | Not specified | Not reported |
+| Chinese | Not specified | 82\.7 | Not specified | Not reported |
+| Chinese | Not specified | 90\.9 | Not specified | Not reported |
 | Multilingual | Not specified | 79\.4 | Not specified | Not reported |
 | Arena\-Hard | Not specified | 85\.5 | Not specified | Not reported |
 | AlpacaEval 2\.0 | Not specified | 70\.0 | Not specified | Not reported |
@@ -100,4 +109,4 @@ SHA-256: `a40e0b8a02603400bfd38d88eb0a57a58c4234abadbbbd6ba2db64be03947dd6`
 
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.license`, `identity.summary`, `lineage.base_models`, `lineage.derivatives`, `training_context.training_data`, `training_context.data_cutoff`, `evaluation.results_summary`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `identity.license`, `lineage.base_models`, `lineage.derivatives`, `training_context.data_cutoff`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.

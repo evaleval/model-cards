@@ -14,10 +14,10 @@
     "developed_by": "mistralai (Hub organization)",
     "license": "apache-2.0",
     "model_id": "mistralai/Mistral-7B-v0.3",
-    "model_type": "Large Language Model (LLM)",
+    "model_type": "Not specified",
     "name": "Mistral-7B-v0.3",
     "release_date": "2024-05-22 (Hugging Face repository creation date)",
-    "summary": "Mistral-7B-v0.3 is a Mistral-7B-v0.2 with extended vocabulary.",
+    "summary": "Mistral-7B-v0.3 is a large language model based on Mistral-7B-v0.2 with an extended vocabulary.",
     "version": "caa1feb0e54d415e2df31207e5f4e273e33509b1"
   },
   "lineage": {
