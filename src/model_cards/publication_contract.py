@@ -1,8 +1,11 @@
 """Canonical schema builder for the agreed public Model Card shape.
 
 This module deliberately describes only the evaluation-focused fields agreed
-for publication.  Evidence, validation, lifecycle, environmental, and risk
-records belong to local audit artifacts rather than this public contract.
+for publication, plus the risks section added on 2026-09-06: AI Risk Atlas
+entries selected for the checkpoint from what the card itself says, the way
+the benchmark cards carry possible_risks.  Evidence, validation, lifecycle and
+environmental records belong to local audit artifacts rather than this public
+contract.
 """
 
 from __future__ import annotations
@@ -62,6 +65,9 @@ SECTION_FIELDS: dict[str, tuple[str, ...]] = {
         "code_repository",
         "citation",
     ),
+    "risks": (
+        "possible_risks",
+    ),
 }
 
 PUBLICATION_SECTIONS: tuple[str, ...] = tuple(SECTION_FIELDS)
@@ -77,11 +83,12 @@ LIST_FIELDS = frozenset(
         "lineage.derivatives",
         "specifications.input_output",
         "evaluation.benchmark_scores",
+        "risks.possible_risks",
     }
 )
 
-if len(FIELD_PATHS) != 33:  # pragma: no cover - protects the agreed boundary
-    raise RuntimeError("the agreed publication contract must contain exactly 33 fields")
+if len(FIELD_PATHS) != 34:  # pragma: no cover - protects the agreed boundary
+    raise RuntimeError("the agreed publication contract must contain exactly 34 fields")
 
 
 def _absence_or(schema: dict[str, Any]) -> dict[str, Any]:
@@ -143,6 +150,22 @@ def build_publication_schema() -> dict[str, Any]:
         },
         "additionalProperties": False,
     }
+    possible_risk = {
+        "type": "object",
+        "required": ["category", "description"],
+        "properties": {
+            "category": {"type": "string", "minLength": 1, "pattern": "\\S"},
+            "description": {"type": "string", "minLength": 1, "pattern": "\\S"},
+            "url": {
+                "anyOf": [
+                    {"type": "string", "format": "uri", "minLength": 1},
+                    {"type": "null"},
+                ]
+            },
+            "justification": {"type": "string", "minLength": 1, "pattern": "\\S"},
+        },
+        "additionalProperties": False,
+    }
     benchmark_score = {
         "type": "object",
         "required": ["benchmark", "metric", "score", "setting"],
@@ -179,6 +202,7 @@ def build_publication_schema() -> dict[str, Any]:
             ]
         },
         "benchmarkScore": benchmark_score,
+        "possibleRisk": possible_risk,
         "identity": _section(
             SECTION_FIELDS["identity"],
             {
@@ -240,6 +264,10 @@ def build_publication_schema() -> dict[str, Any]:
                 "citation": _text(),
             },
         ),
+        "risks": _section(
+            SECTION_FIELDS["risks"],
+            {"possible_risks": _list({"$ref": "#/$defs/possibleRisk"})},
+        ),
     }
 
     return {
@@ -247,8 +275,10 @@ def build_publication_schema() -> dict[str, Any]:
         "$id": "https://raw.githubusercontent.com/evaleval/model-cards/main/schema/model-card.schema.json",
         "title": "Evaluation-focused Model Card publication contract",
         "description": (
-            "The seven-section public Model Card agreed for evaluation context. "
-            "Private evidence, validation, lifecycle, environmental, and risk records are excluded."
+            "The eight-section public Model Card agreed for evaluation context: the seven "
+            "sections of the July contract plus a risks section holding AI Risk Atlas entries "
+            "selected for the checkpoint. Private evidence, validation, lifecycle and "
+            "environmental records are excluded."
         ),
         "type": "object",
         "required": list(PUBLICATION_SECTIONS),

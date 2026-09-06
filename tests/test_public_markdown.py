@@ -210,3 +210,33 @@ class PublicMarkdownTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RisksSectionTests(unittest.TestCase):
+    """The risks section added on 2026-09-06 renders as a table with the atlas link."""
+
+    def test_possible_risks_render_as_a_table_and_absent_risks_render_nothing(self) -> None:
+        card = blank_publication_card()
+        card["identity"]["model_id"] = "org/model"
+        card["risks"]["possible_risks"] = [
+            {
+                "category": "Jailbreaking",
+                "description": "Prompts that bypass safety.",
+                "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/jailbreaking.html",
+                "justification": "open-weight chat model with no reported safety evaluation",
+            },
+            {"category": "Data contamination", "description": "Evaluation data in training data.", "url": None},
+        ]
+        text = render_public_markdown(card, json_filename="org--model.json", json_sha256="0" * 64)
+        self.assertIn("## Risks", text)
+        self.assertIn("### Possible Risks", text)
+        self.assertIn("| Risk | Why it applies here | Description |", text)
+        self.assertIn("[Jailbreaking](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/jailbreaking.html>)", text)
+        self.assertIn("| Data contamination | Not specified | Evaluation data in training data\\. |", text)
+        self.assertNotIn("`risks.possible_risks`", text)
+
+        card["risks"]["possible_risks"] = "Not specified"
+        text = render_public_markdown(card, json_filename="org--model.json", json_sha256="0" * 64)
+        self.assertIn("## Risks", text)
+        self.assertNotIn("### Possible Risks", text)
+        self.assertIn("`risks.possible_risks`", text)

@@ -34,6 +34,7 @@ _SECTION_TITLES = {
     "access_and_adoption": "Access and Adoption",
     "evaluation": "Evaluation",
     "links": "Links",
+    "risks": "Risks",
 }
 _FIELD_TITLES = {
     "model_id": "Model ID",
@@ -122,6 +123,8 @@ def _section_rows(
     for field in SECTION_FIELDS[section]:
         if section == "evaluation" and field == "benchmark_scores":
             continue
+        if section == "risks" and field == "possible_risks":
+            continue
         value = values.get(field, NOT_SPECIFIED)
         if value == NOT_SPECIFIED:
             continue
@@ -173,6 +176,38 @@ def _render_benchmark_scores(value: Any) -> list[str]:
                     _markdown_text(row["score"]),
                     _markdown_text(setting),
                     _markdown_text(row.get("split", "Not reported")),
+                )
+            )
+            + " |"
+        )
+    return rendered
+
+
+def _render_possible_risks(value: Any) -> list[str]:
+    if value == NOT_SPECIFIED:
+        return []
+    if value == NOT_APPLICABLE:
+        return ["### Possible Risks", "", "Not applicable."]
+    rendered = [
+        "### Possible Risks",
+        "",
+        "| Risk | Why it applies here | Description |",
+        "| --- | --- | --- |",
+    ]
+    for row in value:
+        category = _markdown_text(row["category"])
+        url = row.get("url")
+        if isinstance(url, str):
+            destination = _safe_http_link(url)
+            if destination is not None:
+                category = f"[{category}](<{destination}>)"
+        rendered.append(
+            "| "
+            + " | ".join(
+                (
+                    category,
+                    _markdown_text(row.get("justification", NOT_SPECIFIED)),
+                    _markdown_text(row["description"]),
                 )
             )
             + " |"
@@ -253,6 +288,10 @@ def render_public_markdown(
             benchmark_lines = _render_benchmark_scores(benchmark_scores)
             if benchmark_lines:
                 lines.extend(["", *benchmark_lines])
+        if section == "risks":
+            risk_lines = _render_possible_risks(card[section].get("possible_risks", NOT_SPECIFIED))
+            if risk_lines:
+                lines.extend(["", *risk_lines])
 
     unavailable = _unavailable_fields(card)
     lines.extend(["", "---", ""])

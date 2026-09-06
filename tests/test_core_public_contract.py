@@ -38,7 +38,7 @@ def test_the_card_carries_exactly_the_published_fields():
                  for section in doc["properties"]
                  for field in doc["$defs"][section]["properties"]]
     assert list(PUBLIC_FIELD_PATHS) == published
-    assert len(published) == 33 and len(doc["properties"]) == 7
+    assert len(published) == 34 and len(doc["properties"]) == 8
     # the composer schema carries the same paths plus the one private section
     assert tuple(field_paths(model_card_schema())) == CARD_FIELD_PATHS
     assert set(CARD_FIELD_PATHS) - set(PUBLIC_FIELD_PATHS) == {
