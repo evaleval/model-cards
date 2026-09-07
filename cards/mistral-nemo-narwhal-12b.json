@@ -1,0 +1,86 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "18 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "nbeerbower (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "nbeerbower/mistral-nemo-narwhal-12B",
+    "model_type": "Not specified",
+    "name": "nbeerbower/mistral-nemo-narwhal-12B",
+    "release_date": "2025-01-13 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "9384d7e572a09181c79e19d934ab865f7a7d4efc"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "nbeerbower/Mahou-1.5-mistral-nemo-12B-lorablated",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "mistral nemo narwhal"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/nbeerbower/mistral-nemo-narwhal-12B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides only architecture, tuning recipe (ORPO/QLoRA), and license; no design or evaluation details are reported.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "No provenance or traceability information is given for the data used in the ORPO/QLoRA tuning.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card states only text-to-text modality and open weights, with no intended-use or deployment context.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Unrepresentative risk testing",
+        "description": "Testing is unrepresentative when the test inputs are mismatched with the inputs that are expected during deployment.",
+        "justification": "No evaluations or risk testing are reported, so any risk testing cannot be shown to match deployment inputs.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-risk-testing.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "1,024,000 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "22.8 GiB of safetensors weights (24,495,607,104 bytes) in BF16",
+    "num_parameters": "12,247,782,400 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was tuned with ORPO for one epoch using eight A100 GPUs, and the training setup included a QLoRA configuration.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

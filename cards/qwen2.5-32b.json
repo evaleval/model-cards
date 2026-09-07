@@ -1,0 +1,74 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "63,487 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "181 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2.5-32B",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-32B",
+    "release_date": "2024-09-15 (Hugging Face repository creation date)",
+    "summary": "Qwen2.5-32B is a base 32B model in the Qwen2.5 series, reintroduced as part of a significant update to the Qwen family.",
+    "version": "1818d35814b8319459f4bd55ed1ac8709630f003"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5"
+  },
+  "links": {
+    "citation": "@misc{qwen2.5,\n    title = {Qwen2.5: A Party of Foundation Models},\n    url = {https://qwenlm.github.io/blog/qwen2.5/},\n    author = {Qwen Team},\n    month = {September},\n    year = {2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2.5",
+    "model_card": "https://huggingface.co/Qwen/Qwen2.5-32B",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2407.10671"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card summary provides no information about the model's design, development, or evaluation process, so the checkpoint lacks transparency.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card summary describes a base model that is not aligned to human preferences and advises against using it for conversations, but does not define a specific intended use, leaving downstream uses and associated risks undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Improper usage",
+        "description": "Improper usage occurs when a model is used for a purpose that it was not originally designed for.",
+        "justification": "The card summary explicitly advises against using the base model for conversations and recommends post-training such as SFT, RLHF, or continued pretraining, so using it directly for chat would be improper usage.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/improper-usage.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "61.0 GiB of safetensors weights (65,527,841,752 bytes) in BF16",
+    "num_parameters": "32,763,876,352 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a base language model that has been pretrained but not aligned to human preferences; the readme advises against using base models for conversations and suggests applying post-training such as SFT, RLHF, or continued pretraining.",
+    "data_cutoff": "Not specified",
+    "training_data": "The target checkpoint is a pretrained base model; the readme identifies its training stage as pretraining. The cited pretraining corpus description applies to the Qwen2 comparison model, not to this checkpoint, so it is not used as a fact for this model.",
+    "training_data_size": "Not specified"
+  }
+}

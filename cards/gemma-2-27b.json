@@ -1,0 +1,225 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "10,192 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "211 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "top-1",
+        "score": "75.2",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "86.4",
+        "setting": "10-shot"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "Not specified",
+        "score": "83.2",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "SocialIQA",
+        "metric": "Not specified",
+        "score": "53.7",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "BoolQ",
+        "metric": "Not specified",
+        "score": "84.8",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "WinoGrande",
+        "metric": "score",
+        "score": "83.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-e",
+        "metric": "Not specified",
+        "score": "88.6",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "ARC-c",
+        "metric": "Not specified",
+        "score": "71.4",
+        "setting": "25-shot"
+      },
+      {
+        "benchmark": "TriviaQA",
+        "metric": "Not specified",
+        "score": "83.7",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "Natural Questions",
+        "metric": "Not specified",
+        "score": "34.5",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "pass@1",
+        "score": "51.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "62.6",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "74.0",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "42.3",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "AGIEval",
+        "metric": "Not specified",
+        "score": "55.1",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "BIG-Bench",
+        "metric": "Not specified",
+        "score": "74.9",
+        "setting": "3-shot CoT"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "75.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "74",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-c",
+        "metric": "Not specified",
+        "score": "71.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "86.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "DROP",
+        "metric": "F1",
+        "score": "74.2",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "74.9",
+        "setting": "3-shot CoT"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "83.7",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "SIQA",
+        "metric": "Not specified",
+        "score": "53.7",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "NQ",
+        "metric": "Not specified",
+        "score": "34.5",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "74.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "69.4",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the 27B model performs best in its size category and is competitive with a larger model trained for longer, based on evaluations across a large collection of datasets and metrics.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/gemma-2-27b",
+    "model_type": "text-to-text, decoder-only large language model",
+    "name": "gemma-2-27b",
+    "release_date": "2024-06-24 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "938270f5272feb02779b55c2bb2fffdd0f53ff0c"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "gemma 2"
+  },
+  "links": {
+    "citation": "@article{gemma_2024,\n    title={Gemma},\n    url={https://www.kaggle.com/m/3301},\n    DOI={10.34740/KAGGLE/M/3301},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2024}\n}",
+    "code_repository": "https://github.com/huggingface/local-gemma",
+    "model_card": "https://huggingface.co/google/gemma-2-27b",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2408.00118"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "27B model trained from scratch on 13 trillion tokens -> substantial compute and energy use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "101.4 GiB of safetensors weights (108,908,573,008 bytes) in F32",
+    "num_parameters": "27,227,128,320 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The target checkpoint is a 27B model trained from scratch on 13 trillion tokens of primarily-English data.",
+    "training_data_size": "Not specified"
+  }
+}

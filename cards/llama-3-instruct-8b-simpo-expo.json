@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "28 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "16 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "The developer reports AlpacaEval 2.0 results for this extrapolated model: a 40.6% win rate and a 45.8% length-controlled win rate.",
+    "results_summary": "The extrapolated model reports a 40.6% win rate and 45.8% length-controlled win rate on AlpacaEval 2.0, slightly ahead of the original Llama-3-Instruct-8B-SimPO model.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "chujiezheng (Hub organization)",
+    "license": "llama3",
+    "model_id": "chujiezheng/Llama-3-Instruct-8B-SimPO-ExPO",
+    "model_type": "Not specified",
+    "name": "Llama-3-Instruct-8B-SimPO-ExPO",
+    "release_date": "2024-05-26 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "3fcaa9fe99691659eb197487e9a343f601bf63f2"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Llama 3 SimPO ExPO"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/chujiezheng/Llama-3-Instruct-8B-SimPO-ExPO",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,376 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

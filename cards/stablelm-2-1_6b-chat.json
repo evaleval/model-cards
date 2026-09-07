@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "2,519 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "34 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Developer red-teaming found that the model generally does not produce harmful information unless prompted, but it can hallucinate facts and may produce harmful outputs or misinformation when requested."
+  },
+  "identity": {
+    "developed_by": "stabilityai (Hub organization)",
+    "license": "other",
+    "model_id": "stabilityai/stablelm-2-1_6b-chat",
+    "model_type": "Not specified",
+    "name": "stablelm-2-1_6b-chat",
+    "release_date": "2024-04-08 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "f3fe67057c2789ae1bb1fe42b038da99840d4f13"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "stablelm 2 1"
+  },
+  "links": {
+    "citation": "@misc{StableLM-2-1.6B,\n      url={[https://huggingface.co/stabilityai/stablelm-2-1.6b](https://huggingface.co/stabilityai/stablelm-2-1.6b)},\n      title={Stable LM 2 1.6B},\n      author={Stability AI Language Team}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/stabilityai/stablelm-2-1_6b-chat",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "6.1 GiB of safetensors weights (6,578,099,872 bytes) in F32",
+    "num_parameters": "1,644,515,328 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was trained using Direct Preference Optimization (DPO) on a mix of publicly available and synthetic datasets.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on a mixture of large-scale open datasets available on the HuggingFace Hub, including publicly available and synthetic datasets.",
+    "training_data_size": "Not specified"
+  }
+}

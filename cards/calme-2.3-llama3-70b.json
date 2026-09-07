@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "37 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "4 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "MaziyarPanahi (Hub organization)",
+    "license": "llama3",
+    "model_id": "MaziyarPanahi/calme-2.3-llama3-70b",
+    "model_type": "text-generation",
+    "name": "MaziyarPanahi/calme-2.3-llama3-70b",
+    "release_date": "2024-04-27 (Hugging Face repository creation date)",
+    "summary": "A DPO fine-tune of Meta-Llama-3-70B-Instruct for text generation.",
+    "version": "bd17453eaae0e36d1e1e17da13fdd155fce91a29"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "meta-llama/Meta-Llama-3-70B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "calme 2.3 llama3"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/MaziyarPanahi/calme-2.3-llama3-70b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides only architecture, task, and training dataset name; no reported evaluations, training-data details, or development/evaluation process for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Training data is named as MaziyarPanahi/truthy-dpo-v0.1-axolotl but the card gives no origin, ownership, curation, or verification details for that dataset.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not describe how the training data was collected, curated, or used beyond naming the dataset, limiting explainability of model behavior.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "131.4 GiB of safetensors weights (141,107,530,640 bytes) in BF16",
+    "num_parameters": "70,553,722,880 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a DPO fine-tune of meta-llama/Meta-Llama-3-70B-Instruct.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on the MaziyarPanahi/truthy-dpo-v0.1-axolotl dataset.",
+    "training_data_size": "Not specified"
+  }
+}

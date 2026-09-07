@@ -1,0 +1,111 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "9,768 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "144 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "74.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "77.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA",
+        "metric": "Not specified",
+        "score": "34.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "84.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "30.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "70.1",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports benchmark results for the GLM-4-9B base model on several typical tasks, with scores of 74.7 on MMLU, 77.1 on C-Eval, 34.3 on GPQA, 84.0 on GSM8K, 30.4 on MATH, and 70.1 on HumanEval.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "zai-org (Hub organization)",
+    "license": "other",
+    "model_id": "THUDM/glm-4-9b",
+    "model_type": "Not specified",
+    "name": "GLM-4-9B",
+    "release_date": "2024-06-04 (Hugging Face repository creation date)",
+    "summary": "An open-source GLM-4 series language model released by Zhipu AI.",
+    "version": "8cd2b585357ba9e702647ac4e6fa4fafe5cc7bee"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "glm 4"
+  },
+  "links": {
+    "citation": "@misc{glm2024chatglm,\n      title={ChatGLM: A Family of Large Language Models from GLM-130B to GLM-4 All Tools}, \n      author={Team GLM and Aohan Zeng and Bin Xu and Bowen Wang and Chenhui Zhang and Da Yin and Diego Rojas and Guanyu Feng and Hanlin Zhao and Hanyu Lai and Hao Yu and Hongning Wang and Jiadai Sun and Jiajie Zhang and Jiale Cheng and Jiayi Gui and Jie Tang and Jing Zhang and Juanzi Li and Lei Zhao and Lindong Wu and Lucen Zhong and Mingdao Liu and Minlie Huang and Peng Zhang and Qinkai Zheng and Rui Lu and Shuaiqi Duan and Shudan Zhang and Shulin Cao and Shuxun Yang and Weng Lam Tam and Wenyi Zhao and Xiao Liu and Xiao Xia and Xiaohan Zhang and Xiaotao Gu and Xin Lv and Xinghan Liu and Xinyi Liu and Xinyue Yang and Xixuan Song and Xunkai Zhang and Yifan An and Yifan Xu and Yilin Niu and Yuantao Yang and Yueyan Li and Yushi Bai and Yuxiao Dong and Zehan Qi and Zhaoyu Wang and Zhen Yang and Zhengxiao Du and Zhenyu Hou and Zihan Wang},\n      year={2024},\n      eprint={2406.12793},\n      archivePrefix={arXiv},\n      primaryClass={id='cs.CL' full_name='Computation and Language' is_active=True alt_name='cmp-lg' in_archive='cs' is_general=False description='Covers natural language processing. Roughly includes material in ACM Subject Class I.2.7. Note that work on artificial languages (programming languages, logics, formal systems) that does not explicitly address natural-language issues broadly construed (natural-language processing, computational linguistics, speech, text retrieval, etc.) is not appropriate for this area.'}\n}",
+    "code_repository": "https://github.com/THUDM/GLM-4",
+    "model_card": "https://huggingface.co/THUDM/glm-4-9b",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2406.12793"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only benchmark scores and basic training data description; no details on design, development, or evaluation process for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card states training data only as 'open-source version of the latest-generation GLM-4 pretrained model series' with no collection, curation, or composition details.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card does not specify intended or disallowed uses, despite being an open-weight base text model that can be adapted to many downstream tasks.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "17.5 GiB of safetensors weights (18,799,941,256 bytes) in BF16",
+    "num_parameters": "9,399,951,392 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "GLM-4-9B is the open-source version of the latest-generation GLM-4 pretrained model series from Zhipu AI.",
+    "training_data_size": "Not specified"
+  }
+}

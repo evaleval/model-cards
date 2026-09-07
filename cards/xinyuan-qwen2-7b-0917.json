@@ -1,0 +1,52 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "35 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "4 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that a better data governance approach, even with only supervised fine-tuning, can greatly improve model results.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "thomas-yanxin (Hub organization)",
+    "license": "other",
+    "model_id": "thomas-yanxin/XinYuan-Qwen2-7B-0917",
+    "model_type": "Not specified",
+    "name": "XinYuan-Qwen2-7B-0917",
+    "release_date": "2024-09-17 (Hugging Face repository creation date)",
+    "summary": "The model is designed to demonstrate that the quality of the MT-SFT-ShareGPT dataset is sufficient, supporting the idea that data quality alone can determine model usefulness.",
+    "version": "bbbeafd1003c4d5e13f09b7223671957384b961a"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "XinYuan Qwen2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/thomas-yanxin/XinYuan-Qwen2-7B-0917",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": "Not specified",
+    "model_size": "14.2 GiB of safetensors weights (15,231,271,864 bytes) in BF16",
+    "num_parameters": "7,615,616,512 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was adapted through supervised fine-tuning (SFT), with the finding that careful data governance and extraction can substantially improve model results.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on thomas-yanxin/MT-SFT-ShareGPT, a dataset used to validate whether data quality alone is sufficient for strong results.",
+    "training_data_size": "Not specified"
+  }
+}

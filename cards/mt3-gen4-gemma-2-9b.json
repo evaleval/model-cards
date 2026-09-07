@@ -1,0 +1,97 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "21 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "4 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "zelk12 (Hub organization)",
+    "license": "gemma",
+    "model_id": "zelk12/MT3-Gen4-gemma-2-9B",
+    "model_type": "Text-generation model.",
+    "name": "MT3-Gen4-gemma-2-9B",
+    "release_date": "2024-12-16 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "9cbf6e0c1b34bb1b1571824f7348f6dd85456d25"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "zelk12/MT3-Gen4-GBMUI-gemma-2-9B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "zelk12/MT3-Gen4-MAMM-gemma-2-9B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "MT3 Gen4 gemma 2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/zelk12/MT3-Gen4-gemma-2-9B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card only lists architecture, merge method, and license, with no reported evaluations or design/development details, so the checkpoint itself lacks transparency.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "The card does not document training or tuning dataset details for this checkpoint, only the two merged parent model names.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Inaccessible training data",
+        "description": "Without access to the training data, the types of explanations a model can provide are limited and more likely to be incorrect.",
+        "justification": "No training data is provided or described for this checkpoint, limiting explanations of its outputs.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/inaccessible-training-data.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "Because the card gives no training-data content or sources, the content used to generate outputs is not accessible or traceable.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not state how data was collected, curated, or used to train this checkpoint, so its behavior is hard to explain.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "18.9 GiB of safetensors weights (20,318,474,544 bytes) in BF16",
+    "num_parameters": "10,159,209,984 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge of zelk12/MT3-Gen4-MAMM-gemma-2-9B and zelk12/MT3-Gen4-GBMUI-gemma-2-9B, combined using the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "20 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer states that the model was created to test the GRPO training approach introduced in DeepSeek R1.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Danielbrdz (Hub organization)",
+    "license": "llama3.2",
+    "model_id": "Danielbrdz/Barcenas-3b-GRPO",
+    "model_type": "text-generation",
+    "name": "Barcenas-3b-GRPO",
+    "release_date": "2025-02-08 (Hugging Face repository creation date)",
+    "summary": "Barcenas 3b GRPO",
+    "version": "643e7615446a20d9ffe7cb66b88a6791cc6ae1eb"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Barcenas GRPO"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Danielbrdz/Barcenas-3b-GRPO",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Membership inference attack",
+        "description": "A membership inference attack repeatedly queries a model to determine if a given input was part of the model's training. More specifically, given a trained model and a data sample, an attacker appropriately samples the input space, observing outputs to deduce whether that sample was part of the model's training.",
+        "justification": "Trained on openai/gsm8k and open-weight, so an attacker can run the checkpoint locally and perform membership inference on that known public training dataset.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/membership-inference-attack.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "6.0 GiB of safetensors weights (6,425,528,792 bytes) in F16",
+    "num_parameters": "3,212,749,824 parameters (safetensors metadata)",
+    "precision": "F16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on the openai/gsm8k dataset.",
+    "training_data_size": "Not specified"
+  }
+}

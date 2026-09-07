@@ -1,0 +1,219 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "9,830 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "58 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "76.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "43.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA",
+        "metric": "Not specified",
+        "score": "34.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Theorem QA",
+        "metric": "Not specified",
+        "score": "33.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "67.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "85.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "79.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-C",
+        "metric": "Not specified",
+        "score": "64.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "57.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "53.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "71.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "EvalPlus",
+        "metric": "Not specified",
+        "score": "57.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MultiPL-E",
+        "metric": "Not specified",
+        "score": "49.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "80.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "43.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "87.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CMMLU",
+        "metric": "Not specified",
+        "score": "88.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Exam",
+        "metric": "Not specified",
+        "score": "65.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Understanding",
+        "metric": "Not specified",
+        "score": "77.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Mathematics",
+        "metric": "Not specified",
+        "score": "62.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Translation",
+        "metric": "Not specified",
+        "score": "34.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "QPS",
+        "metric": "Not specified",
+        "score": "9.40",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Exam",
+        "metric": "Not specified",
+        "score": "65.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Understanding",
+        "metric": "Not specified",
+        "score": "77.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Mathematics",
+        "metric": "Not specified",
+        "score": "62.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Translation",
+        "metric": "Not specified",
+        "score": "34.5",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "The developer reports automatic evaluations of the base model covering natural language understanding, general question answering, coding, mathematics, scientific knowledge, reasoning, and multilingual capability. The reported scores include MMLU 76.5, HumanEval 53.0, GSM8K 80.7, C-Eval 87.7, and Multi-Exam 65.5.",
+    "results_summary": "Not specified",
+    "safety_evals": "The developer reports a safety evaluation measuring the proportion of harmful responses generated for multilingual unsafe queries in categories including Illegal Activity, Fraud, Pornography, and Privacy Violence."
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2-57B-A14B",
+    "model_type": "text-generation",
+    "name": "Qwen2-57B-A14B",
+    "release_date": "2024-05-22 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "f29d6a182178ddf39f68f403361779b2d37fdce8"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2 A14B"
+  },
+  "links": {
+    "citation": "@article{qwen2,\n  title={Qwen2 Technical Report},\n  year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2",
+    "model_card": "https://huggingface.co/Qwen/Qwen2-57B-A14B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Incorrect risk testing",
+        "description": "A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context.",
+        "justification": "The card reports a safety evaluation measuring the proportion of harmful responses to multilingual unsafe queries, but the model is a base model released without post-training and the readme recommends post-training before use, so the reported safety metric may not measure the risks of the final use",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "mixture-of-experts",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "106.9 GiB of safetensors weights (114,818,032,896 bytes) in BF16",
+    "num_parameters": "57,408,658,944 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a base language model released without post-training; the readme recommends applying post-training such as SFT, RLHF, or continued pretraining before use for text generation.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model is a base language model; the readme does not name the specific pretraining corpus for this checkpoint.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "599,946 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1,601 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "The developer reports that Kimi K2.6 delivers measurable improvements in real-world reliability, including enhanced safety awareness during extended research tasks."
+  },
+  "identity": {
+    "developed_by": "moonshotai (Hub organization)",
+    "license": "other",
+    "model_id": "moonshotai/kimi-k2.6",
+    "model_type": "Not specified",
+    "name": "kimi-k2.6",
+    "release_date": "2026-04-14 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "7eb5002f6aadc958aed6a9177b7ed26bb94011bb"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "kimi k2.6"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/moonshotai/kimi-k2.6",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2602.02276"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only a one-line safety claim and no design, training, or evaluation details for this exact checkpoint, so documentation is insufficient to assess its risks.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card does not describe training or tuning data for kimi-k2.6, so dataset composition and provenance are undocumented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card states only broad image/text-to-text modalities and open weights, without specifying intended or prohibited uses, leaving downstream risk scope undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: image, text",
+      "output: text"
+    ],
+    "model_size": "554.3 GiB of safetensors weights (595,177,988,208 bytes) in I32",
+    "num_parameters": "1,026,879,376,368 parameters (safetensors metadata)",
+    "precision": "I32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

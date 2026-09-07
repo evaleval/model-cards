@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "134 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "7 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "DavidAU (Hub organization)",
+    "license": "Not specified",
+    "model_id": "DavidAU/Gemma-The-Writer-N-Restless-Quill-10B-Uncensored",
+    "model_type": "Not specified",
+    "name": "Gemma-The-Writer-N-Restless-Quill-10B-Uncensored",
+    "release_date": "2024-10-30 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "71b9cadcda7b387979822f52faceb93ccaf36213"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "google/gemma-2-9b-it",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/DavidAU/Gemma-The-Writer-N-Restless-Quill-10B-Uncensored",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Social hacking attack",
+        "description": "Manipulative prompts that use social engineering techniques, such as role-playing or hypothetical scenarios, to persuade the model into generating harmful content.",
+        "justification": "Uncensored open-weight chat model (Gemma-The-Writer-N-Restless-Quill-10B-Uncensored) with no reported safety evaluation -> manipulative role-play prompts may elicit harmful content.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/social-hacking-attack.html"
+      },
+      {
+        "category": "Harmful output",
+        "description": "A model might generate language that leads to physical harm.  The language might include overtly violent, covertly dangerous, or otherwise indirectly unsafe statements.",
+        "justification": "The checkpoint name includes 'Uncensored' and no safety evaluation is reported, so it plausibly generates violent or otherwise unsafe language.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/harmful-output.html"
+      },
+      {
+        "category": "Prompt leaking",
+        "description": "'A prompt leak attack attempts to extract a model's system prompt (also known as the system message).'",
+        "justification": "Open-weight model derived from google/gemma-2-9b-it; if it retains an instruct system prompt, unrestricted access enables prompt extraction attempts.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/prompt-leaking.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "18.7 GiB of safetensors weights (20,069,032,912 bytes) in BF16",
+    "num_parameters": "10,034,486,784 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

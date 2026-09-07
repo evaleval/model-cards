@@ -1,0 +1,92 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "33,174 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "168 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports benchmark results for Granite-3.1-8B-Instruct across two sets of evaluations, with scores varying by task category.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "ibm-granite (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "ibm-granite/granite-3.1-8b-instruct",
+    "model_type": "Not specified",
+    "name": "Granite-3.1-8B-Instruct",
+    "release_date": "2024-12-06 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "4009206d5fc95d2e65a7b7633e159d6e97e25d35"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "ibm-granite/granite-3.1-8b-base",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "granite 3.1"
+  },
+  "links": {
+    "citation": "@misc{granite-models,\n  author = {author 1, author2, ...},\n  title = {},\n  journal = {},\n  volume = {},\n  year = {2024},\n  url = {https://arxiv.org/abs/0000.00000},\n}",
+    "code_repository": "https://github.com/ibm-granite/granite-3.1-language-models",
+    "model_card": "https://huggingface.co/ibm-granite/granite-3.1-8b-instruct",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card lists only broad data categories (open-source instruction datasets, synthetic long-context data, small human-curated data) without dataset details or synthetic generation documentation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Unrepresentative data",
+        "description": "Unrepresentative data occurs when the training or fine-tuning data is not sufficiently representative of the underlying population or does not measure the phenomenon of interest. Synthetic data might not fully capture the complexity and nuances of real-world data. Causes include possible limitations in the seed data quality, biases in generation methods, or inadequate domain knowledge. Thus, AI models might struggle to generalize effectively to real-world scenarios.",
+        "justification": "Fine-tuning relies on synthetic long-context datasets, which may not capture real-world complexity and nuances.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-data.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Training data is described as permissively licensed open-source plus synthetic and human-curated data, but the card does not provide traceability or verification of sources and usage terms.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Data bias",
+        "description": "Historical and societal biases might be present in data that are used to train and fine-tune models. Biases can also be inherited from seed data or exacerbated by synthetic data generation methods.",
+        "justification": "Fine-tuning from base model on open-source and synthetic datasets can inherit or exacerbate historical/societal biases, but no bias evaluation is reported.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-bias.html"
+      },
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports benchmark scores by task category but provides no details on evaluation methodology, inner workings, or design decisions.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.2 GiB of safetensors weights (16,341,738,616 bytes) in BF16",
+    "num_parameters": "8,170,848,256 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was developed with supervised fine-tuning, reinforcement learning alignment, and model merging, using a structured chat format.",
+    "data_cutoff": "Not specified",
+    "training_data": "Granite-3.1-8B-Instruct was fine-tuned from Granite-3.1-8B-Base using a combination of permissively licensed open-source instruction datasets, internally collected synthetic datasets for long-context problems, and small amounts of human-curated data.",
+    "training_data_size": "Not specified"
+  }
+}

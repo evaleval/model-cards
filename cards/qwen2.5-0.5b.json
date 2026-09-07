@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "1,688,938 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "443 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2.5-0.5B",
+    "model_type": "Causal Language Models",
+    "name": "Qwen2.5-0.5B",
+    "release_date": "2024-09-15 (Hugging Face repository creation date)",
+    "summary": "The Qwen2.5 series includes base language models that are pre-trained but not aligned to human preferences, alongside instruction-tuned variants for chat and agent tasks; this repository hosts the base 0.5B model.",
+    "version": "060db6499f32faf8b98477b0a26969ef7d8b9987"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5"
+  },
+  "links": {
+    "citation": "@misc{qwen2.5,\n    title = {Qwen2.5: A Party of Foundation Models},\n    url = {https://qwenlm.github.io/blog/qwen2.5/},\n    author = {Qwen Team},\n    month = {September},\n    year = {2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2.5",
+    "model_card": "https://huggingface.co/Qwen/Qwen2.5-0.5B",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2407.10671"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card states the checkpoint is a base pretraining-stage model but does not name a specific dataset or provide evaluation details, so there is insufficient documentation of design, development, and evaluation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card identifies the training stage as pretraining but does not name a specific dataset or describe data collection/curation, limiting transparency about training data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card advises against using the base model directly for conversations and recommends post-training, but does not define a concrete intended use, so relevant risks are not specified.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Improper usage",
+        "description": "Improper usage occurs when a model is used for a purpose that it was not originally designed for.",
+        "justification": "The card explicitly advises against using the base model directly for conversations, so using it that way would be improper usage.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/improper-usage.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "0.9 GiB of safetensors weights (988,097,824 bytes) in BF16",
+    "num_parameters": "494,032,768 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a base language model that has not been aligned to human preferences; the documentation advises against using it directly for conversations and recommends post-training such as SFT, RLHF, or continued pretraining.",
+    "data_cutoff": "Not specified",
+    "training_data": "The checkpoint is a base pretraining-stage model; the evidence identifies the training stage as pretraining but does not name a specific dataset.",
+    "training_data_size": "Not specified"
+  }
+}

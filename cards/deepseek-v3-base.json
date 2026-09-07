@@ -1,54 +1,216 @@
 {
   "access_and_adoption": {
     "access_type": "open-weight",
-    "downloads": "8,118 downloads (Hub 30-day window, as of 2026-09-04)",
-    "likes": "1,706 likes on the Hub (as of 2026-09-04)"
+    "downloads": "6,009 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1,705 likes on the Hub (as of 2026-09-06)"
   },
   "evaluation": {
     "benchmark_scores": [
       {
-        "benchmark": "English",
+        "benchmark": "Pile-test",
         "metric": "Not specified",
+        "score": "0.548",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "exact match",
+        "score": "87.5",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "accuracy",
+        "score": "87.1",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "MMLU-Redux",
+        "metric": "accuracy",
+        "score": "86.2",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "accuracy",
+        "score": "64.4",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "DROP",
+        "metric": "F1",
+        "score": "89.0",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "ARC-Easy",
+        "metric": "accuracy",
+        "score": "98.9",
+        "setting": "25-shot"
+      },
+      {
+        "benchmark": "ARC-Challenge",
+        "metric": "accuracy",
         "score": "95.3",
-        "setting": "Not specified"
+        "setting": "25-shot"
       },
       {
-        "benchmark": "Code",
-        "metric": "Not specified",
+        "benchmark": "HellaSwag",
+        "metric": "accuracy",
+        "score": "88.9",
+        "setting": "10-shot"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "accuracy",
+        "score": "84.7",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "WinoGrande",
+        "metric": "accuracy",
+        "score": "84.9",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "RACE-Middle",
+        "metric": "accuracy",
+        "score": "67.1",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "RACE-High",
+        "metric": "accuracy",
+        "score": "51.3",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "TriviaQA",
+        "metric": "exact match",
+        "score": "82.9",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "NaturalQuestions",
+        "metric": "exact match",
+        "score": "40.0",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "AGIEval",
+        "metric": "accuracy",
+        "score": "79.6",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "pass@1",
         "score": "65.2",
-        "setting": "Not specified"
+        "setting": "0-shot"
       },
       {
-        "benchmark": "Math",
-        "metric": "Not specified",
+        "benchmark": "MBPP",
+        "metric": "pass@1",
+        "score": "75.4",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "LiveCodeBench-Base",
+        "metric": "pass@1",
+        "score": "19.4",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "CRUXEval-I",
+        "metric": "accuracy",
+        "score": "67.3",
+        "setting": "2-shot"
+      },
+      {
+        "benchmark": "CRUXEval-O",
+        "metric": "accuracy",
+        "score": "69.8",
+        "setting": "2-shot"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "exact match",
         "score": "89.3",
-        "setting": "Not specified"
+        "setting": "8-shot"
       },
       {
-        "benchmark": "Chinese",
-        "metric": "Not specified",
+        "benchmark": "MATH",
+        "metric": "exact match",
+        "score": "61.6",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "MGSM",
+        "metric": "exact match",
+        "score": "79.8",
+        "setting": "8-shot"
+      },
+      {
+        "benchmark": "CMath",
+        "metric": "exact match",
+        "score": "90.7",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "CLUEWSC",
+        "metric": "exact match",
+        "score": "82.7",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "accuracy",
+        "score": "90.1",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "CMMLU",
+        "metric": "accuracy",
+        "score": "88.8",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "CMRC",
+        "metric": "exact match",
         "score": "76.3",
-        "setting": "Not specified"
+        "setting": "1-shot"
       },
       {
-        "benchmark": "Multilingual",
-        "metric": "Not specified",
+        "benchmark": "C3",
+        "metric": "accuracy",
+        "score": "78.6",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "CCPM",
+        "metric": "accuracy",
+        "score": "92.0",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "MMMLU-non-English",
+        "metric": "accuracy",
         "score": "79.4",
-        "setting": "Not specified"
+        "setting": "5-shot"
       }
     ],
     "human_evals": "Not specified",
-    "results_summary": "The developer reports that DeepSeek-V3 surpasses other open-source models and is on par with leading closed-source models in comprehensive evaluations.",
+    "results_summary": "The developer reports that DeepSeek-V3 outperforms other open-source models and is competitive with leading closed-source models, with particularly strong results on mathematics and code benchmarks.",
     "safety_evals": "Not specified"
   },
   "identity": {
     "developed_by": "deepseek-ai (Hub organization)",
     "license": "Not specified",
     "model_id": "deepseek-ai/DeepSeek-V3-Base",
-    "model_type": "Not specified",
+    "model_type": "Mixture-of-Experts (MoE) language model",
     "name": "DeepSeek-V3-Base",
     "release_date": "2024-12-25 (Hugging Face repository creation date)",
-    "summary": "DeepSeek-V3 is a large Mixture-of-Experts language model with 671B total parameters and 37B activated per token.",
+    "summary": "DeepSeek-V3-Base is a large Mixture-of-Experts language model with 671B total parameters and 37B activated per token.",
     "version": "afb92e1fa402c2be2a9eb085312bb02e0384d6c7"
   },
   "lineage": {
@@ -63,21 +225,42 @@
     "system_card": "Not specified",
     "tech_report": "https://arxiv.org/abs/2412.19437"
   },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "DeepSeek-V3-Base is a text-out language model with reported benchmark strengths in math/code but no stated factuality or grounding evaluation, so it plausibly generates inaccurate or fabricated text.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      },
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "The card states a 671B-parameter Mixture-of-Experts model, implying substantial compute for pretraining and operation, with no reported environmental impact assessment.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "The card reports that DeepSeek-V3 outperforms other open-source models and is competitive with leading closed-source models, which could encourage users to over-trust its outputs despite no reported calibration or reliability evaluation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
   "specifications": {
     "architecture_type": "mixture-of-experts",
     "context_length": "163,840 tokens (config.json max_position_embeddings)",
     "input_output": [
-      "Text input",
-      "Text output"
+      "text in, text out"
     ],
     "model_size": "641.3 GiB of safetensors weights (688,586,727,753 bytes) in F8_E4M3",
     "num_parameters": "684,531,386,000 parameters (safetensors metadata)",
     "precision": "F8_E4M3 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "Not specified",
+    "adaptations": "DeepSeek-V3 underwent Supervised Fine-Tuning and Reinforcement Learning after pre-training. It also incorporated a methodology to distill reasoning capabilities from a DeepSeek R1 series long-Chain-of-Thought model.",
     "data_cutoff": "Not specified",
-    "training_data": "The DeepSeek-V3 family was pre-trained on 14.8 trillion diverse and high-quality tokens in its tokenizer.",
+    "training_data": "Not specified",
     "training_data_size": "14.8 trillion tokens"
   }
 }

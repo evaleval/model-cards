@@ -1,0 +1,85 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "17 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "3 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "TheDrunkenSnail (Hub organization)",
+    "license": "other",
+    "model_id": "TheDrunkenSnail/Son-of-Rhodia",
+    "model_type": "Not specified",
+    "name": "Son-of-Rhodia",
+    "release_date": "2024-12-31 (Hugging Face repository creation date)",
+    "summary": "A merge of pretrained language models created with mergekit.",
+    "version": "ec3433a851285073574387b459c4661183ad4dc6"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Infermatic/MN-12B-Inferor-v0.1",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "allura-org/MN-12b-RP-Ink",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/TheDrunkenSnail/Son-of-Rhodia",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only merge recipe and license; no training data, evaluation, or intended-use details for this exact checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card does not state what data the merged base models were trained on or how it was collected/curated.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card does not define intended use or downstream tasks for this open-weight text model, so relevant risks are unspecified.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "22.8 GiB of safetensors weights (24,495,607,104 bytes) in BF16",
+    "num_parameters": "12,247,782,400 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This checkpoint is a SLERP merge of Infermatic/MN-12B-Inferor-v0.1 and allura-org/MN-12b-RP-Ink.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

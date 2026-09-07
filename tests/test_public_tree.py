@@ -90,11 +90,17 @@ class PublicTreeTests(unittest.TestCase):
         self.assertEqual(allowed.returncode, 1)
 
     def test_cards_directory_contains_only_canonical_json_markdown_pairs(self):
+        """The corpus grew from a twelve-card roster to a full run, so the invariant is
+        checked rather than the file list: every card is a JSON and Markdown pair named
+        after the model in lower case, nothing else lives here, and the roster of flagship
+        base and instruct pairs is still among them."""
         cards = self.ROOT / "cards"
         json_paths = {path.stem for path in cards.iterdir() if path.suffix == ".json"}
         markdown_paths = {path.stem for path in cards.iterdir() if path.suffix == ".md"}
-        self.assertEqual(
-            json_paths,
+        self.assertEqual(json_paths, markdown_paths)
+        self.assertTrue(json_paths)
+        self.assertTrue(all(name == name.lower() for name in json_paths))
+        self.assertLessEqual(
             {
                 "deepseek-v3",
                 "deepseek-v3-base",
@@ -109,15 +115,11 @@ class PublicTreeTests(unittest.TestCase):
                 "qwen3-8b",
                 "qwen3-8b-base",
             },
+            json_paths,
         )
-        self.assertEqual(json_paths, markdown_paths)
         self.assertTrue(
             all(
                 path.is_file() and path.suffix in {".json", ".md"}
                 for path in cards.iterdir()
             )
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

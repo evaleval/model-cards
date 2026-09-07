@@ -1,0 +1,62 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "25,384 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "7 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "The model has not undergone safety alignment, so it may produce problematic outputs."
+  },
+  "identity": {
+    "developed_by": "ibm-granite (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "ibm-granite/granite-3.0-1b-a400m-base",
+    "model_type": "Not specified",
+    "name": "Granite-3.0-1B-A400M-Base",
+    "release_date": "2024-10-03 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "d91cbed802d85eb1b32374623331f6ab2b37403a"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "granite 3.0 a400m"
+  },
+  "links": {
+    "citation": "@misc{granite-models,\n  author = {author 1, author2, ...},\n  title = {},\n  journal = {},\n  volume = {},\n  year = {2024},\n  url = {https://arxiv.org/abs/0000.00000},\n}",
+    "code_repository": "https://github.com/ibm-granite/granite-3.0-language-models",
+    "model_card": "https://huggingface.co/ibm-granite/granite-3.0-1b-a400m-base",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "open-weight base model with no safety alignment and no reported safety evaluations -> users may over-trust its outputs despite lack of alignment",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "mixture-of-experts",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "5.2 GiB of safetensors weights (5,539,854,072 bytes) in F32",
+    "num_parameters": "1,384,956,928 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model has not undergone any safety alignment, so it may produce problematic outputs.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

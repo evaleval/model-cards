@@ -1,0 +1,86 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "373,775 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "6,644 likes on the Hub (as of 2026-09-05)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "The developer states that care was taken during model development to optimize both helpfulness and safety."
+  },
+  "identity": {
+    "developed_by": "meta-llama (Hub organization)",
+    "license": "llama3",
+    "model_id": "meta-llama/Meta-Llama-3-8B",
+    "model_type": "Not specified",
+    "name": "Meta-Llama-3-8B",
+    "release_date": "2024-04-17 (Hugging Face repository creation date)",
+    "summary": "A generative text model in the Meta Llama 3 family, released in 8B and 70B sizes.",
+    "version": "8cde5ca8380496c9a6cc7ef3a8b46a0372a1d920"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Meta Llama 3"
+  },
+  "links": {
+    "citation": "@article{llama3modelcard,\n\n  title={Llama 3 Model Card},\n\n  author={AI@Meta},\n\n  year={2024},\n\n  url = {https://github.com/meta-llama/llama3/blob/main/MODEL_CARD.md}\n\n}",
+    "code_repository": "https://github.com/meta-llama/llama3",
+    "model_card": "https://huggingface.co/meta-llama/Meta-Llama-3-8B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides only a brief description of training data as 'a new mix of publicly available online data' and no details on model design, development, or evaluation process, so the checkpoint lacks transparency.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "The card does not document training dataset details beyond 'a new mix of publicly available online data', so training/tuning dataset details are insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Training data is described only as 'publicly available online data' with no traceability of ownership, origin, or transformations, so data provenance is uncertain.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "Because the training data is an undisclosed mix of public online data, the content used to generate outputs is not accessible or attributable.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card does not state intended use or use restrictions beyond a gated access and license, so the model's intended use is incomplete for defining relevant risks.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,376 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on a new mix of publicly available online data.",
+    "training_data_size": "Not specified"
+  }
+}

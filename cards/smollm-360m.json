@@ -1,0 +1,74 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "7,452 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "73 likes on the Hub (as of 2026-09-05)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that SmolLM models perform competitively against other models of similar size on benchmarks that assess common sense reasoning and world knowledge.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "HuggingFaceTB (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "HuggingFaceTB/SmolLM-360M",
+    "model_type": "Small language model",
+    "name": "SmolLM",
+    "release_date": "2024-07-14 (Hugging Face repository creation date)",
+    "summary": "This is the SmolLM-360M",
+    "version": "59f7ef243ee09a72cbc14cb054393a3e3b771d41"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "SmolLM"
+  },
+  "links": {
+    "citation": "@misc{allal2024SmolLM,\n      title={SmolLM - blazingly fast and remarkably powerful}, \n      author={Loubna Ben Allal and Anton Lozhkov and Elie Bakouch and Leandro von Werra and Thomas Wolf},\n      year={2024},\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/HuggingFaceTB/SmolLM-360M",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides only architecture, size, and benchmark claims; no training data, development, or evaluation details are documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card does not describe how training data was collected, curated, or used, so training data transparency is lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card only says 'small language model' and gives no intended-use or misuse definition, leaving downstream risk scope undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "2,048 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "1.3 GiB of safetensors weights (1,447,317,080 bytes) in F32",
+    "num_parameters": "361,821,120 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The repository contains a converted version of the latest trained model.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

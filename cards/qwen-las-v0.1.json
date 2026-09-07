@@ -1,0 +1,58 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "2 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The model card states that this model is a fine-tuned version of Qwen1.5-4B-Chat, trained on the LangGPT_community, LangGPT_alpaca, and LangGPT_seed datasets.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "langgptai (Hub organization)",
+    "license": "other",
+    "model_id": "langgptai/Qwen-las-v0.1",
+    "model_type": "Not specified",
+    "name": "Qwen-las-v0.1",
+    "release_date": "2024-05-26 (Hugging Face repository creation date)",
+    "summary": "This model is a fine-tuned version of Qwen1.5-4B-Chat, trained on the LangGPT_community, LangGPT_alpaca, and LangGPT_seed datasets.",
+    "version": "b6c6c48f777668ca93a19487ec71a4e8f2473dd7"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "adapter",
+        "model_id": "Qwen/Qwen1.5-4B-Chat",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen las"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/langgptai/Qwen-las-v0.1",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": "Not specified",
+    "model_size": "0.0 GiB of safetensors weights (13,128,368 bytes)",
+    "num_parameters": "Not specified",
+    "precision": "Not specified"
+  },
+  "training_context": {
+    "adaptations": "This model is a fine-tuned version of Qwen1.5-4B-Chat, trained with llama-factory and LoRA, and generated from trainer.",
+    "data_cutoff": "Not specified",
+    "training_data": "This model is a fine-tuned version of Qwen1.5-4B-Chat on the LangGPT_community, LangGPT_alpaca, and LangGPT_seed datasets.",
+    "training_data_size": "Not specified"
+  }
+}

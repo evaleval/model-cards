@@ -1,0 +1,128 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "53,528 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "175 likes on the Hub (as of 2026-09-05)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "39.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "50.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "22.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "3.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Math",
+        "metric": "Not specified",
+        "score": "3.13",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "12.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "6.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "18.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CMMLU",
+        "metric": "Not specified",
+        "score": "46.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Exams",
+        "metric": "Not specified",
+        "score": "26.98",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Understanding",
+        "metric": "Not specified",
+        "score": "44.08",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Translation",
+        "metric": "Not specified",
+        "score": "9.17",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer-reported results for Qwen1.5-0.5B show scores of 39.2 on MMLU, 50.5 on C-Eval, 22.0 on GSM8K, 3.1 on MATH, 12.2 on HumanEval, 6.8 on MBPP, 18.3 on BBH, and 46.6 on CMMLU. Additional reported scores include 26.98 on Exams, 44.08 on Understanding, 3.13 on Math, and 9.17 on Translation.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "other",
+    "model_id": "Qwen/Qwen1.5-0.5B",
+    "model_type": "Transformer-based decoder-only language model",
+    "name": "Qwen1.5-0.5B",
+    "release_date": "2024-01-22 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "8f445e3628f3500ee69f24e1303c9f10f5342a39"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen1.5"
+  },
+  "links": {
+    "citation": "@article{qwen,\n  title={Qwen Technical Report},\n  author={Jinze Bai and Shuai Bai and Yunfei Chu and Zeyu Cui and Kai Dang and Xiaodong Deng and Yang Fan and Wenbin Ge and Yu Han and Fei Huang and Binyuan Hui and Luo Ji and Mei Li and Junyang Lin and Runji Lin and Dayiheng Liu and Gao Liu and Chengqiang Lu and Keming Lu and Jianxin Ma and Rui Men and Xingzhang Ren and Xuancheng Ren and Chuanqi Tan and Sinan Tan and Jianhong Tu and Peng Wang and Shijie Wang and Wei Wang and Shengguang Wu and Benfeng Xu and Jin Xu and An Yang and Hao Yang and Jian Yang and Shusheng Yang and Yang Yao and Bowen Yu and Hongyi Yuan and Zheng Yuan and Jianwei Zhang and Xingxuan Zhang and Yichang Zhang and Zhenru Zhang and Chang Zhou and Jingren Zhou and Xiaohuan Zhou and Tianhang Zhu},\n  journal={arXiv preprint arXiv:2309.16609},\n  year={2023}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen1.5",
+    "model_card": "https://huggingface.co/Qwen/Qwen1.5-0.5B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "1.2 GiB of safetensors weights (1,239,173,352 bytes) in BF16",
+    "num_parameters": "619,570,176 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The base model is not recommended for direct text generation; post-training such as SFT, RLHF, or continued pretraining is suggested before use.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

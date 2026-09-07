@@ -1,0 +1,66 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "28 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Marsouuu (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Marsouuu/lareneg1_78B-ECE-PRYMMAL-Martial",
+    "model_type": "Not specified",
+    "name": "lareneg1_78B-ECE-PRYMMAL-Martial",
+    "release_date": "2024-10-23 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "0505bdcdccc4b1af2723250cdd907020588d17df"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Qwen/Qwen2.5-1.5B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "lareneg1 ECE PRYMMAL Martial"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Marsouuu/lareneg1_78B-ECE-PRYMMAL-Martial",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "3.3 GiB of safetensors weights (3,554,214,752 bytes) in BF16",
+    "num_parameters": "1,777,088,000 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge of pre-trained language models, created with mergekit using the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

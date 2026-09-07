@@ -1,0 +1,92 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "761,252 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "817 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/gemma-3-12b-it",
+    "model_type": "Not specified",
+    "name": "gemma-3-12b-it",
+    "release_date": "2025-03-01 (Hugging Face repository creation date)",
+    "summary": "Gemma 3 is a lightweight, state-of-the-art open model family from Google, built using the same research and technology as the Gemini models.",
+    "version": "96b6f1eccf38110c56df3a15bffe176da04bfd80"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "google/gemma-3-12b-pt",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "gemma 3"
+  },
+  "links": {
+    "citation": "@article{gemma_2025,\n    title={Gemma 3},\n    url={https://goo.gle/Gemma3Report},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2025}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/google/gemma-3-12b-it",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2503.19786"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only high-level training data description ('text dataset drawn from a wide variety of sources') and no evaluation details, so design/development/evaluation process is insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card states training data only as 'text dataset drawn from a wide variety of sources' without dataset details, so training/tuning dataset documentation is insufficient.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Inaccessible training data",
+        "description": "Without access to the training data, the types of explanations a model can provide are limited and more likely to be incorrect.",
+        "justification": "No training data access is provided in the card; only a vague 'wide variety of sources' description is given.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/inaccessible-training-data.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "Because training data is not accessible or specified, content of training data used for outputs is not traceable.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card describes modalities and family but does not define intended use or downstream tasks, leaving relevant risks undefined as use changes.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: image, text",
+      "output: text"
+    ],
+    "model_size": "22.7 GiB of safetensors weights (24,374,793,024 bytes) in BF16",
+    "num_parameters": "12,187,325,040 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on a text dataset drawn from a wide variety of sources.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,11 +1,17 @@
 {
   "access_and_adoption": {
     "access_type": "open-weight",
-    "downloads": "61,617 downloads (Hub 30-day window, as of 2026-09-04)",
-    "likes": "50 likes on the Hub (as of 2026-09-04)"
+    "downloads": "62,846 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "50 likes on the Hub (as of 2026-09-05)"
   },
   "evaluation": {
     "benchmark_scores": [
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "28.2",
+        "setting": "Not specified"
+      },
       {
         "benchmark": "Average",
         "metric": "Not specified",
@@ -15,19 +21,19 @@
       {
         "benchmark": "AlpacaEval",
         "metric": "Not specified",
+        "score": "5.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AlpacaEval",
+        "metric": "Not specified",
         "score": "29.1",
         "setting": "Not specified"
       },
       {
-        "benchmark": "DROP",
+        "benchmark": "IFEval",
         "metric": "Not specified",
-        "score": "60.5",
-        "setting": "Not specified"
-      },
-      {
-        "benchmark": "GSM8k",
-        "metric": "Not specified",
-        "score": "85.1",
+        "score": "32.2",
         "setting": "Not specified"
       },
       {
@@ -37,15 +43,9 @@
         "setting": "Not specified"
       },
       {
-        "benchmark": "MATH",
+        "benchmark": "PopQA",
         "metric": "Not specified",
-        "score": "32.5",
-        "setting": "Not specified"
-      },
-      {
-        "benchmark": "MMLU",
-        "metric": "Not specified",
-        "score": "61.3",
+        "score": "17.1",
         "setting": "Not specified"
       },
       {
@@ -57,7 +57,25 @@
       {
         "benchmark": "TruthQA",
         "metric": "Not specified",
+        "score": "44.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthQA",
+        "metric": "Not specified",
         "score": "56.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AVG",
+        "metric": "Not specified",
+        "score": "51.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AVG",
+        "metric": "Not specified",
+        "score": "55.9",
         "setting": "Not specified"
       },
       {
@@ -69,7 +87,31 @@
       {
         "benchmark": "AE2",
         "metric": "Not specified",
+        "score": "10.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AE2",
+        "metric": "Not specified",
+        "score": "27.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AE2",
+        "metric": "Not specified",
         "score": "29.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFE",
+        "metric": "Not specified",
+        "score": "66.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFE",
+        "metric": "Not specified",
+        "score": "73",
         "setting": "Not specified"
       },
       {
@@ -81,7 +123,31 @@
       {
         "benchmark": "PQA",
         "metric": "Not specified",
+        "score": "23.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "PQA",
+        "metric": "Not specified",
+        "score": "23.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "PQA",
+        "metric": "Not specified",
         "score": "23.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TQA",
+        "metric": "Not specified",
+        "score": "48.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TQA",
+        "metric": "Not specified",
+        "score": "56",
         "setting": "Not specified"
       },
       {
@@ -92,17 +158,17 @@
       }
     ],
     "human_evals": "Not specified",
-    "results_summary": "The developer-reported table lists the instruct model's scores across a set of benchmarks, with an average of 54.8 and notable results such as 85.1 on GSM8k and 72.3 on IFEval.",
+    "results_summary": "The developer reports that the OLMo-2-7B-1124-Instruct checkpoint achieves an average score of 54.8 across the listed evaluations, with notable results including 29.1 on AlpacaEval, 72.3 on IFEval, 23.2 on PopQA, and 56.5 on TruthQA.",
     "safety_evals": "Not specified"
   },
   "identity": {
     "developed_by": "allenai (Hub organization)",
     "license": "apache-2.0",
     "model_id": "allenai/OLMo-2-1124-7B-Instruct",
-    "model_type": "Text generation model.",
+    "model_type": "Not specified",
     "name": "OLMo-2-1124-7B-Instruct",
     "release_date": "2024-12-18 (Hugging Face repository creation date)",
-    "summary": "OLMo 2 7B Instruct is a post-trained language model built from the OLMo-2 7B November 2024 base through supervised finetuning, DPO, and RLVR.",
+    "summary": "OLMo 2 is the next generation of fully open language models; this Instruct variant is post-trained from the base OLMo-2 7B model via supervised finetuning, DPO, and RLVR.",
     "version": "470b1fba1ae01581f270116362ee4aa1b97f4c84"
   },
   "lineage": {
@@ -123,6 +189,40 @@
     "system_card": "Not specified",
     "tech_report": "https://arxiv.org/abs/2501.00656"
   },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "Reported TruthQA score of 56.5 and AlpacaEval 29.1 indicate the model can produce factually inaccurate or ungrounded text, and the card does not report any hallucination mitigation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "The card reports an Instruct/chat model with moderate evaluation scores (e.g., 29.1 AlpacaEval, 72.3 IFEval) and no calibration or human-decision-making evaluation, so users could over-trust its outputs in assisted decision-making.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      },
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "The model is open-weight and was fine-tuned on data including outputs generated from third-party models subject to additional terms such as the Gemma Terms of Use, so users may prompt it with copyrighted or licensed material without clear IP safeguards.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Data privacy rights alignment",
+        "description": "Applicable laws can establish data subject rights such as opt-out rights, right to access, and right to be forgotten. Synthetic data might raise unique concerns, such as the potential for reidentification of individuals from seemingly anonymous synthetic data. Data subject rights might also be relevant in scenarios where synthetic data is derived from sensitive or personal information.",
+        "justification": "The card states the model was fine-tuned on the Tülu 3 variant dataset, which includes outputs from third-party models, but it does not document whether personal data or data-subject rights were addressed in that training data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-privacy-rights.html"
+      },
+      {
+        "category": "Legal accountability",
+        "description": "Determining who is responsible for an AI model is challenging without good documentation and governance processes. The use of synthetic data in model development adds further complexity, since the lack of standardized frameworks for recording synthetic data design choices and verification steps makes accountability harder to establish.",
+        "justification": "The card provides open-weight access under Apache-2.0 and reports evaluations, but it does not document governance or accountability processes for the use of third-party model outputs in its post-training data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/legal-accountability.html"
+      }
+    ]
+  },
   "specifications": {
     "architecture_type": "dense decoder-only",
     "context_length": "4,096 tokens (config.json max_position_embeddings)",
@@ -135,9 +235,9 @@
     "precision": "BF16 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "Not specified",
+    "adaptations": "The model is a post-trained variant of the OLMo-2 7B November 2024 base model, having undergone supervised fine-tuning, DPO training, and RLVR training on the Tülu 3 variant dataset.",
     "data_cutoff": "Not specified",
-    "training_data": "Not specified",
+    "training_data": "The OLMo 2 7B Instruct November 2024 model was fine-tuned on an OLMo-specific variant of the Tülu 3 dataset, with a mix that includes outputs generated from third-party models subject to additional terms such as the Gemma Terms of Use.",
     "training_data_size": "Not specified"
   }
 }

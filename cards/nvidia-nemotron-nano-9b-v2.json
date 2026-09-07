@@ -1,0 +1,135 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "429,626 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "517 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "AIME25",
+        "metric": "Not specified",
+        "score": "72.1%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH500",
+        "metric": "Not specified",
+        "score": "97.8%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA",
+        "metric": "Not specified",
+        "score": "64.0%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LCB",
+        "metric": "Not specified",
+        "score": "71.1%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BFCL v3",
+        "metric": "Not specified",
+        "score": "66.9%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval",
+        "metric": "Not specified",
+        "score": "90.3%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HLE",
+        "metric": "Not specified",
+        "score": "6.5%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "RULER",
+        "metric": "Not specified",
+        "score": "78.9%",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the model was evaluated in Reasoning-On mode for all benchmarks except RULER, which was evaluated in Reasoning-Off mode.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "nvidia (Hub organization)",
+    "license": "other",
+    "model_id": "nvidia/nvidia-nemotron-nano-9b-v2",
+    "model_type": "Not specified",
+    "name": "NVIDIA-Nemotron-Nano-9B-v2",
+    "release_date": "2025-08-12 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "6533e8de2c68e4536bf7c411d7a3ce5734111476"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "nvidia/NVIDIA-Nemotron-Nano-12B-v2",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "nvidia nemotron nano v2"
+  },
+  "links": {
+    "citation": "@misc{nvidia2025nvidianemotronnano2,\n      title={NVIDIA Nemotron Nano 2: An Accurate and Efficient Hybrid Mamba-Transformer Reasoning Model},\n      author={NVIDIA},\n      year={2025},\n      eprint={2508.14444},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2508.14444},\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/nvidia/nvidia-nemotron-nano-9b-v2",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2508.14444"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only a short list of training datasets and benchmark names with no dataset composition, curation, or evaluation details, so the checkpoint's design and development process is insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Training data is described only by dataset names (e.g., Nemotron-Post-Training-Dataset-v1/v2, Nemotron-CC-v2) with no origin, ownership, or generation traceability, making provenance uncertain.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not describe how the named Nemotron datasets were collected, curated, or used, so training-data transparency is lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card states only text-in/text-out and open-weight access, with no intended-use or misuse definition, so relevant risks cannot be scoped for downstream uses.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "16.6 GiB of safetensors weights (17,776,492,512 bytes) in BF16",
+    "num_parameters": "8,888,227,328 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was trained using Megatron-LM and NeMo-RL.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on NVIDIA datasets including Nemotron-Post-Training-Dataset-v1 and v2, Nemotron-Pretraining-Dataset-sample, Nemotron-CC-v2, Nemotron-CC-Math-v1, and Nemotron-Pretraining-SFT-v1.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "723 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "179 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer states that Dolphin-2.9.2 possesses a range of instruction-following, conversational, and coding capabilities, and also notes initial agentic abilities and function-calling support.",
+    "safety_evals": "The developer describes the model as uncensored, with alignment and bias removed from the dataset, and states that it will be highly compliant with requests, including unethical ones."
+  },
+  "identity": {
+    "developed_by": "dphn (Hub organization)",
+    "license": "other",
+    "model_id": "cognitivecomputations/dolphin-2.9.2-qwen2-72b",
+    "model_type": "Not specified",
+    "name": "Dolphin 2.9.2 Qwen2 72B 🐬",
+    "release_date": "2024-05-27 (Hugging Face repository creation date)",
+    "summary": "Dolphin 2.9.2 is a model with a variety of instruction, conversational, and coding skills.",
+    "version": "5fdf999df3464a95c6387386f827e93227f3fa60"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2-72B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "dolphin 2.9.2 qwen2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/cognitivecomputations/dolphin-2.9.2-qwen2-72b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Direct instructions attack",
+        "description": "Prompts, questions, or requests designed to elicit undesirable responses from the application. This approach directly instructs the model to engage in the undesired behavior.",
+        "justification": "Card states the model is uncensored, with alignment and bias removed, and highly compliant with requests including unethical ones -> direct instructions for harmful content are plausibly effective.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/direct-instructions-attack.html"
+      },
+      {
+        "category": "Jailbreaking",
+        "description": "A jailbreaking attack attempts to break through the guardrails established in the model to perform restricted actions.",
+        "justification": "Open-weight model explicitly described as uncensored with alignment removed -> no guardrails to bypass, but the card's own safety evaluation indicates jailbreaking-style restricted actions are not prevented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/jailbreaking.html"
+      },
+      {
+        "category": "Harmful output",
+        "description": "A model might generate language that leads to physical harm.  The language might include overtly violent, covertly dangerous, or otherwise indirectly unsafe statements.",
+        "justification": "Card states it will be highly compliant with requests, including unethical ones -> plausible generation of language leading to physical harm.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/harmful-output.html"
+      },
+      {
+        "category": "Toxic output",
+        "description": "Toxic output occurs when the model produces hateful, abusive, and profane (HAP) or obscene content. This also includes behaviors like bullying.",
+        "justification": "Card states alignment and bias were removed from the dataset and the model is uncensored -> plausible hateful, abusive, profane, or obscene output.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/toxic-output.html"
+      },
+      {
+        "category": "Dangerous use",
+        "description": "Generative AI models might be used with the sole intention of harming people.",
+        "justification": "Open-weight checkpoint with reported high compliance with unethical requests -> plausible intentional use to harm people.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/dangerous-use.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "135.4 GiB of safetensors weights (145,412,518,832 bytes) in BF16",
+    "num_parameters": "72,706,203,648 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was trained with full fine-tuning on parameters selected by Laser Scanner, using the ChatML prompt template format.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

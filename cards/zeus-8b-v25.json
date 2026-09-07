@@ -1,0 +1,106 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "12 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "T145 (Hub organization)",
+    "license": "Not specified",
+    "model_id": "T145/ZEUS-8B-V25",
+    "model_type": "Not specified",
+    "name": "ZEUS-8B-V25",
+    "release_date": "2025-01-23 (Hugging Face repository creation date)",
+    "summary": "ZEUS-8B-V25 is a merge of pre-trained language models created using mergekit.",
+    "version": "9eb6cb27591bcd250276190153ddf9864df7c710"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Orenguteng/Llama-3.1-8B-Lexi-Uncensored-V2",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "VAGOsolutions/Llama-3.1-SauerkrautLM-8b-Instruct",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "arcee-ai/Llama-3.1-SuperNova-Lite",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "unsloth/Llama-3.1-Storm-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "unsloth/Meta-Llama-3.1-8B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "ZEUS V25"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/T145/ZEUS-8B-V25",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only that ZEUS-8B-V25 is a mergekit merge of named open-weight Llama-3.1 models, with no documentation of design, development, or evaluation process.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "The card identifies only the merged base/instruct models and gives no traceability of the training/merge data or its usage terms.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "No information is provided about how data was collected, curated, or used for the merge, making model behavior harder to explain.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "Because the card does not disclose training data content, outputs cannot be traced back to specific training sources.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,572,744 bytes) in BF16",
+    "num_parameters": "8,030,269,440 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

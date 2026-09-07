@@ -1,8 +1,8 @@
 {
   "access_and_adoption": {
     "access_type": "open-weight",
-    "downloads": "13,232,997 downloads (Hub 30-day window, as of 2026-09-04)",
-    "likes": "1,342 likes on the Hub (as of 2026-09-04)"
+    "downloads": "13,512,721 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "1,344 likes on the Hub (as of 2026-09-05)"
   },
   "evaluation": {
     "benchmark_scores": [
@@ -267,10 +267,10 @@
     "developed_by": "Qwen (Hub organization)",
     "license": "apache-2.0",
     "model_id": "Qwen/Qwen3-8B",
-    "model_type": "Not specified",
+    "model_type": "Large language model (LLM)",
     "name": "Qwen3-8B",
     "release_date": "2025-04-27 (Hugging Face repository creation date)",
-    "summary": "Qwen3-8B is one of six open-weighted dense models in the Qwen3 family, released under the Apache 2.0 license.",
+    "summary": "Qwen3-8B is a member of the Qwen3 family of large language models, released by the Qwen team.",
     "version": "b968826d9c46dd6066d109eabc6255188de91218"
   },
   "lineage": {
@@ -290,6 +290,9 @@
     "model_card": "https://huggingface.co/Qwen/Qwen3-8B",
     "system_card": "Not specified",
     "tech_report": "https://arxiv.org/abs/2505.09388"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
   },
   "specifications": {
     "architecture_type": "dense decoder-only",

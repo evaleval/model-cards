@@ -1,0 +1,147 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "35,328 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "573 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "RealToxicity",
+        "metric": "Not specified",
+        "score": "8.84",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CrowS-Pairs",
+        "metric": "top-1",
+        "score": "36.67",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBQ Ambig",
+        "metric": "top-1",
+        "score": "85.99",
+        "setting": "1-shot"
+      },
+      {
+        "benchmark": "BBQ Disambig",
+        "metric": "top-1",
+        "score": "86.94",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogender",
+        "metric": "top-1",
+        "score": "77.22",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "51.60",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winobias 12",
+        "metric": "Not specified",
+        "score": "81.94",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winobias 22",
+        "metric": "Not specified",
+        "score": "97.22",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Toxigen",
+        "metric": "Not specified",
+        "score": "38.42",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Elo",
+        "metric": "Elo",
+        "score": "1218",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Elo",
+        "metric": "Elo",
+        "score": "1127",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the model was evaluated on a broad set of text-generation datasets and metrics covering different aspects of generation quality.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/gemma-2-27b-it",
+    "model_type": "Text-to-text, decoder-only large language model.",
+    "name": "gemma-2-27b-it",
+    "release_date": "2024-06-24 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "aaf20e6b9f4c0fcf043f6fb2a2068419086d77b0"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "google/gemma-2-27b",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "gemma 2"
+  },
+  "links": {
+    "citation": "@article{gemma_2024,\n    title={Gemma},\n    url={https://www.kaggle.com/m/3301},\n    DOI={10.34740/KAGGLE/M/3301},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2024}\n}",
+    "code_repository": "https://github.com/huggingface/local-gemma",
+    "model_card": "https://huggingface.co/google/gemma-2-27b-it",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2408.00118"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only broad 'wide variety of sources' for training data and generic 'broad set' of evaluations, with no dataset details, evaluation results, or design/development documentation, so transparency about this checkpoint is limited.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Confidential information in data",
+        "description": "Confidential information might be included as part of the data that is used to train or tune the model.",
+        "justification": "Training data is described only as drawn from a wide variety of sources, with no filtering or deduplication of confidential or personal information stated, so the checkpoint plausibly contains confidential information in its training data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-information-in-data.html"
+      },
+      {
+        "category": "Unrepresentative data",
+        "description": "Unrepresentative data occurs when the training or fine-tuning data is not sufficiently representative of the underlying population or does not measure the phenomenon of interest. Synthetic data might not fully capture the complexity and nuances of real-world data. Causes include possible limitations in the seed data quality, biases in generation methods, or inadequate domain knowledge. Thus, AI models might struggle to generalize effectively to real-world scenarios.",
+        "justification": "The card gives no information about the composition or representativeness of the training data, so the checkpoint may not generalize to all real-world text distributions.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-data.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "50.7 GiB of safetensors weights (54,454,316,552 bytes) in BF16",
+    "num_parameters": "27,227,128,320 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The instruction-tuned model uses a chat template that must be followed for conversational use.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on a text dataset drawn from a wide variety of sources.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "1,631 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "33 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "nvidia (Hub organization)",
+    "license": "llama3.1",
+    "model_id": "nvidia/OpenMath2-Llama3.1-8B",
+    "model_type": "Not specified",
+    "name": "OpenMath2-Llama3.1-8B",
+    "release_date": "2024-09-30 (Hugging Face repository creation date)",
+    "summary": "OpenMath2-Llama3.1-8B is a math-focused language model created by fine-tuning Llama 3.1 8B Base on the OpenMathInstruct-2 dataset.",
+    "version": "0f9db814ea4acd66485b9e6679b3e58df8663875"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "meta-llama/Llama-3.1-8B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "OpenMath2 Llama3.1"
+  },
+  "links": {
+    "citation": "@article{toshniwal2024openmath2,\n  title   = {OpenMathInstruct-2: Accelerating AI for Math with Massive Open-Source Instruction Data},\n  author  = {Shubham Toshniwal and Wei Du and Ivan Moshkov and  Branislav Kisacanin and Alexan Ayrapetyan and Igor Gitman},\n  year    = {2024},\n  journal = {arXiv preprint arXiv:2410.01560}\n}",
+    "code_repository": "https://github.com/meta-llama/llama-models",
+    "model_card": "https://huggingface.co/nvidia/OpenMath2-Llama3.1-8B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only architecture, base model, and dataset name; no training details, evaluation results, or intended-use documentation are provided.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card names OpenMathInstruct-2 but gives no dataset composition, filtering, or synthetic-data generation details.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card does not state intended use, misuse, or deployment context for the math-focused model.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,400 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was produced by fine-tuning Llama3.1-8B-Base with OpenMathInstruct-2.",
+    "data_cutoff": "Not specified",
+    "training_data": "OpenMath2-Llama3.1-8B is a fine-tune of Llama3.1-8B-Base on OpenMathInstruct-2.",
+    "training_data_size": "Not specified"
+  }
+}

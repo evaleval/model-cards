@@ -1,0 +1,194 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "68,206 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "728 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "top-1",
+        "score": "71.3",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "81.9",
+        "setting": "10-shot"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "Not specified",
+        "score": "81.7",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "SocialIQA",
+        "metric": "Not specified",
+        "score": "53.4",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "BoolQ",
+        "metric": "Not specified",
+        "score": "84.2",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "WinoGrande",
+        "metric": "score",
+        "score": "80.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-e",
+        "metric": "Not specified",
+        "score": "88.0",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "ARC-c",
+        "metric": "Not specified",
+        "score": "68.4",
+        "setting": "25-shot"
+      },
+      {
+        "benchmark": "TriviaQA",
+        "metric": "Not specified",
+        "score": "76.6",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "Natural Questions",
+        "metric": "Not specified",
+        "score": "29.2",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "pass@1",
+        "score": "40.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "52.4",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "68.6",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "36.6",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "AGIEval",
+        "metric": "Not specified",
+        "score": "52.8",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "BIG-Bench",
+        "metric": "Not specified",
+        "score": "68.2",
+        "setting": "3-shot CoT"
+      },
+      {
+        "benchmark": "DROP",
+        "metric": "F1",
+        "score": "69.4",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "68.2",
+        "setting": "3-shot CoT"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "80.6",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "SIQA",
+        "metric": "Not specified",
+        "score": "53.4",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "NQ",
+        "metric": "Not specified",
+        "score": "29.2",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "70.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "64.9",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the model was evaluated across a broad set of datasets and metrics covering different aspects of text generation, and that the resulting models deliver strong performance for their size, offering competitive alternatives to larger models.",
+    "safety_evals": "The developer reports that ethics and safety evaluation results were within acceptable thresholds for internal policies covering categories such as child safety, content safety, representational harms, memorization, and large-scale harms."
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/gemma-2-9b",
+    "model_type": "text-to-text, decoder-only large language model",
+    "name": "gemma-2-9b",
+    "release_date": "2024-06-24 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "33c193028431c2fde6c6e51f29e6f17b60cbfac6"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "gemma 2"
+  },
+  "links": {
+    "citation": "@article{gemma_2024,\n    title={Gemma},\n    url={https://www.kaggle.com/m/3301},\n    DOI={10.34740/KAGGLE/M/3301},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2024}\n}",
+    "code_repository": "https://github.com/huggingface/local-gemma",
+    "model_card": "https://huggingface.co/google/gemma-2-9b",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2408.00118"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "34.4 GiB of safetensors weights (36,966,878,040 bytes) in F32",
+    "num_parameters": "9,241,705,984 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model card states that the model was evaluated against a large collection of datasets and metrics to cover different aspects of text generation.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model card states that the model was trained on text data from a wide variety of sources.",
+    "training_data_size": "Not specified"
+  }
+}

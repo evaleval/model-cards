@@ -1,0 +1,92 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "42 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "3 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "macadeliccc (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "macadeliccc/Samantha-Qwen-2-7B",
+    "model_type": "AutoModelForCausalLM",
+    "name": "Samantha Qwen2 7B",
+    "release_date": "2024-06-15 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "59058972fa9b56d132d04589eb17cbba277c2826"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2-7B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Samantha Qwen 2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/macadeliccc/Samantha-Qwen-2-7B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "The card lists multiple fine-tuning datasets (opus_samantha, ultrachat_200k, OpenHermes-2.5, Claude-3-Opus-Instruct-15K) but provides no provenance or traceability details for them.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "The card names datasets but does not document their composition, filtering, or generation process, so tuning-data details are insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Data usage rights restrictions",
+        "description": "Terms of service, license compliance, or other IP issues may restrict the ability to use certain data for building models.",
+        "justification": "Fine-tuning on datasets derived from or named after other models (e.g., Claude-3-Opus-Instruct-15K) raises possible terms-of-service or license restrictions on using that data to build models.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-usage-rights.html"
+      },
+      {
+        "category": "Copyright infringement",
+        "description": "A model might generate content that is similar or identical to existing work protected by copyright or covered by open-source license agreement.",
+        "justification": "An open-weight conversational model fine-tuned on instruction/chat datasets may reproduce copyrighted or license-protected text from those sources, with no reported copyright mitigation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/copyright-infringement.html"
+      },
+      {
+        "category": "Improper usage",
+        "description": "Improper usage occurs when a model is used for a purpose that it was not originally designed for.",
+        "justification": "The card only specifies AutoModelForCausalLM text generation and reports no safety evaluations or usage restrictions, so the open-weight model could plausibly be used outside its intended conversational purpose.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/improper-usage.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,231,271,528 bytes) in F16",
+    "num_parameters": "7,615,616,512 parameters (safetensors metadata)",
+    "precision": "F16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was fine-tuned on a mix of conversational datasets, including opus_samantha, ultrachat_200k, OpenHermes-2.5, and Claude-3-Opus-Instruct-15K, formatted in the ChatML sharegpt style.",
+    "training_data_size": "Not specified"
+  }
+}

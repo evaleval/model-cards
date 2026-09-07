@@ -1,0 +1,62 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "28 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "lalainy (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "lalainy/ECE-PRYMMAL-YL-6B-SLERP-V2",
+    "model_type": "Not specified",
+    "name": "ECE-PRYMMAL-YL-6B-SLERP-V2",
+    "release_date": "2024-11-09 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "18d282d0206ae8f878a9cfa80ce4eaf042056569"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/lalainy/ECE-PRYMMAL-YL-6B-SLERP-V2",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "dense 6B decoder-only model with open weights and no reported training/evaluation details; training and inference of such a model plausibly has carbon/water costs",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "22.6 GiB of safetensors weights (24,244,175,656 bytes) in F32",
+    "num_parameters": "6,061,035,520 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

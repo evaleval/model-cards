@@ -1,0 +1,68 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "32 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "MaziyarPanahi (Hub organization)",
+    "license": "other",
+    "model_id": "MaziyarPanahi/calme-3.1-baguette-3b",
+    "model_type": "Text-generation model",
+    "name": "MaziyarPanahi/calme-3.1-baguette-3b",
+    "release_date": "2024-11-07 (Hugging Face repository creation date)",
+    "summary": "This model is a fine-tuned iteration of Qwen/Qwen2.5-3B, optimized for general-domain performance in French and English.",
+    "version": "2029e36e5764f04cfe2f57a09af64ceab52ec9fb"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-3B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "calme 3.1 baguette"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/MaziyarPanahi/calme-3.1-baguette-3b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Legal accountability",
+        "description": "Determining who is responsible for an AI model is challenging without good documentation and governance processes. The use of synthetic data in model development adds further complexity, since the lack of standardized frameworks for recording synthetic data design choices and verification steps makes accountability harder to establish.",
+        "justification": "open-weight fine-tune with license 'other' and no documentation of governance or evaluation details in the card",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/legal-accountability.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "5.7 GiB of safetensors weights (6,170,816,984 bytes) in BF16",
+    "num_parameters": "3,085,383,680 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "It is a fine-tuned iteration of Qwen/Qwen2.5-3B, adapted to improve general-domain performance in French and English.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was fine-tuned from Qwen/Qwen2.5-3B using two French instruction datasets: MaziyarPanahi/french_instruct_sharegpt and MaziyarPanahi/calme-legalkit-v0.2.",
+    "training_data_size": "Not specified"
+  }
+}

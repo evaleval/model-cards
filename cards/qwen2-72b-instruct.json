@@ -1,0 +1,285 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "31,166 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "718 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "TheroemQA",
+        "metric": "Not specified",
+        "score": "44.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MT-Bench",
+        "metric": "Not specified",
+        "score": "9.12",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Arena-Hard",
+        "metric": "Not specified",
+        "score": "48.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "EvalPlus",
+        "metric": "Not specified",
+        "score": "79.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench",
+        "metric": "Not specified",
+        "score": "35.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "83.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AlignBench",
+        "metric": "Not specified",
+        "score": "8.27",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Theorem QA",
+        "metric": "Not specified",
+        "score": "44.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench v1",
+        "metric": "Not specified",
+        "score": "35.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MixEval",
+        "metric": "Not specified",
+        "score": "86.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval strict-prompt",
+        "metric": "Not specified",
+        "score": "77.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Knowledge",
+        "metric": "Not specified",
+        "score": "76.19",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Knowledge",
+        "metric": "Not specified",
+        "score": "83.00",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Exam",
+        "metric": "Not specified",
+        "score": "75.65",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Comprehension",
+        "metric": "Not specified",
+        "score": "74.72",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Comprehension",
+        "metric": "Not specified",
+        "score": "73.58",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Coding",
+        "metric": "Not specified",
+        "score": "49.53",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Coding",
+        "metric": "Not specified",
+        "score": "53.03",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Reasoning",
+        "metric": "Not specified",
+        "score": "70.59",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "69.58",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "72.94",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Arabic",
+        "metric": "Not specified",
+        "score": "3.86",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "French",
+        "metric": "Not specified",
+        "score": "4.01",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Indonesian",
+        "metric": "Not specified",
+        "score": "3.83",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Japanese",
+        "metric": "Not specified",
+        "score": "3.63",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Korean",
+        "metric": "Not specified",
+        "score": "4.14",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Portuguese",
+        "metric": "Not specified",
+        "score": "3.97",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Russian",
+        "metric": "Not specified",
+        "score": "4.15",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Spanish",
+        "metric": "Not specified",
+        "score": "4.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Thai",
+        "metric": "Not specified",
+        "score": "3.75",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Vietnamese",
+        "metric": "Not specified",
+        "score": "3.91",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "3.93",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Illegal",
+        "metric": "Not specified",
+        "score": "0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Fraud",
+        "metric": "Not specified",
+        "score": "2.41",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Pornography",
+        "metric": "Not specified",
+        "score": "22.91",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Privacy",
+        "metric": "Not specified",
+        "score": "2.47",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "The developer reports comprehensive evaluation of Qwen2-72B-Instruct on 16 benchmarks across various domains.",
+    "results_summary": "The developer reports that Qwen2-72B-Instruct was evaluated on 16 benchmarks across various domains, with strengths in language understanding, coding, and mathematics, and capable of handling information extraction tasks within a 128k context. It is described as balancing better capabilities with alignment to human values, and comparisons with similar-sized instruction-tuned models are provided.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "other",
+    "model_id": "Qwen/Qwen2-72B-Instruct",
+    "model_type": "text-generation",
+    "name": "Qwen2-72B-Instruct",
+    "release_date": "2024-05-28 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "c867f763ef53f2ea9d9b31ee8501273dedd391eb"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2-72B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2"
+  },
+  "links": {
+    "citation": "@article{qwen2,\n  title={Qwen2 Technical Report},\n  year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2",
+    "model_card": "https://huggingface.co/Qwen/Qwen2-72B-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2407.10671"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "text-generation model with reported strengths in language understanding, coding, and mathematics but no reported factuality or hallucination evaluation in the card summary",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "135.4 GiB of safetensors weights (145,412,518,888 bytes) in BF16",
+    "num_parameters": "72,706,203,648 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was pretrained on a large amount of unspecified data, then post-trained with supervised finetuning and direct preference optimization.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "11 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Sakalti (Hub organization)",
+    "license": "Not specified",
+    "model_id": "Sakalti/SJT-24B-Alpha",
+    "model_type": "Not specified",
+    "name": "SJT-24B-Alpha",
+    "release_date": "2025-02-02 (Hugging Face repository creation date)",
+    "summary": "SJT-24B-Alpha is a merge of pre-trained language models created using mergekit.",
+    "version": "273305272a361d7c5db9623bfa369f738e0b537a"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Sakalti/ultiima-14B-v0.4",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Sakalti/SJT-24B-Alpha",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Jailbreaking",
+        "description": "A jailbreaking attack attempts to break through the guardrails established in the model to perform restricted actions.",
+        "justification": "open-weight text model with no reported safety evaluation or guardrails in the card -> jailbreaking",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/jailbreaking.html"
+      },
+      {
+        "category": "Harmful output",
+        "description": "A model might generate language that leads to physical harm.  The language might include overtly violent, covertly dangerous, or otherwise indirectly unsafe statements.",
+        "justification": "open-weight text-generation model with no reported safety evaluation -> harmful output",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/harmful-output.html"
+      },
+      {
+        "category": "Dangerous use",
+        "description": "Generative AI models might be used with the sole intention of harming people.",
+        "justification": "open-weight model with no reported use restrictions or safety evaluation -> dangerous use",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/dangerous-use.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "44.9 GiB of safetensors weights (48,250,273,728 bytes) in F16",
+    "num_parameters": "24,125,080,576 parameters (safetensors metadata)",
+    "precision": "F16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

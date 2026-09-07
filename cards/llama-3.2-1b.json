@@ -1,0 +1,104 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "1,308,768 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "2,567 likes on the Hub (as of 2026-09-05)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "accuracy",
+        "score": "32.2",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "accuracy",
+        "score": "39.8",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "AGIEval English",
+        "metric": "accuracy",
+        "score": "23.3",
+        "setting": "3-5 shot"
+      },
+      {
+        "benchmark": "ARC-Challenge",
+        "metric": "accuracy",
+        "score": "32.8",
+        "setting": "25-shot"
+      },
+      {
+        "benchmark": "SQuAD",
+        "metric": "exact match",
+        "score": "49.2",
+        "setting": "1-shot"
+      },
+      {
+        "benchmark": "QuAC",
+        "metric": "F1",
+        "score": "37.9",
+        "setting": "1-shot"
+      },
+      {
+        "benchmark": "DROP",
+        "metric": "F1",
+        "score": "28.0",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "Needle in Haystack",
+        "metric": "exact match",
+        "score": "96.8",
+        "setting": "0-shot"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that this model outperforms many available open-source and closed chat models on common industry benchmarks.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "meta-llama (Hub organization)",
+    "license": "llama3.2",
+    "model_id": "meta-llama/Llama-3.2-1B",
+    "model_type": "Not specified",
+    "name": "Llama-3.2-1B",
+    "release_date": "2024-09-18 (Hugging Face repository creation date)",
+    "summary": "A 1B-parameter multilingual generative language model from the Llama 3.2 collection, available in pretrained and instruction-tuned variants.",
+    "version": "4e20de362430cd3b72f300e6b0f18e50e7166e08"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Llama 3.2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "https://github.com/meta-llama/llama",
+    "model_card": "https://huggingface.co/meta-llama/Llama-3.2-1B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "2.3 GiB of safetensors weights (2,471,645,608 bytes) in BF16",
+    "num_parameters": "1,235,814,400 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "160,774 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "2,377 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "Basic",
+        "metric": "Not specified",
+        "score": "98.04",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Basic",
+        "metric": "Not specified",
+        "score": "100",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Basic",
+        "metric": "Not specified",
+        "score": "97.28",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Basic",
+        "metric": "Not specified",
+        "score": "77.84",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Base64",
+        "metric": "Not specified",
+        "score": "100",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Base64",
+        "metric": "Not specified",
+        "score": "96.97",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Base64",
+        "metric": "Not specified",
+        "score": "98.48",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Base64",
+        "metric": "Not specified",
+        "score": "82.93",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Prompt Injection",
+        "metric": "Not specified",
+        "score": "93.14",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Prompt Injection",
+        "metric": "Not specified",
+        "score": "75.76",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Prompt Injection",
+        "metric": "Not specified",
+        "score": "98.39",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Prompt Injection",
+        "metric": "Not specified",
+        "score": "88.33",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Prompt Injection",
+        "metric": "Not specified",
+        "score": "87.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Iterative Jailbreak",
+        "metric": "Not specified",
+        "score": "92.16",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Iterative Jailbreak",
+        "metric": "Not specified",
+        "score": "57.57",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Iterative Jailbreak",
+        "metric": "Not specified",
+        "score": "63.97",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Iterative Jailbreak",
+        "metric": "Not specified",
+        "score": "76.67",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Iterative Jailbreak",
+        "metric": "Not specified",
+        "score": "43.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Crescendo",
+        "metric": "Not specified",
+        "score": "64.71",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Crescendo",
+        "metric": "Not specified",
+        "score": "56.06",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Crescendo",
+        "metric": "Not specified",
+        "score": "85.71",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Crescendo",
+        "metric": "Not specified",
+        "score": "96.67",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Crescendo",
+        "metric": "Not specified",
+        "score": "68.29",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that Kimi-K2-Instruct achieves state-of-the-art open-source performance on real-world software engineering tasks, and describes its post-training evaluation across multiple areas.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "moonshotai (Hub organization)",
+    "license": "other",
+    "model_id": "moonshotai/kimi-k2-instruct",
+    "model_type": "Mixture-of-Experts (MoE) large language model",
+    "name": "kimi-k2-instruct",
+    "release_date": "2025-07-11 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "fd1984e2b7a3350dbf7305fe73a4ede25c14de50"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "kimi k2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "https://github.com/moonshotai/Kimi-K2",
+    "model_card": "https://huggingface.co/moonshotai/kimi-k2-instruct",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only high-level post-training and benchmark claims for kimi-k2-instruct, with no details on training data, evaluation methodology, or inner workings, so transparency is limited.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not state how kimi-k2-instruct's training data was collected, curated, or used, making training data transparency lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete AI agent evaluation",
+        "description": "Evaluating the performance or accuracy or an agent is difficult because of system complexity and open-endedness.",
+        "justification": "The model is explicitly optimized for agentic use and reports software engineering performance, but the card gives no agentic evaluation details, so agent evaluation is incomplete.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-ai-agent-evaluation-agentic.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "mixture-of-experts",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "958.5 GiB of safetensors weights (1,029,190,981,272 bytes) in F8_E4M3",
+    "num_parameters": "1,026,408,235,864 parameters (safetensors metadata)",
+    "precision": "F8_E4M3 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Kimi-K2-Instruct is a post-trained version of the base model, optimized for general-purpose chat and agentic use, and described as a reflex-grade model without long thinking.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

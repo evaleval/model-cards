@@ -1,0 +1,74 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "686,151 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "312 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The Qwen2.5 family is reported to outperform Qwen2 with substantially higher scores on knowledge, coding, and mathematics benchmarks, while also improving instruction following, long-text generation, structured-data understanding, and structured-output generation. The models are described as more robust to varied system prompts and as retaining 128K-token context support with up to 8K-token generation and multilingual coverage of over 29 languages.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2.5-7B",
+    "model_type": "Causal language model",
+    "name": "Qwen2.5-7B",
+    "release_date": "2024-09-15 (Hugging Face repository creation date)",
+    "summary": "A base 7B model in the Qwen2.5 series, released as a causal language model.",
+    "version": "d149729398750b98c0af14eb82c78cfe92750796"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5"
+  },
+  "links": {
+    "citation": "@misc{qwen2.5,\n    title = {Qwen2.5: A Party of Foundation Models},\n    url = {https://qwenlm.github.io/blog/qwen2.5/},\n    author = {Qwen Team},\n    month = {September},\n    year = {2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2.5",
+    "model_card": "https://huggingface.co/Qwen/Qwen2.5-7B",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2407.10671"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "The card states the checkpoint is a base pretraining model but does not specify its training data, so dataset details are undocumented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card describes a base model released without post-training and recommends applying SFT/RLHF/continued pretraining before conversational use, leaving intended use undefined for downstream deployments.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Improper usage",
+        "description": "Improper usage occurs when a model is used for a purpose that it was not originally designed for.",
+        "justification": "The card explicitly recommends post-training before conversational use, so using the base model directly for chat would be an improper use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/improper-usage.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,231,271,888 bytes) in BF16",
+    "num_parameters": "7,615,616,512 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a base language model released without post-training; the documentation recommends applying post-training such as SFT, RLHF, or continued pretraining before conversational use.",
+    "data_cutoff": "Not specified",
+    "training_data": "The checkpoint is a base pretraining model; its training data is not specified in the evidence items.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "57,053 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "1,524 likes on the Hub (as of 2026-09-05)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "meta-llama (Hub organization)",
+    "license": "llama3",
+    "model_id": "meta-llama/Meta-Llama-3-70B-Instruct",
+    "model_type": "Not specified",
+    "name": "Meta-Llama-3-70B-Instruct",
+    "release_date": "2024-04-17 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "50fd307e57011801c7833c87efa1984ddf2db42f"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "meta-llama/Meta-Llama-3-70B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Meta Llama 3"
+  },
+  "links": {
+    "citation": "@article{llama3modelcard,\n\n  title={Llama 3 Model Card},\n\n  author={AI@Meta},\n\n  year={2024},\n\n  url = {https://github.com/meta-llama/llama3/blob/main/MODEL_CARD.md}\n\n}",
+    "code_repository": "https://github.com/meta-llama/llama3",
+    "model_card": "https://huggingface.co/meta-llama/Meta-Llama-3-70B-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card only states training on a new mix of publicly available online data with no details on design, development, or evaluation, so documentation is insufficient.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Training data is described only as a new mix of publicly available online data, with no traceability of sources or usage terms.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "No information is provided about how the online data was collected, curated, or used, making training-data documentation lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card gives no intended-use or misuse definition for this instruct model, so relevant risks cannot be scoped.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "131.4 GiB of safetensors weights (141,107,497,872 bytes) in BF16",
+    "num_parameters": "70,553,706,496 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on a new mix of publicly available online data.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "17 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "2 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "sthenno (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "sthenno/tempesthenno-fusion-0309",
+    "model_type": "Not specified",
+    "name": "tempesthenno-fusion-0309",
+    "release_date": "2025-03-08 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "62827e57e10bb9a2ec7d545b303ee82131dedefb"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "sthenno-com/miscii-14b-0218",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "sthenno/tempesthenno-sft-0309-ckpt10",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "tempesthenno fusion"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/sthenno/tempesthenno-fusion-0309",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only architecture, license, and mergekit merge; no training data, training procedure, or evaluation results are documented for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "The card states it is a merge of pre-trained language models created using mergekit but does not document the provenance of the merged base models' training data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "No information is provided about how training data was collected, curated, or used for the merged model or its components.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card specifies only text-to-text modality and open-weight access, with no intended-use or out-of-scope-use description.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "55.0 GiB of safetensors weights (59,063,857,880 bytes) in F32",
+    "num_parameters": "14,765,947,904 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

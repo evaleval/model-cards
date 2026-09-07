@@ -4,8 +4,8 @@ The EEE datastore snapshot is laid out data/<benchmark>/<developer>/<model>/<uui
 so a clean Hugging Face model id is a directory lookup. The join tier is recorded with
 the result: exact (the id matches a directory verbatim), case_insensitive (only the
 casing differs), none. Nothing fuzzier: 62% of the snapshot sits under developer
-"unknown" and free-text alphaxiv names, and resolving those is Jenny's registry's job,
-not this card's.
+"unknown" and free-text alphaxiv names, and resolving those belongs to the registry that
+owns those records, not to this card.
 """
 
 from __future__ import annotations

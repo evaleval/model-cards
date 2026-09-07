@@ -1,0 +1,73 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "19 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "2 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "marcuscedricridia (Hub organization)",
+    "license": "Not specified",
+    "model_id": "marcuscedricridia/cursa-o1-7b-v1.1",
+    "model_type": "Not specified",
+    "name": "cursa-o1-7b-v1.1",
+    "release_date": "2025-02-28 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "7932d91ce03991a94866f4d7291c9866b3733906"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "marcuscedricridia/Abus-7B-Instruct",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "marcuscedricridia/post-cursa-o1",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/marcuscedricridia/cursa-o1-7b-v1.1",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight text model with no stated data or usage guardrails, and the card names a merge of instruct/post-trained checkpoints, so prompts sent to it may include copyrighted material without mitigation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,225,551,792 bytes) in BF16",
+    "num_parameters": "7,612,756,480 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge of marcuscedricridia/pre-cursa-o1-v1.2 and marcuscedricridia/post-cursa-o1, combined using the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

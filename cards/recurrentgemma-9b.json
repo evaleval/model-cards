@@ -1,0 +1,207 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "213 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "64 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "top-1",
+        "score": "60.5",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "80.4",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "Not specified",
+        "score": "81.3",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "SocialIQA",
+        "metric": "Not specified",
+        "score": "52.3",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "BoolQ",
+        "metric": "Not specified",
+        "score": "80.3",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "WinoGrande",
+        "metric": "score",
+        "score": "73.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CommonsenseQA",
+        "metric": "Not specified",
+        "score": "73.2",
+        "setting": "7-shot"
+      },
+      {
+        "benchmark": "TriviaQA",
+        "metric": "Not specified",
+        "score": "70.5",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "Natural Questions",
+        "metric": "Not specified",
+        "score": "21.7",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "pass@1",
+        "score": "31.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "42.0",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "42.6",
+        "setting": "maj@1"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "23.8",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "RealToxicity",
+        "metric": "Not specified",
+        "score": "10.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BOLD",
+        "metric": "Not specified",
+        "score": "47.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CrowS-Pairs",
+        "metric": "top-1",
+        "score": "38.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBQ Ambig",
+        "metric": "top-1",
+        "score": "95.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBQ Disambig",
+        "metric": "top-1",
+        "score": "78.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogender",
+        "metric": "top-1",
+        "score": "59.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "47.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoBias 12",
+        "metric": "Not specified",
+        "score": "60.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoBias 22",
+        "metric": "Not specified",
+        "score": "90.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Toxigen",
+        "metric": "Not specified",
+        "score": "64.5",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that RecurrentGemma-9B performs comparably to Gemma-7B despite being trained on three times fewer tokens.",
+    "safety_evals": "The developer states that ethics and safety evaluations met internal thresholds for child safety, content safety, representational harms, memorization, and large-scale harms."
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/recurrentgemma-9b",
+    "model_type": "Not specified",
+    "name": "recurrentgemma-9b",
+    "release_date": "2024-06-07 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "141ed2b60cc2096ab7064582f69ed80a7d104666"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "recurrentgemma"
+  },
+  "links": {
+    "citation": "@article{recurrentgemma_2024,\n    title={RecurrentGemma},\n    url={},\n    DOI={},\n    publisher={Kaggle},\n    author={Griffin Team, Alexsandar Botev and Soham De and Samuel L Smith and Anushan Fernando and George-Christian Muraru and Ruba Haroun and Leonard Berrada et al.},\n    year={2024}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/google/recurrentgemma-9b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Membership inference attack",
+        "description": "A membership inference attack repeatedly queries a model to determine if a given input was part of the model's training. More specifically, given a trained model and a data sample, an attacker appropriately samples the input space, observing outputs to deduce whether that sample was part of the model's training.",
+        "justification": "Base model trained on Gemma data, gated access; no alignment, so probing outputs may reveal training-data membership.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/membership-inference-attack.html"
+      },
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "Base text-generation model without task-specific fine-tuning or alignment; no reported factual grounding, so it can produce factually inaccurate content.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "17.9 GiB of safetensors weights (19,257,191,752 bytes) in BF16",
+    "num_parameters": "9,628,553,216 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This is the 9B base version of RecurrentGemma, so it has not undergone task-specific fine-tuning or alignment beyond base pretraining.",
+    "data_cutoff": "Not specified",
+    "training_data": "RecurrentGemma was trained on the same data and with the same data processing as the Gemma model family.",
+    "training_data_size": "Not specified"
+  }
+}

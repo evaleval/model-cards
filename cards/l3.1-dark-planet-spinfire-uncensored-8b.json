@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "960 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "6 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer labels this a Class 1 model, meaning its settings are intended to enhance operation.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "DavidAU (Hub organization)",
+    "license": "Not specified",
+    "model_id": "DavidAU/L3.1-Dark-Planet-SpinFire-Uncensored-8B",
+    "model_type": "Not specified",
+    "name": "L3.1-Dark-Planet-SpinFire-Uncensored-8B",
+    "release_date": "2024-11-10 (Hugging Face repository creation date)",
+    "summary": "L3.1-Dark-Planet-SpinFire-Uncensored-8B",
+    "version": "06b3adbf5ac9d97bf330a78cd6841308e003a685"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "L3.1-Dark-Planet-SpinFire-Uncensored-8B"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/DavidAU/L3.1-Dark-Planet-SpinFire-Uncensored-8B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge created with mergekit.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "29 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "The developer notes that none of the tested models appear to be fully jailbroken."
+  },
+  "identity": {
+    "developed_by": "lodrick-the-lafted (Hub organization)",
+    "license": "wtfpl",
+    "model_id": "lodrick-the-lafted/llama-3.1-8b-instruct-ortho-v7",
+    "model_type": "Not specified",
+    "name": "llama-3.1-8b-instruct-ortho-v7",
+    "release_date": "2024-07-25 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "6b7673cd78398c3a8c92f8e759aaae6409e96978"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "llama 3.1 ortho v7"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/lodrick-the-lafted/llama-3.1-8b-instruct-ortho-v7",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Incorrect risk testing",
+        "description": "A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context.",
+        "justification": "The card reports safety evaluations only as 'none of the tested models appear to be fully jailbroken', which is a narrow jailbreak test and does not measure other risks such as hallucination or data privacy, so the selected metric may incompletely measure the risk.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,376 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is the result of orthogonalization or abliteration attempts applied to llama-3.1-8b-instruct, using variations of a method for eliciting latent behaviors in language models. Different vectors were tried, with variations in where the new refusal boundaries lie.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

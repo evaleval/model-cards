@@ -1,0 +1,73 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "20 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "jaspionjader (Hub organization)",
+    "license": "Not specified",
+    "model_id": "jaspionjader/bh-28",
+    "model_type": "Not specified",
+    "name": "bh-28",
+    "release_date": "2025-02-03 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created with mergekit.",
+    "version": "6fc7244ffa3191b1e6559a8ecd29e58a0c8ad281"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/bh-26",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/fr-18-8b",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "mergekit merge"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/jaspionjader/bh-28",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "open-weight merge of two language models with no reported evaluations or safety testing -> users may over-trust outputs",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was created by merging jaspionjader/fr-18-8b and jaspionjader/bh-26 using the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "This checkpoint is a merge of two models, jaspionjader/fr-18-8b and jaspionjader/bh-26, rather than a model trained on a new dataset.",
+    "training_data_size": "Not specified"
+  }
+}

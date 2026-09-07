@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [qwen3\-8b\.json](<./qwen3-8b.json>)<br>
-SHA-256: `281a767a87f245696445c08dce4692651e8deb9fd2ed1aa391590fd778776f11`
+SHA-256: `ad329534cb35f0929a89c3ff2edb7fb8d36715f7da650a64df878a0207f625f4`
 
 ## Identity
 
@@ -12,10 +12,11 @@ SHA-256: `281a767a87f245696445c08dce4692651e8deb9fd2ed1aa391590fd778776f11`
 | Model ID | Qwen/Qwen3\-8B |
 | Name | Qwen3\-8B |
 | Developed by | Qwen \(Hub organization\) |
+| Model type | Large language model \(LLM\) |
 | License | apache\-2\.0 |
 | Release date | 2025\-04\-27 \(Hugging Face repository creation date\) |
 | Version | b968826d9c46dd6066d109eabc6255188de91218 |
-| Summary | Qwen3\-8B is one of six open\-weighted dense models in the Qwen3 family, released under the Apache 2\.0 license\. |
+| Summary | Qwen3\-8B is a member of the Qwen3 family of large language models, released by the Qwen team\. |
 
 ## Lineage
 
@@ -44,8 +45,8 @@ _No specified fields are available in the publication data._
 | Field | Value |
 | --- | --- |
 | Access type | open\-weight |
-| Downloads | 13,232,997 downloads \(Hub 30\-day window, as of 2026\-09\-04\) |
-| Likes | 1,342 likes on the Hub \(as of 2026\-09\-04\) |
+| Downloads | 13,512,721 downloads \(Hub 30\-day window, as of 2026\-09\-05\) |
+| Likes | 1,344 likes on the Hub \(as of 2026\-09\-05\) |
 
 ## Evaluation
 
@@ -107,6 +108,10 @@ _No specified fields are available in the publication data._
 | Code repository | [https://github\.com/QwenLM/Qwen3](<https://github.com/QwenLM/Qwen3>) |
 | Citation | @misc\{qwen3technicalreport,<br>      title=\{Qwen3 Technical Report\}, <br>      author=\{Qwen Team\},<br>      year=\{2025\},<br>      eprint=\{2505\.09388\},<br>      archivePrefix=\{arXiv\},<br>      primaryClass=\{cs\.CL\},<br>      url=\{https://arxiv\.org/abs/2505\.09388\}, <br>\} |
 
+## Risks
+
+_No specified fields are available in the publication data._
+
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`.
+Unavailable agreed fields (not specified in the publication data): `lineage.derivatives`, `training_context.training_data`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `risks.possible_risks`.

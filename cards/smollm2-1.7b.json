@@ -1,0 +1,195 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "382,575 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "159 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "68.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC",
+        "metric": "Not specified",
+        "score": "60.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "Not specified",
+        "score": "77.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "19.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CommonsenseQA",
+        "metric": "Not specified",
+        "score": "43.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TriviaQA",
+        "metric": "Not specified",
+        "score": "36.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "59.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "OpenBookQA",
+        "metric": "Not specified",
+        "score": "42.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Natural Questions",
+        "metric": "Not specified",
+        "score": "8.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "11.6",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "22.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average-Real",
+        "metric": "Not specified",
+        "score": "31.67",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average-All",
+        "metric": "Not specified",
+        "score": "32.61",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Recall",
+        "metric": "Not specified",
+        "score": "36.38",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "RAG",
+        "metric": "Not specified",
+        "score": "47.17",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ICL",
+        "metric": "Not specified",
+        "score": "23.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Re-rank",
+        "metric": "Not specified",
+        "score": "23.31",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LongQA",
+        "metric": "Not specified",
+        "score": "33",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "HuggingFaceTB (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+    "model_type": "Not specified",
+    "name": "SmolLM2",
+    "release_date": "2024-10-30 (Hugging Face repository creation date)",
+    "summary": "A state-of-the-art small language model that is lightweight enough to run on-device while handling a wide range of tasks.",
+    "version": "effd688a12921b4cc83e3312b6feb579f70f9c71"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "SmolLM2"
+  },
+  "links": {
+    "citation": "@misc{allal2025smollm2smolgoesbig,\n      title={SmolLM2: When Smol Goes Big -- Data-Centric Training of a Small Language Model}, \n      author={Loubna Ben Allal and Anton Lozhkov and Elie Bakouch and Gabriel Martín Blázquez and Guilherme Penedo and Lewis Tunstall and Andrés Marafioti and Hynek Kydlíček and Agustín Piqueres Lajarín and Vaibhav Srivastav and Joshua Lochner and Caleb Fahlgren and Xuan-Son Nguyen and Clémentine Fourrier and Ben Burtenshaw and Hugo Larcher and Haojun Zhao and Cyril Zakka and Mathieu Morlon and Colin Raffel and Leandro von Werra and Thomas Wolf},\n      year={2025},\n      eprint={2502.02737},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2502.02737}, \n}",
+    "code_repository": "https://github.com/huggingface/smollm",
+    "model_card": "https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2502.02737"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "open-weight pretrained on 11T tokens from web, math, code, and instruction data with no dataset-level provenance details in the card",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "card names broad corpora (FineWeb-Edu, DCLM, The Stack, curated math/code sets) but does not document collection, curation, or synthetic generation details",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "training-data documentation lacks details about how the 11T-token mix was collected, curated, and used, making model behavior harder to explain",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "card only says it handles a wide range of tasks and is lightweight for on-device use, without specifying intended uses or limitations",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Data bias",
+        "description": "Historical and societal biases might be present in data that are used to train and fine-tune models. Biases can also be inherited from seed data or exacerbated by synthetic data generation methods.",
+        "justification": "pretrained on web-scale corpora (FineWeb-Edu, DCLM, The Stack) that can contain historical and societal biases, with no debiasing or bias evaluation reported",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-bias.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "3.2 GiB of safetensors weights (3,422,777,952 bytes) in BF16",
+    "num_parameters": "1,711,376,384 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "SmolLM2 was pretrained on about 11 trillion tokens combining web text with specialized math, code, and instruction-following data, including FineWeb-Edu, DCLM, The Stack, and newly curated mathematics and coding datasets.",
+    "training_data_size": "Not specified"
+  }
+}

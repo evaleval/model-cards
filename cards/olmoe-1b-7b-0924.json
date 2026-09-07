@@ -1,0 +1,249 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "124,737 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "148 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "54.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "80.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-Chall.",
+        "metric": "Not specified",
+        "score": "62.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-Easy",
+        "metric": "Not specified",
+        "score": "84.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "Not specified",
+        "score": "79.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoGrande",
+        "metric": "Not specified",
+        "score": "70.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "39.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "39.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "54.3",
+        "setting": "0-shot CoT"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "54.6",
+        "setting": "0-shot CoT"
+      },
+      {
+        "benchmark": "PopQA",
+        "metric": "Not specified",
+        "score": "21.0",
+        "setting": "15-shot"
+      },
+      {
+        "benchmark": "PopQA",
+        "metric": "Not specified",
+        "score": "20.6",
+        "setting": "15-shot"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "44.7",
+        "setting": "6-shot"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "49.1",
+        "setting": "6-shot"
+      },
+      {
+        "benchmark": "BigBenchHard",
+        "metric": "Not specified",
+        "score": "36.6",
+        "setting": "3-shot CoT"
+      },
+      {
+        "benchmark": "BigBenchHard",
+        "metric": "Not specified",
+        "score": "36.8",
+        "setting": "3-shot CoT"
+      },
+      {
+        "benchmark": "DROP",
+        "metric": "Not specified",
+        "score": "34.7",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "DROP",
+        "metric": "Not specified",
+        "score": "34.5",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "8.2",
+        "setting": "4-shot CoT"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "42.5",
+        "setting": "8-shot CoT"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "47.4",
+        "setting": "8-shot CoT"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "pass@10",
+        "score": "63.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "pass@10",
+        "score": "63.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval+",
+        "metric": "pass@10",
+        "score": "57.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval+",
+        "metric": "pass@10",
+        "score": "58.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval",
+        "metric": "Not specified",
+        "score": "41.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval",
+        "metric": "Not specified",
+        "score": "45.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AlpacaEval 2",
+        "metric": "Not specified",
+        "score": "6.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AlpacaEval 2",
+        "metric": "Not specified",
+        "score": "7.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Safety",
+        "metric": "Not specified",
+        "score": "65.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Safety",
+        "metric": "Not specified",
+        "score": "51.4",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "allenai (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "allenai/OLMoE-1B-7B-0924",
+    "model_type": "Mixture-of-Experts language model",
+    "name": "OLMoE-1B-7B-0924",
+    "release_date": "2024-07-20 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "6d84c48581ece794365f2b8e9cfb043c68ade9c5"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "OLMoE"
+  },
+  "links": {
+    "citation": "@misc{muennighoff2024olmoeopenmixtureofexpertslanguage,\n      title={OLMoE: Open Mixture-of-Experts Language Models}, \n      author={Niklas Muennighoff and Luca Soldaini and Dirk Groeneveld and Kyle Lo and Jacob Morrison and Sewon Min and Weijia Shi and Pete Walsh and Oyvind Tafjord and Nathan Lambert and Yuling Gu and Shane Arora and Akshita Bhagia and Dustin Schwenk and David Wadden and Alexander Wettig and Binyuan Hui and Tim Dettmers and Douwe Kiela and Ali Farhadi and Noah A. Smith and Pang Wei Koh and Amanpreet Singh and Hannaneh Hajishirzi},\n      year={2024},\n      eprint={2409.02060},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2409.02060}, \n}",
+    "code_repository": "https://github.com/allenai/OLMoE",
+    "model_card": "https://huggingface.co/allenai/OLMoE-1B-7B-0924",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2409.02060"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "OLMoE-1B-7B-0924 is a 1B-parameter open-weight text-generation model pretrained on OLMoE-mix-0924 with no reported evaluation or guardrails in the card summary, so it can plausibly produce factually inaccurate or untruthful text.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "mixture-of-experts",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "12.9 GiB of safetensors weights (13,838,721,960 bytes) in BF16",
+    "num_parameters": "6,919,161,856 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The base model was further adapted to create an instruct version; the readme also documents SFT, DPO, and KTO adaptation recipes, and the released checkpoint is used as the starting point for adaptation.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was pretrained on the OLMoE-mix-0924 dataset, as stated in the Hugging Face readme and the associated GitHub instructions.",
+    "training_data_size": "Not specified"
+  }
+}

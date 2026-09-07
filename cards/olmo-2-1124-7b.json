@@ -1,15 +1,27 @@
 {
   "access_and_adoption": {
     "access_type": "open-weight",
-    "downloads": "86,066 downloads (Hub 30-day window, as of 2026-09-04)",
-    "likes": "70 likes on the Hub (as of 2026-09-04)"
+    "downloads": "85,628 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "70 likes on the Hub (as of 2026-09-05)"
   },
   "evaluation": {
     "benchmark_scores": [
       {
         "benchmark": "Average",
         "metric": "Not specified",
+        "score": "38.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
         "score": "62.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC/C",
+        "metric": "Not specified",
+        "score": "46.4",
         "setting": "Not specified"
       },
       {
@@ -21,7 +33,19 @@
       {
         "benchmark": "HSwag",
         "metric": "Not specified",
+        "score": "78.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HSwag",
+        "metric": "Not specified",
         "score": "83.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoG",
+        "metric": "Not specified",
+        "score": "68.5",
         "setting": "Not specified"
       },
       {
@@ -33,7 +57,19 @@
       {
         "benchmark": "MMLU",
         "metric": "Not specified",
+        "score": "28.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
         "score": "63.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "DROP",
+        "metric": "Not specified",
+        "score": "27.3",
         "setting": "Not specified"
       },
       {
@@ -45,7 +81,19 @@
       {
         "benchmark": "NQ",
         "metric": "Not specified",
+        "score": "24.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "NQ",
+        "metric": "Not specified",
         "score": "36.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AGIEval",
+        "metric": "Not specified",
+        "score": "23.7",
         "setting": "Not specified"
       },
       {
@@ -57,13 +105,31 @@
       {
         "benchmark": "GSM8k",
         "metric": "Not specified",
+        "score": "9.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8k",
+        "metric": "Not specified",
         "score": "67.5",
         "setting": "Not specified"
       },
       {
         "benchmark": "MMLUPro",
         "metric": "Not specified",
+        "score": "12.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLUPro",
+        "metric": "Not specified",
         "score": "31",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TriviaQA",
+        "metric": "Not specified",
+        "score": "64.1",
         "setting": "Not specified"
       },
       {
@@ -84,7 +150,7 @@
     "model_type": "A Transformer-style autoregressive language model.",
     "name": "OLMo-2-1124-7B",
     "release_date": "2024-10-29 (Hugging Face repository creation date)",
-    "summary": "OLMo 2 is the next generation of fully open language models, with 7B and 13B variants showing improved MMLU and other evaluation gains over the original OLMo 7B.",
+    "summary": "OLMo 2 is a fully open family of dense autoregressive language models, with the 7B version showing notable evaluation gains over the original OLMo 7B.",
     "version": "7df9a82518afdecae4e8c026b27adccc8c1f0032"
   },
   "lineage": {
@@ -99,12 +165,33 @@
     "system_card": "Not specified",
     "tech_report": "https://arxiv.org/abs/2501.00656"
   },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only architecture/access/license and no training-data or evaluation details for this checkpoint, so its design and development process is underdocumented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card does not describe how OLMo-2-1124-7B's training data was collected, curated, or used, so training-data documentation is lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card states only 'text in, text out' and 'primary task' without specifying intended uses or misuse boundaries, leaving downstream risk scope undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
   "specifications": {
     "architecture_type": "dense decoder-only",
     "context_length": "4,096 tokens (config.json max_position_embeddings)",
     "input_output": [
-      "text input",
-      "text output"
+      "text in, text out"
     ],
     "model_size": "27.2 GiB of safetensors weights (29,194,510,544 bytes) in F32",
     "num_parameters": "7,298,617,344 parameters (safetensors metadata)",
@@ -112,8 +199,8 @@
   },
   "training_context": {
     "adaptations": "Not specified",
-    "data_cutoff": "Dec. 2023.",
-    "training_data": "The model was trained on OLMo-mix-1124 and Dolmino-mix-1124 datasets using a staged training approach. Pretraining Stage 1 used OLMo-Mix-1124 with 4 trillion tokens (1 epoch), and Pretraining Stage 2 used Dolmino-Mix-1124 with 50B tokens (3 runs) merged.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
     "training_data_size": "Not specified"
   }
 }

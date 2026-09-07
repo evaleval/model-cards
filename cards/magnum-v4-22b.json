@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "306 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "33 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "anthracite-org (Hub organization)",
+    "license": "other",
+    "model_id": "anthracite-org/magnum-v4-22b",
+    "model_type": "text generation",
+    "name": "magnum-v4-22b",
+    "release_date": "2024-10-20 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "e412f3077a1ccd2efb9bb4fbbac5824e7eec1ff3"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "magnum v4"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/anthracite-org/magnum-v4-22b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Training data includes anthracite-org datasets with opaque names and no stated collection/verification details, so traceability of data origin and usage terms is not established.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card lists dataset names but does not document how data was collected, curated, or used, limiting ability to explain model behavior.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides architecture and fine-tune base but no evaluation results, training details beyond epochs/hardware, or inner-workings insights.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Legal accountability",
+        "description": "Determining who is responsible for an AI model is challenging without good documentation and governance processes. The use of synthetic data in model development adds further complexity, since the lack of standardized frameworks for recording synthetic data design choices and verification steps makes accountability harder to establish.",
+        "justification": "Open-weight full-parameter fine-tune of Mistral-Small-Instruct-2409 with 'other' license and no documentation of data rights or governance makes responsibility hard to establish.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/legal-accountability.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "41.4 GiB of safetensors weights (44,494,624,536 bytes) in BF16",
+    "num_parameters": "22,247,282,688 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a full-parameter fine-tune of Mistral-Small-Instruct-2409, trained for 2 epochs on 8xH100 GPUs provided by Recursal AI / Featherless AI.",
+    "data_cutoff": "Not specified",
+    "training_data": "This model is a fine-tune of Mistral-Small-Instruct-2409, trained on a set of anthracite-org datasets including c2_logs_32k_mistral-v3_v1.2_no_system, kalo-opus-instruct-22k-no-refusal-no-system, kalo-opus-instruct-3k-filtered-no-system, nopm_claude_writing_fixed, and kalo_opus_misc_240827_no_system.",
+    "training_data_size": "Not specified"
+  }
+}

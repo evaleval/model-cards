@@ -1,0 +1,86 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "29,011 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "72 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the Yi series, trained as a bilingual language model on a 3T multilingual corpus, ranks among the strongest LLMs worldwide, with strengths in language understanding, commonsense reasoning, and reading comprehension.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "01-ai (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "01-ai/Yi-6B-Chat",
+    "model_type": "Text generation.",
+    "name": "Yi-6B-Chat",
+    "release_date": "2023-11-22 (Hugging Face repository creation date)",
+    "summary": "An open-source large language model in the Yi series, trained from scratch by 01.AI.",
+    "version": "2dbf63b0cb7bc493c0243502c6e6111a36e3a093"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Yi series"
+  },
+  "links": {
+    "citation": "@misc{ai2024yi,\n    title={Yi: Open Foundation Models by 01.AI},\n    author={01. AI and : and Alex Young and Bei Chen and Chao Li and Chengen Huang and Ge Zhang and Guanwei Zhang and Heng Li and Jiangcheng Zhu and Jianqun Chen and Jing Chang and Kaidong Yu and Peng Liu and Qiang Liu and Shawn Yue and Senbin Yang and Shiming Yang and Tao Yu and Wen Xie and Wenhao Huang and Xiaohui Hu and Xiaoyi Ren and Xinyao Niu and Pengcheng Nie and Yuchi Xu and Yudong Liu and Yue Wang and Yuxuan Cai and Zhenyu Gu and Zhiyuan Liu and Zonghong Dai},\n    year={2024},\n    eprint={2403.04652},\n    archivePrefix={arXiv},\n    primaryClass={cs.CL}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/01-ai/Yi-6B-Chat",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only broad training corpus size and aggregate strengths, with no details on data sources, curation, or evaluation methodology.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card states a 3T multilingual corpus and SFT but does not document data collection, curation, or filtering for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Open-weight bilingual model trained on a 3T corpus with no traceability of data origin or usage terms.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Unrepresentative data",
+        "description": "Unrepresentative data occurs when the training or fine-tuning data is not sufficiently representative of the underlying population or does not measure the phenomenon of interest. Synthetic data might not fully capture the complexity and nuances of real-world data. Causes include possible limitations in the seed data quality, biases in generation methods, or inadequate domain knowledge. Thus, AI models might struggle to generalize effectively to real-world scenarios.",
+        "justification": "Bilingual 3T corpus with no reported demographic or domain coverage may not represent all real-world text populations.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-data.html"
+      },
+      {
+        "category": "Data bias",
+        "description": "Historical and societal biases might be present in data that are used to train and fine-tune models. Biases can also be inherited from seed data or exacerbated by synthetic data generation methods.",
+        "justification": "Large multilingual pretraining corpus and SFT can encode societal biases, but the card reports no bias testing or mitigation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-bias.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "11.3 GiB of safetensors weights (12,122,104,808 bytes) in BF16",
+    "num_parameters": "6,061,035,520 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The released chat model underwent supervised fine-tuning (SFT).",
+    "data_cutoff": "June 2023",
+    "training_data": "The Yi series models are bilingual language models trained on a 3T multilingual corpus.",
+    "training_data_size": "3T tokens"
+  }
+}

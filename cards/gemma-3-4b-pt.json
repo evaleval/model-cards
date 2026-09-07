@@ -1,260 +1,260 @@
 {
   "access_and_adoption": {
     "access_type": "gated",
-    "downloads": "75,826 downloads (Hub 30-day window, as of 2026-09-04)",
-    "likes": "160 likes on the Hub (as of 2026-09-04)"
+    "downloads": "74,967 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "160 likes on the Hub (as of 2026-09-05)"
   },
   "evaluation": {
     "benchmark_scores": [
       {
-        "benchmark": "[HellaSwag][hellaswag]",
+        "benchmark": "HellaSwag",
         "metric": "Not specified",
         "score": "77.2",
-        "setting": "Not specified"
+        "setting": "10-shot"
       },
       {
-        "benchmark": "[BoolQ][boolq]",
+        "benchmark": "BoolQ",
         "metric": "Not specified",
         "score": "72.3",
-        "setting": "Not specified"
+        "setting": "0-shot"
       },
       {
-        "benchmark": "[PIQA][piqa]",
+        "benchmark": "PIQA",
         "metric": "Not specified",
         "score": "79.6",
-        "setting": "Not specified"
+        "setting": "0-shot"
       },
       {
-        "benchmark": "[SocialIQA][socialiqa]",
+        "benchmark": "SocialIQA",
         "metric": "Not specified",
         "score": "51.9",
-        "setting": "Not specified"
+        "setting": "0-shot"
       },
       {
-        "benchmark": "[TriviaQA][triviaqa]",
+        "benchmark": "TriviaQA",
         "metric": "Not specified",
         "score": "65.8",
-        "setting": "Not specified"
+        "setting": "5-shot"
       },
       {
-        "benchmark": "[Natural Questions][naturalq]",
+        "benchmark": "Natural Questions",
         "metric": "Not specified",
         "score": "20.0",
-        "setting": "Not specified"
+        "setting": "5-shot"
       },
       {
-        "benchmark": "[ARC-c][arc]",
+        "benchmark": "ARC-c",
         "metric": "Not specified",
         "score": "56.2",
-        "setting": "Not specified"
+        "setting": "25-shot"
       },
       {
-        "benchmark": "[ARC-e][arc]",
+        "benchmark": "ARC-e",
         "metric": "Not specified",
         "score": "82.4",
-        "setting": "Not specified"
+        "setting": "0-shot"
       },
       {
-        "benchmark": "[WinoGrande][winogrande]",
+        "benchmark": "WinoGrande",
         "metric": "Not specified",
         "score": "64.7",
-        "setting": "Not specified"
+        "setting": "5-shot"
       },
       {
-        "benchmark": "[BIG-Bench Hard][bbh]",
+        "benchmark": "BIG-Bench Hard",
         "metric": "Not specified",
         "score": "50.9",
-        "setting": "Not specified"
+        "setting": "few-shot"
       },
       {
-        "benchmark": "[DROP][drop]",
+        "benchmark": "DROP",
         "metric": "Not specified",
         "score": "60.1",
-        "setting": "Not specified"
+        "setting": "1-shot"
       },
       {
-        "benchmark": "[MMLU][mmlu]",
+        "benchmark": "MMLU",
         "metric": "Not specified",
         "score": "59.6",
-        "setting": "Not specified"
+        "setting": "5-shot"
       },
       {
-        "benchmark": "[MMLU][mmlu]",
+        "benchmark": "MMLU",
         "metric": "Not specified",
         "score": "29.2",
-        "setting": "COT"
+        "setting": "5-shot"
       },
       {
-        "benchmark": "[AGIEval][agieval]",
+        "benchmark": "AGIEval",
         "metric": "Not specified",
         "score": "42.1",
-        "setting": "Not specified"
+        "setting": "5-shot"
       },
       {
-        "benchmark": "[MATH][math]",
+        "benchmark": "MATH",
         "metric": "Not specified",
         "score": "24.2",
-        "setting": "Not specified"
+        "setting": "4-shot"
       },
       {
-        "benchmark": "[GSM8K][gsm8k]",
+        "benchmark": "GSM8K",
         "metric": "Not specified",
         "score": "38.4",
-        "setting": "Not specified"
+        "setting": "8-shot"
       },
       {
-        "benchmark": "[GPQA][gpqa]",
+        "benchmark": "GPQA",
         "metric": "Not specified",
         "score": "15.0",
-        "setting": "Not specified"
+        "setting": "5-shot"
       },
       {
-        "benchmark": "[MBPP][mbpp]",
+        "benchmark": "MBPP",
         "metric": "Not specified",
         "score": "46.0",
-        "setting": "Not specified"
+        "setting": "3-shot"
       },
       {
-        "benchmark": "[HumanEval][humaneval]",
+        "benchmark": "HumanEval",
         "metric": "Not specified",
         "score": "36.0",
-        "setting": "Not specified"
+        "setting": "0-shot"
       },
       {
-        "benchmark": "[MGSM][mgsm]",
+        "benchmark": "MGSM",
         "metric": "Not specified",
         "score": "34.7",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[Global-MMLU-Lite][global-mmlu-lite]",
+        "benchmark": "Global-MMLU-Lite",
         "metric": "Not specified",
         "score": "57.0",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[WMT24++][wmt24pp]",
+        "benchmark": "WMT24++",
         "metric": "Not specified",
         "score": "48.4",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[FloRes][flores]",
+        "benchmark": "FloRes",
         "metric": "Not specified",
         "score": "39.2",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[XQuAD][xquad]",
+        "benchmark": "XQuAD",
         "metric": "Not specified",
         "score": "68.0",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[ECLeKTic][eclektic]",
+        "benchmark": "ECLeKTic",
         "metric": "Not specified",
         "score": "11.0",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[IndicGenBench][indicgenbench]",
+        "benchmark": "IndicGenBench",
         "metric": "Not specified",
         "score": "57.2",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[COCOcap][coco-cap]",
+        "benchmark": "COCOcap",
         "metric": "Not specified",
         "score": "102",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[DocVQA][docvqa]",
+        "benchmark": "DocVQA",
         "metric": "Not specified",
         "score": "72.8",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[InfoVQA][info-vqa]",
+        "benchmark": "InfoVQA",
         "metric": "Not specified",
         "score": "44.1",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[MMMU][mmmu]",
+        "benchmark": "MMMU",
         "metric": "Not specified",
         "score": "39.2",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[TextVQA][textvqa]",
+        "benchmark": "TextVQA",
         "metric": "Not specified",
         "score": "58.9",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[RealWorldQA][realworldqa]",
+        "benchmark": "RealWorldQA",
         "metric": "Not specified",
         "score": "45.5",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[ReMI][remi]",
+        "benchmark": "ReMI",
         "metric": "Not specified",
         "score": "27.3",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[AI2D][ai2d]",
+        "benchmark": "AI2D",
         "metric": "Not specified",
         "score": "63.2",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[ChartQA][chartqa]",
+        "benchmark": "ChartQA",
         "metric": "Not specified",
         "score": "63.6",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[VQAv2][vqav2]",
+        "benchmark": "VQAv2",
         "metric": "Not specified",
         "score": "63.9",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[BLINK][blinkvqa]",
+        "benchmark": "BLINK",
         "metric": "Not specified",
         "score": "38.0",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[OKVQA][okvqa]",
+        "benchmark": "OKVQA",
         "metric": "Not specified",
         "score": "51.0",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[TallyQA][tallyqa]",
+        "benchmark": "TallyQA",
         "metric": "Not specified",
         "score": "42.5",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[SpatialSense VQA][ss-vqa]",
+        "benchmark": "SpatialSense VQA",
         "metric": "Not specified",
         "score": "50.9",
         "setting": "Not specified"
       },
       {
-        "benchmark": "[CountBenchQA][countbenchqa]",
+        "benchmark": "CountBenchQA",
         "metric": "Not specified",
         "score": "26.1",
         "setting": "Not specified"
       }
     ],
     "human_evals": "Not specified",
-    "results_summary": "The developer reports a broad evaluation across text, multilingual, and multimodal benchmarks, with the model's scores listed in a table alongside other Gemma 3 variants.",
+    "results_summary": "The developer reports that the model was evaluated across a broad set of text-generation and multimodal benchmarks, with scores listed for many datasets. The stated results cover reasoning, knowledge, math, coding, translation, and vision-language tasks.",
     "safety_evals": "Not specified"
   },
   "identity": {
@@ -270,14 +270,42 @@
   "lineage": {
     "base_models": "Not specified",
     "derivatives": "Not specified",
-    "model_family": "gemma 3 pt"
+    "model_family": "gemma 3"
   },
   "links": {
     "citation": "@article{gemma_2025,\n    title={Gemma 3},\n    url={https://goo.gle/Gemma3Report},\n    publisher={Kaggle},\n    author={Gemma Team},\n    year={2025}\n}",
     "code_repository": "Not specified",
     "model_card": "https://huggingface.co/google/gemma-3-4b-pt",
     "system_card": "Not specified",
-    "tech_report": "https://arxiv.org/abs/2404.16816"
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Confidential data in prompt",
+        "description": "Confidential information might be included as a part of the prompt that is sent to the model.",
+        "justification": "gated access and multimodal input (image, text) means users may send confidential images/text to the model, but the card does not report any data-handling safeguards.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-data-in-prompt.html"
+      },
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "the model accepts image and text prompts and was trained on web documents/code/images, so users may include copyrighted or licensed material in prompts without stated protections.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "the card reports a 4B multimodal model trained on large web/code/image data, implying substantial training compute and associated energy/water use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      },
+      {
+        "category": "Incorrect risk testing",
+        "description": "A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context.",
+        "justification": "the card lists benchmark scores for reasoning, knowledge, math, coding, translation, and vision-language tasks but does not report safety or risk-specific evaluations, so risk measurements are incomplete.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html"
+      }
+    ]
   },
   "specifications": {
     "architecture_type": "Not specified",
@@ -291,9 +319,9 @@
     "precision": "BF16 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "The model is available as both a pre-trained variant and an instruction-tuned variant.",
+    "adaptations": "Not specified",
     "data_cutoff": "Not specified",
-    "training_data": "The 4B checkpoint was trained on a text dataset assembled from a wide variety of sources.",
+    "training_data": "The 4B model was trained on a text dataset covering a wide variety of sources, including web documents in over 140 languages, code, mathematics, and images.",
     "training_data_size": "Not specified"
   }
 }

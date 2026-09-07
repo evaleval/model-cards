@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "32 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "2 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Pretergeek (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Pretergeek/OpenChat-3.5-0106_8.11B_36Layers-Appended",
+    "model_type": "Text-generation model.",
+    "name": "OpenChat-3.5-0106_8.11B_36Layers-Appended",
+    "release_date": "2024-07-26 (Hugging Face repository creation date)",
+    "summary": "A text-generation model produced by merging OpenChat-3.5-0106 with an appended block-expansion variation.",
+    "version": "5a109a47db845ccf4b0e2f2f236425d9b7e97cb7"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "openchat/openchat-3.5-0106",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "OpenChat 3.5 36Layers Appended"
+  },
+  "links": {
+    "citation": "@misc{wu2024llamaproprogressivellama,\n      title={LLaMA Pro: Progressive LLaMA with Block Expansion}, \n      author={Chengyue Wu and Yukang Gan and Yixiao Ge and Zeyu Lu and Jiahao Wang and Ye Feng and Ying Shan and Ping Luo},\n      year={2024},\n      eprint={2401.02415},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2401.02415}, \n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Pretergeek/OpenChat-3.5-0106_8.11B_36Layers-Appended",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only architecture and merge method, with no training data, evaluation, or safety documentation for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card does not state what data was used to train or merge the model, so training data provenance and curation are undocumented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card only says 'text-generation' and gives no intended-use or misuse guidance, leaving downstream risk scope undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.1 GiB of safetensors weights (16,228,430,992 bytes) in BF16",
+    "num_parameters": "8,114,196,480 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was created by merging components using a passthrough merge method with a variation of the Block Expansion method from LLaMA Pro. It has not yet received additional training, so it is expected to perform close to the original model.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

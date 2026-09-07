@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "42,344 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "35 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "The developer states that the model has not been fine-tuned for common deployment contexts such as genre prose writing or commercial chatbots.",
+    "results_summary": "The developer reports that, although downstream performance was not a design goal, the model matches or exceeds comparable models of similar size, including those in the OPT and GPT-Neo suites.",
+    "safety_evals": "The developer cautions that the model may produce socially unacceptable or undesirable text even when the prompt is not explicitly offensive."
+  },
+  "identity": {
+    "developed_by": "EleutherAI (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "EleutherAI/pythia-2.8b",
+    "model_type": "Transformer-based Language Model",
+    "name": "Pythia-2.8B",
+    "release_date": "2023-02-13 (Hugging Face repository creation date)",
+    "summary": "A transformer-based language model from EleutherAI's Pythia Scaling Suite, a collection of models developed to facilitate interpretability research.",
+    "version": "2a259cdd96a4beb1cdf467512e3904197345f6a9"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "pythia"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "https://github.com/EleutherAI/pythia",
+    "model_card": "https://huggingface.co/EleutherAI/pythia-2.8b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "2,048 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "5.3 GiB of safetensors weights (5,684,693,096 bytes) in F16",
+    "num_parameters": "2,909,427,008 parameters (safetensors metadata)",
+    "precision": "F16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Pythia-2.8B has not been fine-tuned for downstream contexts such as genre prose or commercial chatbots.",
+    "data_cutoff": "Not specified",
+    "training_data": "Pythia-2.8B was trained on the Pile, a dataset that was not deduplicated before use.",
+    "training_data_size": "Not specified"
+  }
+}

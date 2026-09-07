@@ -1,0 +1,68 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "418,072 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1,105 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the model outperforms comparable open-source models such as MPT-7B, StableLM, and RedPajama, attributing this to training on 1,500B tokens of RefinedWeb enhanced with curated corpora.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "tiiuae (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "tiiuae/falcon-7b",
+    "model_type": "Causal decoder-only language model.",
+    "name": "🚀 Falcon-7B",
+    "release_date": "2023-04-24 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "ec89142b67d748a1865ea4451372db8313ada0d8"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "falcon"
+  },
+  "links": {
+    "citation": "@article{falcon40b,\n  title={{Falcon-40B}: an open large language model with state-of-the-art performance},\n  author={Almazrouei, Ebtesam and Alobeidli, Hamza and Alshamsi, Abdulaziz and Cappelli, Alessandro and Cojocaru, Ruxandra and Debbah, Merouane and Goffinet, Etienne and Heslow, Daniel and Launay, Julien and Malartic, Quentin and Noune, Badreddine and Pannier, Baptiste and Penedo, Guilherme},\n  year={2023}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/tiiuae/falcon-7b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only task/architecture/access and a broad comparison result, with no documentation of training data composition, evaluation methodology, or limitations.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Training uses 1,500B tokens of RefinedWeb enhanced with curated corpora, but the card does not describe the provenance or usage terms of these corpora.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "13.4 GiB of safetensors weights (14,434,402,976 bytes) in BF16",
+    "num_parameters": "7,217,189,760 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "1,500B tokens"
+  }
+}

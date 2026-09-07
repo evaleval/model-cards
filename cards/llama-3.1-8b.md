@@ -3,7 +3,7 @@
 > This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
 
 Paired JSON: [llama\-3\.1\-8b\.json](<./llama-3.1-8b.json>)<br>
-SHA-256: `332535c5f0e1431287e92c82e26d02dc126677c470b1cba439b9157ecb9060cd`
+SHA-256: `501dc43bcb22bd375b0a8ded7b91da8483e51f59e3f2a9317667cc96bd441ced`
 
 ## Identity
 
@@ -15,7 +15,7 @@ SHA-256: `332535c5f0e1431287e92c82e26d02dc126677c470b1cba439b9157ecb9060cd`
 | License | llama3\.1 |
 | Release date | 2024\-07\-14 \(Hugging Face repository creation date\) |
 | Version | d04e592bb4f6aa9cfee91e2e20afa771667e1d4b |
-| Summary | A multilingual large language model from the Llama 3\.1 collection, available in 8B, 70B, and 405B sizes and supporting text in/text out\. |
+| Summary | An 8B\-parameter multilingual large language model from the Meta Llama 3\.1 collection, supporting text\-in/text\-out generation\. |
 
 ## Lineage
 
@@ -37,22 +37,18 @@ SHA-256: `332535c5f0e1431287e92c82e26d02dc126677c470b1cba439b9157ecb9060cd`
 | Field | Value |
 | --- | --- |
 | Training data | The checkpoint was trained on a new mix of publicly available online data\. |
-| Training data size | 15T\+ tokens |
-| Data cutoff | December 2023 |
 
 ## Access and Adoption
 
 | Field | Value |
 | --- | --- |
 | Access type | gated |
-| Downloads | 513,485 downloads \(Hub 30\-day window, as of 2026\-09\-04\) |
-| Likes | 2,416 likes on the Hub \(as of 2026\-09\-04\) |
+| Downloads | 511,423 downloads \(Hub 30\-day window, as of 2026\-09\-05\) |
+| Likes | 2,421 likes on the Hub \(as of 2026\-09\-05\) |
 
 ## Evaluation
 
-| Field | Value |
-| --- | --- |
-| Results summary | The developer states that the Llama 3\.1 instruction\-tuned text\-only models, including the 8B variant, are optimized for multilingual dialogue and outperform many open\-source and closed chat models on common industry benchmarks\. |
+_No specified fields are available in the publication data._
 
 ## Links
 
@@ -61,6 +57,19 @@ SHA-256: `332535c5f0e1431287e92c82e26d02dc126677c470b1cba439b9157ecb9060cd`
 | Model card | [https://huggingface\.co/meta\-llama/Llama\-3\.1\-8B](<https://huggingface.co/meta-llama/Llama-3.1-8B>) |
 | Code repository | [https://github\.com/meta\-llama/llama3](<https://github.com/meta-llama/llama3>) |
 
+## Risks
+
+_No specified fields are available in the publication data._
+
+### Possible Risks
+
+| Risk | Why it applies here | Description |
+| --- | --- | --- |
+| [Lack of model transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html>) | Card gives only architecture size, modality, and training\-data mix; no design, development, or evaluation details are reported for this checkpoint\. | Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model\. |
+| [Lack of data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html>) | Training data is described only as &\#x27;a new mix of publicly available online data&\#x27; with no dataset details, curation, or documentation\. | Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation\.  |
+| [Uncertain data provenance](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html>) | The card does not provide traceability or source verification for the &\#x27;publicly available online data&\#x27; mix, so data origin and usage terms are uncertain\. | Data provenance refers to the traceability of data \(including synthetic data\), which includes its ownership, origin, transformations, and generation\. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation\. |
+| [Data usage rights restrictions](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-usage-rights.html>) | Because the training data is only broadly described as publicly available online data, the card does not establish license or terms\-of\-service compliance for that data\. | Terms of service, license compliance, or other IP issues may restrict the ability to use certain data for building models\. |
+
 ---
 
-Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `lineage.base_models`, `lineage.derivatives`, `specifications.architecture_type`, `specifications.context_length`, `training_context.adaptations`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.
+Unavailable agreed fields (not specified in the publication data): `identity.model_type`, `lineage.base_models`, `lineage.derivatives`, `specifications.architecture_type`, `specifications.context_length`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.results_summary`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.citation`.

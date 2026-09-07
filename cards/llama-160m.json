@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "87,122 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "37 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer states that no evaluation has been conducted yet, so the model should be used with care.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "JackFram (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "JackFram/llama-160m",
+    "model_type": "text generation",
+    "name": "llama-160m",
+    "release_date": "2023-05-26 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "aca9b687d1425f863dcf5de9a4c96e3fe36266dd"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "llama"
+  },
+  "links": {
+    "citation": "@misc{miao2023specinfer,\n      title={SpecInfer: Accelerating Generative LLM Serving with Speculative Inference and Token Tree Verification}, \n      author={Xupeng Miao and Gabriele Oliaro and Zhihao Zhang and Xinhao Cheng and Zeyu Wang and Rae Ying Yee Wong and Zhuoming Chen and Daiyaan Arfeen and Reyna Abhyankar and Zhihao Jia},\n      year={2023},\n      eprint={2305.09781},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/JackFram/llama-160m",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "2,048 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "0.6 GiB of safetensors weights (649,684,840 bytes) in F32",
+    "num_parameters": "162,417,792 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

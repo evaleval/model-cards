@@ -1,0 +1,212 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "10,809 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "199 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "84.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "55.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA",
+        "metric": "Not specified",
+        "score": "37.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Theorem QA",
+        "metric": "Not specified",
+        "score": "43.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "82.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "87.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WindoGrande",
+        "metric": "Not specified",
+        "score": "85.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-C",
+        "metric": "Not specified",
+        "score": "68.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "54.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "64.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "76.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "EvalPlus",
+        "metric": "Not specified",
+        "score": "65.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MultiPL-E",
+        "metric": "Not specified",
+        "score": "59.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "89.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "51.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "91.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CMMLU",
+        "metric": "Not specified",
+        "score": "90.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Mulit-Exam",
+        "metric": "Not specified",
+        "score": "76.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Understanding",
+        "metric": "Not specified",
+        "score": "80.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Mathematics",
+        "metric": "Not specified",
+        "score": "76.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Translation",
+        "metric": "Not specified",
+        "score": "37.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "85.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Exam",
+        "metric": "Not specified",
+        "score": "76.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Understanding",
+        "metric": "Not specified",
+        "score": "80.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Mathematics",
+        "metric": "Not specified",
+        "score": "76.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Translation",
+        "metric": "Not specified",
+        "score": "37.8",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "other",
+    "model_id": "Qwen/Qwen2-72B",
+    "model_type": "Not specified",
+    "name": "Qwen2-72B",
+    "release_date": "2024-05-22 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "5f149cae83c11c408a953dec64b12e7e662e8cb9"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2"
+  },
+  "links": {
+    "citation": "@article{qwen2,\n  title={Qwen2 Technical Report},\n  year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2",
+    "model_card": "https://huggingface.co/Qwen/Qwen2-72B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "135.4 GiB of safetensors weights (145,412,518,888 bytes) in BF16",
+    "num_parameters": "72,706,203,648 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The base language model is not recommended for direct text generation; post-training such as SFT, RLHF, or continued pretraining is suggested.",
+    "data_cutoff": "Not specified",
+    "training_data": "The Qwen2 dense model family, excluding the 0.5B variant, was pre-trained on a large-scale dataset of over 7 trillion tokens.",
+    "training_data_size": "Not specified"
+  }
+}

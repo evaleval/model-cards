@@ -1,0 +1,140 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "16,449 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "186 likes on the Hub (as of 2026-09-05)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "61.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "74.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "62.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "20.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "36.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "37.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "40.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CMMLU",
+        "metric": "Not specified",
+        "score": "73.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Coursera",
+        "metric": "Not specified",
+        "score": "59.74",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM",
+        "metric": "Not specified",
+        "score": "60.00",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "QuALITY",
+        "metric": "Not specified",
+        "score": "64.36",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TOEFL",
+        "metric": "Not specified",
+        "score": "79.18",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "SFiction",
+        "metric": "Not specified",
+        "score": "62.50",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "65.16",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "other",
+    "model_id": "Qwen/Qwen1.5-7B-Chat",
+    "model_type": "A transformer-based decoder-only language model.",
+    "name": "Qwen1.5-7B-Chat",
+    "release_date": "2024-01-30 (Hugging Face repository creation date)",
+    "summary": "Qwen1.5 is a language model series that includes decoder-only language models of different sizes, with both base and chat variants released.",
+    "version": "5f4f5e69ac7f1d508f8369e977de208b4803444b"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen1.5"
+  },
+  "links": {
+    "citation": "@article{qwen,\n  title={Qwen Technical Report},\n  author={Jinze Bai and Shuai Bai and Yunfei Chu and Zeyu Cui and Kai Dang and Xiaodong Deng and Yang Fan and Wenbin Ge and Yu Han and Fei Huang and Binyuan Hui and Luo Ji and Mei Li and Junyang Lin and Runji Lin and Dayiheng Liu and Gao Liu and Chengqiang Lu and Keming Lu and Jianxin Ma and Rui Men and Xingzhang Ren and Xuancheng Ren and Chuanqi Tan and Sinan Tan and Jianhong Tu and Peng Wang and Shijie Wang and Wei Wang and Shengguang Wu and Benfeng Xu and Jin Xu and An Yang and Hao Yang and Jian Yang and Shusheng Yang and Yang Yao and Bowen Yu and Hongyi Yuan and Zheng Yuan and Jianwei Zhang and Xingxuan Zhang and Yichang Zhang and Zhenru Zhang and Chang Zhou and Jingren Zhou and Xiaohuan Zhou and Tianhang Zhu},\n  journal={arXiv preprint arXiv:2309.16609},\n  year={2023}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen1.5",
+    "model_card": "https://huggingface.co/Qwen/Qwen1.5-7B-Chat",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.4 GiB of safetensors weights (15,442,693,552 bytes) in BF16",
+    "num_parameters": "7,721,324,544 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

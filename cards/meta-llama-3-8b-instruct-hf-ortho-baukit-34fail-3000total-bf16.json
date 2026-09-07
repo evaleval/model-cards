@@ -1,0 +1,62 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "27 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that this version produced 34 refusals across 3,000 orthogonality tests, a refusal count consistent with the other versions in the same series.",
+    "safety_evals": "The developer reports 34 refusals out of 3,000 orthogonality tests, noting this is in line with the other versions in the series."
+  },
+  "identity": {
+    "developed_by": "Edgerunners (Hub organization)",
+    "license": "cc-by-nc-4.0",
+    "model_id": "Edgerunners/meta-llama-3-8b-instruct-hf-ortho-baukit-34fail-3000total-bf16",
+    "model_type": "Not specified",
+    "name": "meta-llama-3-8b-instruct-hf-ortho-baukit-34fail-3000total-bf16",
+    "release_date": "2024-05-12 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "4b8290f9ef1f7d33df282d3764f795af4e64022c"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Edgerunners/meta-llama-3-8b-instruct-hf-ortho-baukit-34fail-3000total-bf16",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Incorrect risk testing",
+        "description": "A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context.",
+        "justification": "The card's only reported safety evaluation is a refusal count on 3,000 orthogonality tests, which measures refusal behavior rather than the specific safety risks of an open-weight refusal-direction model, so the selected metric may be incomplete for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,376 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is an implementation of the refusal direction method from the cited Alignment Forum paper, applied to Llama 3 8B Instruct using an updated Baukit implementation.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

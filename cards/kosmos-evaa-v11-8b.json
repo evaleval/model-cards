@@ -1,0 +1,79 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "22 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "jaspionjader (Hub organization)",
+    "license": "Not specified",
+    "model_id": "jaspionjader/Kosmos-EVAA-v11-8B",
+    "model_type": "Not specified",
+    "name": "Kosmos-EVAA-v11-8B",
+    "release_date": "2024-12-27 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "0d96e6e1e53814b3950a3993e7733cd9a3057114"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/Auro-Kosmos-EVAA-v2.2-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/Kosmos-EVAA-v10-8B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/jaspionjader/Kosmos-EVAA-v11-8B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "8B dense decoder-only model merged via SLERP; no reported efficiency or environmental mitigation in card, so training/operation footprint is plausible.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      },
+      {
+        "category": "Legal accountability",
+        "description": "Determining who is responsible for an AI model is challenging without good documentation and governance processes. The use of synthetic data in model development adds further complexity, since the lack of standardized frameworks for recording synthetic data design choices and verification steps makes accountability harder to establish.",
+        "justification": "Card is a merge of two open-weight 8B models with no documentation of training data, evaluations, or governance, making accountability hard to establish.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/legal-accountability.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge of two other 8B models, jaspionjader/Kosmos-EVAA-v10-8B and jaspionjader/Auro-Kosmos-EVAA-v2.2-8B, combined with the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

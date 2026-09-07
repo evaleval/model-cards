@@ -1,0 +1,111 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "106 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "124 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MT Bench⬇️",
+        "metric": "Not specified",
+        "score": "7.81",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval",
+        "metric": "Not specified",
+        "score": "28.76",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AGIEval",
+        "metric": "Not specified",
+        "score": "34.22",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPT4All",
+        "metric": "Not specified",
+        "score": "66.37",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "52.19",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BigBench",
+        "metric": "Not specified",
+        "score": "37.10",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average ⬇️",
+        "metric": "Not specified",
+        "score": "47.47",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "HuggingFaceH4 (Hub organization)",
+    "license": "other",
+    "model_id": "HuggingFaceH4/zephyr-7b-gemma-v0.1",
+    "model_type": "Not specified",
+    "name": "Zephyr 7B Gemma",
+    "release_date": "2024-03-01 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "03b3427d0ed07d2e0f86c0a7e53d82d4beef9540"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "HuggingFaceH4/zephyr-7b-gemma-sft-v0.1",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "zephyr gemma"
+  },
+  "links": {
+    "citation": "@misc{tunstall2023zephyr,\n      title={Zephyr: Direct Distillation of LM Alignment}, \n      author={Lewis Tunstall and Edward Beeching and Nathan Lambert and Nazneen Rajani and Kashif Rasul and Younes Belkada and Shengyi Huang and Leandro von Werra and Clémentine Fourrier and Nathan Habib and Nathan Sarrazin and Omar Sanseviero and Alexander M. Rush and Thomas Wolf},\n      year={2023},\n      eprint={2310.16944},\n      archivePrefix={arXiv},\n      primaryClass={cs.LG}\n}",
+    "code_repository": "https://github.com/huggingface/alignment-handbook",
+    "model_card": "https://huggingface.co/HuggingFaceH4/zephyr-7b-gemma-v0.1",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "open-weight dense decoder-only text model; card reports no efficiency or training footprint information, so its training/operation plausibly has environmental costs.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.9 GiB of safetensors weights (17,075,391,360 bytes) in BF16",
+    "num_parameters": "8,537,680,896 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

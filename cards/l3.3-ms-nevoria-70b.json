@@ -1,0 +1,106 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "301 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "188 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Steelskull (Hub organization)",
+    "license": "other",
+    "model_id": "Steelskull/L3.3-MS-Nevoria-70b",
+    "model_type": "Not specified",
+    "name": "L3.3-MS-Nevoria-70b",
+    "release_date": "2025-01-14 (Hugging Face repository creation date)",
+    "summary": "L3.3-MS-Nevoria-70B",
+    "version": "19610dc97f8200d52f35137c23857d289709c9bb"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "EVA-UNIT-01/EVA-LLaMA-3.33-70B-v0.1",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Sao10K/L3.3-70B-Euryale-v2.3",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "SicariusSicariiStuff/Negative_LLAMA_70B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "TheDrummer/Anubis-70B-v1",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "nbeerbower/Llama-3.1-Nemotron-lorablated-70B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "L3.3 MS Nevoria"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Steelskull/L3.3-MS-Nevoria-70b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card only lists merged base models and gives no documentation of design, development, or evaluation process for this exact checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "The card identifies the checkpoint as a merge of listed base models but provides no traceability of the merge data or training data lineage.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not describe how the merged model's data was collected, curated, or used, making training data transparency lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card states only text-to-text modalities and architecture, with no intended-use or misuse definition for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "131.4 GiB of safetensors weights (141,107,498,056 bytes) in BF16",
+    "num_parameters": "70,553,706,496 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge of the listed base models.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

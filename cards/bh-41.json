@@ -1,0 +1,73 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "15 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "jaspionjader (Hub organization)",
+    "license": "Not specified",
+    "model_id": "jaspionjader/bh-41",
+    "model_type": "Not specified",
+    "name": "bh-41",
+    "release_date": "2025-02-03 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models built using mergekit.",
+    "version": "754c1a81b955d34e2bc93505350f1cdbac527260"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/bh-38",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/slu-37",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "mergekit merge"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/jaspionjader/bh-41",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "open-weight dense decoder-only model produced by merging two pre-trained language models with mergekit; no reported training/evaluation details, but the card's stated merge process implies additional compute for loading/merging and serving an open-weight checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge of jaspionjader/bh-38 and jaspionjader/slu-37, combined using the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "91 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "40 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "anthracite-org (Hub organization)",
+    "license": "other",
+    "model_id": "anthracite-org/magnum-v2-72b",
+    "model_type": "Not specified",
+    "name": "magnum-v2-72b",
+    "release_date": "2024-08-18 (Hugging Face repository creation date)",
+    "summary": "This is the seventh model in a series aimed at replicating the prose quality of Claude 3 models, specifically Sonnet and Opus.",
+    "version": "c6a1f2afbd378eb2d9a6d74396efa0f09a91f04c"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2-72B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "magnum v2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/anthracite-org/magnum-v2-72b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides no evaluation results, training data details, or inner-workings info for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Card does not state the provenance or usage terms of the fine-tuning data used to adapt Qwen-2 72B Instruct.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card only says it aims to replicate prose quality of Claude 3 models and gives no intended-use or misuse definition.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card gives no documentation of the fine-tuning dataset, its collection, curation, or synthetic-data generation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Model usage rights restrictions",
+        "description": "Terms of service, licenses, or other rules restrict the use of certain models.",
+        "justification": "License is listed only as 'other' with no terms stated, leaving usage restrictions unclear.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/model-usage-rights.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "135.4 GiB of safetensors weights (145,412,518,832 bytes) in BF16",
+    "num_parameters": "72,706,203,648 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was produced by full-parameter fine-tuning of Qwen-2 72B Instruct for two epochs using 8x AMD Instinct MI300X accelerators. Training used a weight decay of 0.01 and a peak learning rate of 4e-6, with sample packing for 16k tokens.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

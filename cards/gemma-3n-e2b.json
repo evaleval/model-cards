@@ -1,0 +1,68 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "607 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "96 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the E2B sub-model is already extracted for direct download and offers up to 2x faster inference, while the E4B main model provides the highest capabilities. The architecture shares middle-layer keys and values from local and global attention with all top layers, yielding a 2x prefill improvement over Gemma 3 4B. Strong translation results are reported for English into and from Spanish, French, Italian, and Portuguese, and on a Google Pixel Edge TPU the model shows a 13x speedup with quantization, 46% fewer parameters, and a 4x smaller memory footprint with higher vision-language accuracy.",
+    "safety_evals": "The developer reports that the models were evaluated against categories relevant to ethics and safety, including child safety and content safety. Child safety evaluation covered text-to-text and image-to-text prompts addressing child safety policies, including child sexual abuse and exploitation."
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/gemma-3n-e2b",
+    "model_type": "Not specified",
+    "name": "gemma-3n-e2b",
+    "release_date": "2025-06-12 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "c0ad2723802bade99f427667a609a03ae17a6a66"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "google/gemma-3n-E4B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "gemma 3n e2b"
+  },
+  "links": {
+    "citation": "@article{gemma_3n_2025,\n    title={Gemma 3n},\n    url={https://ai.google.dev/gemma/docs/gemma-3n},\n    publisher={Google DeepMind},\n    author={Gemma Team},\n    year={2025}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/google/gemma-3n-e2b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Incorrect risk testing",
+        "description": "A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context.",
+        "justification": "Card reports child safety and content safety evaluations but no evaluation for other risks such as hallucination or privacy, so the reported safety testing may be incomplete for the model's broad multimodal use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: image, text",
+      "output: text"
+    ],
+    "model_size": "10.1 GiB of safetensors weights (10,879,085,840 bytes) in BF16",
+    "num_parameters": "5,439,438,272 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The repository provides one sub-model, with access to custom-sized models via the Mix-and-Match method.",
+    "data_cutoff": "Not specified",
+    "training_data": "This checkpoint was trained on a broad mixture of sources totaling approximately 11 trillion tokens.",
+    "training_data_size": "Approximately 11 trillion tokens."
+  }
+}

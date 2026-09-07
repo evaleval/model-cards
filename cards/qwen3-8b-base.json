@@ -1,8 +1,8 @@
 {
   "access_and_adoption": {
     "access_type": "open-weight",
-    "downloads": "428,960 downloads (Hub 30-day window, as of 2026-09-04)",
-    "likes": "118 likes on the Hub (as of 2026-09-04)"
+    "downloads": "420,468 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "119 likes on the Hub (as of 2026-09-05)"
   },
   "evaluation": {
     "benchmark_scores": [
@@ -95,262 +95,10 @@
         "metric": "Not specified",
         "score": "59.40",
         "setting": "Not specified"
-      },
-      {
-        "benchmark": "MMLU-Redux",
-        "metric": "Not specified",
-        "score": "87.5",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "GPQA-Diamond",
-        "metric": "Not specified",
-        "score": "62.0",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "C-Eval",
-        "metric": "Not specified",
-        "score": "83.4",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "LiveBench 2024-11-25",
-        "metric": "Not specified",
-        "score": "67.1",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "IFEval strict prompt",
-        "metric": "Not specified",
-        "score": "85.0",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "Arena-Hard",
-        "metric": "Not specified",
-        "score": "85.8",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "AlignBench v1.1",
-        "metric": "Not specified",
-        "score": "8.46",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "Creative Writing v3",
-        "metric": "Not specified",
-        "score": "75.0",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "WritingBench",
-        "metric": "Not specified",
-        "score": "7.59",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "MATH-500",
-        "metric": "Not specified",
-        "score": "97.4",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "AIME'24",
-        "metric": "Not specified",
-        "score": "76.0",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "AIME'25",
-        "metric": "Not specified",
-        "score": "67.3",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "ZebraLogic",
-        "metric": "Not specified",
-        "score": "84.8",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "AutoLogi",
-        "metric": "Not specified",
-        "score": "89.1",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "BFCL v3",
-        "metric": "Not specified",
-        "score": "68.1",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "LiveCodeBench v5",
-        "metric": "Not specified",
-        "score": "57.5",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "Multi-IF",
-        "metric": "Not specified",
-        "score": "71.2",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "INCLUDE",
-        "metric": "Not specified",
-        "score": "67.8",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "MMMLU 14 languages",
-        "metric": "Not specified",
-        "score": "74.4",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "MT-AIME2024",
-        "metric": "Not specified",
-        "score": "65.4",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "PolyMath",
-        "metric": "Not specified",
-        "score": "42.7",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "MLogiQA",
-        "metric": "Not specified",
-        "score": "69.0",
-        "setting": "Thinking"
-      },
-      {
-        "benchmark": "GPQA-Diamond C-Eval",
-        "metric": "Not specified",
-        "score": "77.9",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "LiveBench 2024-11-25",
-        "metric": "Not specified",
-        "score": "53.5",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "IFEval strict prompt",
-        "metric": "Not specified",
-        "score": "83.0",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "Arena-Hard",
-        "metric": "Not specified",
-        "score": "79.6",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "AlignBench v1.1",
-        "metric": "Not specified",
-        "score": "8.38",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "Creative Writing v3",
-        "metric": "Not specified",
-        "score": "64.5",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "WritingBench",
-        "metric": "Not specified",
-        "score": "7.15",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "MATH-500",
-        "metric": "Not specified",
-        "score": "87.4",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "AIME'24",
-        "metric": "Not specified",
-        "score": "29.1",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "AIME'25",
-        "metric": "Not specified",
-        "score": "20.9",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "ZebraLogic",
-        "metric": "Not specified",
-        "score": "26.7",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "AutoLogi",
-        "metric": "Not specified",
-        "score": "76.5",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "BFCL v3",
-        "metric": "Not specified",
-        "score": "60.2",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "LiveCodeBench v5",
-        "metric": "Not specified",
-        "score": "22.8",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "Multi-IF",
-        "metric": "Not specified",
-        "score": "69.2",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "INCLUDE",
-        "metric": "Not specified",
-        "score": "62.5",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "MMMLU 14 languages",
-        "metric": "Not specified",
-        "score": "66.9",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "MT-AIME2024",
-        "metric": "Not specified",
-        "score": "16.6",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "PolyMath",
-        "metric": "Not specified",
-        "score": "18.8",
-        "setting": "Non-thinking"
-      },
-      {
-        "benchmark": "MLogiQA",
-        "metric": "Not specified",
-        "score": "51.4",
-        "setting": "Non-thinking"
       }
     ],
     "human_evals": "Not specified",
-    "results_summary": "Not specified",
+    "results_summary": "The developer reports that Qwen3 models achieve strong results across diverse benchmarks, including code generation, mathematical reasoning, and agent tasks, and that the dense base models are competitive with larger Qwen2.5 base models, particularly in STEM, coding, and reasoning.",
     "safety_evals": "Not specified"
   },
   "identity": {
@@ -375,6 +123,9 @@
     "system_card": "Not specified",
     "tech_report": "https://arxiv.org/abs/2505.09388"
   },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
   "specifications": {
     "architecture_type": "dense decoder-only",
     "context_length": "32,768 tokens (config.json max_position_embeddings)",
@@ -387,9 +138,9 @@
     "precision": "BF16 (safetensors weight dtype)"
   },
   "training_context": {
-    "adaptations": "The model card states the training stage is pretraining, indicating no post-training or alignment is described for this checkpoint.",
+    "adaptations": "Not specified",
     "data_cutoff": "Not specified",
-    "training_data": "The target checkpoint is a pretrained model; the cited pretraining corpus description refers to the Qwen3 family, not this checkpoint specifically, so it is not attributed as this model's own training data.",
+    "training_data": "The Qwen3 family, which includes this checkpoint, was pre-trained on a large multilingual corpus spanning 119 languages and dialects, totaling 36 trillion tokens, with an emphasis on high-quality data covering coding, STEM, reasoning, books, multilingual content, and synthetic data.",
     "training_data_size": "Not specified"
   }
 }

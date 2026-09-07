@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "50 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "3 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "ValiantLabs (Hub organization)",
+    "license": "llama3.2",
+    "model_id": "ValiantLabs/Llama3.2-3B-Esper2",
+    "model_type": "Text generation model.",
+    "name": "Llama3.2-3B-Esper2",
+    "release_date": "2024-10-03 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "ad469d77965acc6bf6b9736a1d939818bb2c3668"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Llama3.2 Esper2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/ValiantLabs/Llama3.2-3B-Esper2",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "12.0 GiB of safetensors weights (12,851,028,496 bytes) in F32",
+    "num_parameters": "3,212,749,824 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

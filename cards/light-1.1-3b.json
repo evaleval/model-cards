@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "16 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Sakalti (Hub organization)",
+    "license": "other",
+    "model_id": "Sakalti/light-1.1-3B",
+    "model_type": "Not specified",
+    "name": "light-1.1-3B",
+    "release_date": "2025-01-07 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "1eda1a75e2575cc65bf340289446b9cb41990539"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Sakalti/light-3B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "light 1.1"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Sakalti/light-1.1-3B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "5.7 GiB of safetensors weights (6,171,926,568 bytes) in F16",
+    "num_parameters": "3,085,938,688 parameters (safetensors metadata)",
+    "precision": "F16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was trained with Unsloth and Hugging Face's TRL library, which the source states enabled two-fold faster training.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

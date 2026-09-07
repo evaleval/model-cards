@@ -1,0 +1,76 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "18 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "2 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "CultriX (Hub organization)",
+    "license": "Not specified",
+    "model_id": "CultriX/Qwen2.5-14B-BrocaV9",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-14B-BrocaV9",
+    "release_date": "2025-01-02 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "883dafbff4edb8c83ef58a33413d4e09e922a53d"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "CultriX/Qwen2.5-14B-Wernickev3",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "CultriX/SeQwence-14Bv1",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "djuna/Q2.5-Veltha-14B-0.5",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "qingy2024/Qwen2.5-Math-14B-Instruct-Preview",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/CultriX/Qwen2.5-14B-BrocaV9",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "27.5 GiB of safetensors weights (29,531,962,384 bytes) in BF16",
+    "num_parameters": "14,765,947,904 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

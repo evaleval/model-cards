@@ -1,0 +1,86 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "25 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "LimYeri (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "LimYeri/CodeMind-Llama3-8B-unsloth_v2-merged",
+    "model_type": "text generation",
+    "name": "CodeMind-Llama3-8B-unsloth_v2-merged",
+    "release_date": "2024-06-04 (Hugging Face repository creation date)",
+    "summary": "The model is a Llama-based text-generation model that was trained with Unsloth and Hugging Face's TRL library.",
+    "version": "d4ec745f8279e3ac6d41709153c21cc077e66385"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "unsloth/llama-3-8b-Instruct-bnb-4bit",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "https://github.com/unslothai/unsloth",
+    "model_card": "https://huggingface.co/LimYeri/CodeMind-Llama3-8B-unsloth_v2-merged",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Harmful code generation",
+        "description": "Models might generate code that causes harm or unintentionally affects other systems.",
+        "justification": "Fine-tuned on LeetCode_Python_Solutions and generates code, so it may produce code that causes harm or unintended effects.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/harmful-code-generation.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card names the dataset but provides no documentation of its collection, curation, or filtering, so dataset details are insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "The card does not provide access to the training data content, so outputs cannot be traced to specific training examples.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Poor model accuracy",
+        "description": "Poor model accuracy occurs when a model's performance is insufficient to the task it was designed for. Low accuracy might occur if the model is not correctly engineered, or if the model's expected inputs change.",
+        "justification": "The card reports no evaluation results for the fine-tuned checkpoint, so its accuracy on code-generation tasks is unverified.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/poor-model-accuracy.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,376 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was fine-tuned on the LimYeri/LeetCode_Python_Solutions dataset.",
+    "training_data_size": "Not specified"
+  }
+}

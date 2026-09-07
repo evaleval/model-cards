@@ -1,0 +1,74 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "302,757 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "202 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer highlights Qwen2.5-3B as an efficient small model that delivers strong performance with roughly 3 billion parameters, improving on its predecessors. The model is also described as part of a family that surpasses most prior open-weight models and remains competitive with proprietary systems across language understanding, generation, multilingual tasks, coding, mathematics, and reasoning.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "other",
+    "model_id": "Qwen/Qwen2.5-3B",
+    "model_type": "Causal language model",
+    "name": "Qwen2.5-3B",
+    "release_date": "2024-09-15 (Hugging Face repository creation date)",
+    "summary": "A base 3B-parameter model in the Qwen2.5 series, designed for causal language modeling and noted for strong efficiency relative to its size.",
+    "version": "3aab1f1954e9cc14eb9509a215f9e5ca08227a9b"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5"
+  },
+  "links": {
+    "citation": "@misc{qwen2.5,\n    title = {Qwen2.5: A Party of Foundation Models},\n    url = {https://qwenlm.github.io/blog/qwen2.5/},\n    author = {Qwen Team},\n    month = {September},\n    year = {2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2.5",
+    "model_card": "https://huggingface.co/Qwen/Qwen2.5-3B",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2407.10671"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card summary provides only high-level information (architecture, training stage, family-level claims) and no detailed evaluation or development documentation for this exact checkpoint, so insufficient documentation of design/evaluation is plausibly raised.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card explicitly says the base model is not aligned and advises against using it directly for conversations, but it does not define a concrete intended use or downstream task, leaving the relevant risk space open.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Improper usage",
+        "description": "Improper usage occurs when a model is used for a purpose that it was not originally designed for.",
+        "justification": "The card warns that this base model is not aligned to human preferences and should not be used directly for conversations, so using it as a chat model would be an improper use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/improper-usage.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "5.7 GiB of safetensors weights (6,171,926,992 bytes) in BF16",
+    "num_parameters": "3,085,938,688 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a base language model and is not aligned to human preferences; the readme advises against using it directly for conversations and recommends applying post-training such as SFT, RLHF, or continued pretraining.",
+    "data_cutoff": "Not specified",
+    "training_data": "The checkpoint is a base pretraining model; the readme identifies its training stage as pretraining.",
+    "training_data_size": "Not specified"
+  }
+}

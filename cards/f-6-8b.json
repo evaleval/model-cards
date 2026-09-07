@@ -1,0 +1,66 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "12 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "0 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "jaspionjader (Hub organization)",
+    "license": "Not specified",
+    "model_id": "jaspionjader/f-6-8b",
+    "model_type": "Not specified",
+    "name": "f-6-8b",
+    "release_date": "2025-01-02 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "57a3cc9f1d70dffbb9bb679aee0a07a8af7ba2b3"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/Kosmos-EVAA-mix-v35-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/f-5-8b",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/jaspionjader/f-6-8b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge of jaspionjader/f-5-8b and jaspionjader/Kosmos-EVAA-mix-v35-8B, created using the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

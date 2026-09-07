@@ -1,0 +1,62 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "10 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "icefog72 (Hub organization)",
+    "license": "cc-by-nc-4.0",
+    "model_id": "icefog72/Ice0.69-25.01-RP",
+    "model_type": "Not specified",
+    "name": "Ice0.69-25.01-RP",
+    "release_date": "2025-01-26 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "e1eca954b660c98d83a199ea0a83822471f02373"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Ice0.69 25.01 RP"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/icefog72/Ice0.69-25.01-RP",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight text model with cc-by-nc-4.0 license and no stated data filtering or prompt controls -> users may include copyrighted material in prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "13.5 GiB of safetensors weights (14,483,498,032 bytes) in BF16",
+    "num_parameters": "7,241,732,096 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge of two checkpoints, created using the SLERP merge method. The merge included the models Ice0.60-18.01-RP and Ice0.66-25.01-RP.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

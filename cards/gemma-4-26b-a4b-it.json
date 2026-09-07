@@ -1,0 +1,152 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "8,307,671 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "1,481 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU Pro",
+        "metric": "Not specified",
+        "score": "82.6%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AIME 2026 no tools",
+        "metric": "Not specified",
+        "score": "88.3%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench v6",
+        "metric": "Not specified",
+        "score": "77.1%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Codeforces ELO",
+        "metric": "Elo",
+        "score": "1718",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA Diamond",
+        "metric": "Not specified",
+        "score": "82.3%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Tau2",
+        "metric": "Not specified",
+        "score": "68.2%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HLE no tools",
+        "metric": "Not specified",
+        "score": "8.7%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HLE with search",
+        "metric": "Not specified",
+        "score": "17.2%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BigBench Extra Hard",
+        "metric": "Not specified",
+        "score": "64.8%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMMLU",
+        "metric": "Not specified",
+        "score": "86.3%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMMU Pro",
+        "metric": "Not specified",
+        "score": "73.8%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "OmniDocBench 1.5",
+        "metric": "Not specified",
+        "score": "0.149",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH-Vision",
+        "metric": "Not specified",
+        "score": "82.4%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MedXPertQA MM",
+        "metric": "Not specified",
+        "score": "58.1%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MRCR v2 8 needle 128k",
+        "metric": "Not specified",
+        "score": "44.1%",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "The developer reports that the 26B model ranks sixth on the Arena AI text leaderboard.",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "google/gemma-4-26b-a4b-it",
+    "model_type": "Not specified",
+    "name": "gemma-4-26b-a4b-it",
+    "release_date": "2026-03-11 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "4d7ae4984b7db7de8f8457170b3f1a419ee76d52"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "google/gemma-4-26B-A4B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "gemma 4 a4b"
+  },
+  "links": {
+    "citation": "@misc{gemmateam2026gemma4,\n      title={Gemma 4 Technical Report}, \n      author={Gemma Team},\n      year={2026},\n      eprint={2607.02770},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2607.02770}, \n}",
+    "code_repository": "https://github.com/bebechien/gemma",
+    "model_card": "https://huggingface.co/google/gemma-4-26b-a4b-it",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: image, text",
+      "output: text"
+    ],
+    "model_size": "48.1 GiB of safetensors weights (51,612,009,916 bytes) in BF16",
+    "num_parameters": "25,805,936,206 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The release includes both pre-trained and instruction-tuned open-weight variants.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

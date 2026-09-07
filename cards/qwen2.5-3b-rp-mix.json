@@ -1,0 +1,91 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "24 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "4 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "bunnycore (Hub organization)",
+    "license": "Not specified",
+    "model_id": "bunnycore/Qwen2.5-3B-RP-Mix",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-3B-RP-Mix",
+    "release_date": "2024-10-22 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "3e3725ccbbd3ec731f92e2cb4e71bbcaa8c0ee5c"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Qwen/Qwen2.5-3B-Instruct",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bunnycore/Qwen-2.5-3b-Rp-lora_model",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5 RP Mix"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/bunnycore/Qwen2.5-3B-RP-Mix",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Confidential data in prompt",
+        "description": "Confidential information might be included as a part of the prompt that is sent to the model.",
+        "justification": "The checkpoint is an open-weight text-in/text-out model for roleplay (RP) merges, so users may paste private or personal context into prompts with no reported confidentiality safeguards.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-data-in-prompt.html"
+      },
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "The model is an open-weight RP merge of an instruct model and a roleplay LoRA, and roleplay prompts can include copyrighted character or story text with no reported IP protections.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Prompt leaking",
+        "description": "'A prompt leak attack attempts to extract a model's system prompt (also known as the system message).'",
+        "justification": "The model is an open-weight text-in/text-out instruct/RP merge; system prompts or roleplay instructions may be extractable through prompt-leak attacks, and no prompt-leak evaluation is reported.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/prompt-leaking.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "The card reports no safety or reliability evaluations for this open-weight RP/instruct merge, so users may over-trust its outputs in decision-making or under-trust them without evidence.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "6.3 GiB of safetensors weights (6,794,256,992 bytes) in BF16",
+    "num_parameters": "3,397,103,616 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was created by merging Qwen/Qwen2.5-3B-Instruct with bunnycore/Qwen-2.5-3b-Rp-lora_model using the passthrough merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "This checkpoint is a merge of Qwen/Qwen2.5-3B-Instruct and bunnycore/Qwen-2.5-3b-Rp-lora_model using the passthrough merge method.",
+    "training_data_size": "Not specified"
+  }
+}

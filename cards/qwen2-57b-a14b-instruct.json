@@ -1,0 +1,225 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "12,607 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "83 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "75.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "52.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA",
+        "metric": "Not specified",
+        "score": "34.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TheroemQA",
+        "metric": "Not specified",
+        "score": "33.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MT-Bench",
+        "metric": "Not specified",
+        "score": "8.55",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "79.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "70.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MultiPL-E",
+        "metric": "Not specified",
+        "score": "66.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "EvalPlus",
+        "metric": "Not specified",
+        "score": "71.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench",
+        "metric": "Not specified",
+        "score": "25.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "79.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "80.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AlignBench",
+        "metric": "Not specified",
+        "score": "7.36",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU MMLU-Pro",
+        "metric": "Not specified",
+        "score": "75.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Knowledge",
+        "metric": "Not specified",
+        "score": "64.15",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Knowledge",
+        "metric": "Not specified",
+        "score": "76.80",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Exam",
+        "metric": "Not specified",
+        "score": "73.67",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Comprehension",
+        "metric": "Not specified",
+        "score": "67.52",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Comprehension",
+        "metric": "Not specified",
+        "score": "67.92",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Coding",
+        "metric": "Not specified",
+        "score": "40.66",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Coding",
+        "metric": "Not specified",
+        "score": "42.37",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Reasoning",
+        "metric": "Not specified",
+        "score": "59.89",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "61.63",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "66.03",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that Qwen2-57B-A14B-Instruct handles contexts up to 64K tokens proficiently and supports a context length of up to 65,536 tokens. It is also described as generally surpassing most open-source models and showing competitiveness against proprietary models across benchmarks for language understanding and language generation.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2-57B-A14B-Instruct",
+    "model_type": "Instruction-tuned Mixture-of-Experts language model.",
+    "name": "Qwen2-57B-A14B-Instruct",
+    "release_date": "2024-06-04 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "50896d66b39f1425d63720541a66c7df13e053c0"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2-57B-A14B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2 A14B"
+  },
+  "links": {
+    "citation": "@article{qwen2,\n  title={Qwen2 Technical Report},\n  year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2",
+    "model_card": "https://huggingface.co/Qwen/Qwen2-57B-A14B-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "Instruction-tuned open-weight chat model with reported benchmark strengths but no reported factuality/grounding evaluation; long 65K context increases surface for generating plausible but ungrounded content.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "Model is described as surpassing most open-source models and competitive with proprietary models, which can encourage over-reliance in downstream use, while no human-AI decision or calibration evidence is reported.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      },
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "Large Mixture-of-Experts model pretrained on a large amount of data and supporting 65K-token contexts; training and long-context inference plausibly increase energy/water use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "mixture-of-experts",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "106.9 GiB of safetensors weights (114,818,032,896 bytes) in BF16",
+    "num_parameters": "57,408,658,944 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was post-trained with supervised finetuning and direct preference optimization after pretraining.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was pretrained on a large amount of unspecified data, then post-trained with supervised finetuning and direct preference optimization.",
+    "training_data_size": "Not specified"
+  }
+}

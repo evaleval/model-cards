@@ -1,0 +1,159 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "119,896 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "103 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "56.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "21.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Theorem QA",
+        "metric": "Not specified",
+        "score": "15.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "31.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "37.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "58.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "21.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "37.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "66.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "66.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-C",
+        "metric": "Not specified",
+        "score": "43.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "45.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "70.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CMMLU",
+        "metric": "Not specified",
+        "score": "70.3",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the Qwen2 family of models generally surpasses most open-source models and remains competitive with proprietary models across benchmarks for language understanding and other capabilities. For the 1.5B model specifically, the reported scores include 56.5 on MMLU, 31.1 on HumanEval, 58.5 on GSM8K, and 70.6 on C-Eval.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2-1.5B",
+    "model_type": "text-generation",
+    "name": "Qwen2-1.5B",
+    "release_date": "2024-05-31 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "8a16abf2848eda07cc5253dec660bf1ce007ad7a"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2"
+  },
+  "links": {
+    "citation": "@article{qwen2,\n  title={Qwen2 Technical Report},\n  year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2",
+    "model_card": "https://huggingface.co/Qwen/Qwen2-1.5B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "The card does not specify the target checkpoint's pretraining data; the 7T token statement is explicitly family-scope, so the exact training data for this checkpoint is undocumented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card describes a base language model and advises against direct use for text generation, but does not define a concrete intended use or downstream task, leaving the relevant risk context unspecified.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "The card reports text-generation capability and benchmark scores (e.g., MMLU, GSM8K) but no factuality or grounding evaluation, so a base text-generation model plausibly can produce factually inaccurate content.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "2.9 GiB of safetensors weights (3,087,467,144 bytes) in BF16",
+    "num_parameters": "1,543,714,304 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a base language model, and the documentation advises against using base language models directly for text generation, recommending post-training such as SFT, RLHF, or continued pretraining instead.",
+    "data_cutoff": "Not specified",
+    "training_data": "The target checkpoint is a base language model; its pretraining data is not specified for this checkpoint. The Qwen2 family documentation states that all Qwen2 dense models except Qwen2-0.5B were pre-trained on a large-scale dataset of over 7 trillion tokens, but that statement is about the family and does not identify the target checkpoint's own training data.",
+    "training_data_size": "Not specified"
+  }
+}

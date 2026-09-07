@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "6,434 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "196 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "stabilityai (Hub organization)",
+    "license": "other",
+    "model_id": "stabilityai/stablelm-2-1_6b",
+    "model_type": "Not specified",
+    "name": "`Stable LM 2 1.6B`",
+    "release_date": "2024-01-18 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "f499ead74c53749bd93cebc6ce8bc0d7bdf1eaef"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "stablelm 2 1"
+  },
+  "links": {
+    "citation": "@article{bellagente2024stable,\n  title={Stable LM 2 1.6 B Technical Report},\n  author={Bellagente, Marco and Tow, Jonathan and Mahan, Dakota and Phung, Duy and Zhuravinskyi, Maksym and Adithyan, Reshinth and Baicoianu, James and Brooks, Ben and Cooper, Nathan and Datta, Ashish and others},\n  journal={arXiv preprint arXiv:2402.17834},\n  year={2024}\n}",
+    "code_repository": "https://github.com/Stability-AI/StableLM",
+    "model_card": "https://huggingface.co/stabilityai/stablelm-2-1_6b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "3.1 GiB of safetensors weights (3,289,069,520 bytes) in BF16",
+    "num_parameters": "1,644,515,328 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a base pre-trained model; the documentation recommends fine-tuning it for downstream tasks.",
+    "data_cutoff": "Not specified",
+    "training_data": "The base Stable LM 2 1.6B model was pre-trained on a filtered mixture of open-source datasets from the HuggingFace Hub, including Falcon RefinedWeb extract, RedPajama-Data and The Pile without the Books3 subset, and StarCoder, supplemented with multilingual data from CulturaX, particularly its OSCAR corpora, and restructured data in the style of Yuan & Liu.",
+    "training_data_size": "Not specified"
+  }
+}

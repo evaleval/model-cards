@@ -1,14 +1,14 @@
 {
   "access_and_adoption": {
     "access_type": "open-weight",
-    "downloads": "2,648,636 downloads (Hub 30-day window, as of 2026-09-04)",
-    "likes": "2,835 likes on the Hub (as of 2026-09-04)"
+    "downloads": "2,603,844 downloads (Hub 30-day window, as of 2026-09-05)",
+    "likes": "2,836 likes on the Hub (as of 2026-09-05)"
   },
   "evaluation": {
     "benchmark_scores": "Not specified",
     "human_evals": "Not specified",
-    "results_summary": "The developer presents the model as a demonstration that the base model can be fine-tuned to achieve compelling performance.",
-    "safety_evals": "The developer states that the model does not have any moderation mechanisms."
+    "results_summary": "Not specified",
+    "safety_evals": "The model does not include any moderation mechanisms."
   },
   "identity": {
     "developed_by": "mistralai (Hub organization)",
@@ -17,7 +17,7 @@
     "model_type": "Not specified",
     "name": "Mistral-7B-Instruct-v0.3",
     "release_date": "2024-05-22 (Hugging Face repository creation date)",
-    "summary": "An instruct fine-tuned large language model based on Mistral-7B-v0.3.",
+    "summary": "Mistral-7B-Instruct-v0.3 is an instruction-tuned large language model derived from Mistral-7B-v0.3.",
     "version": "c170c708c41dac9275d15a8fff4eca08d52bab71"
   },
   "lineage": {
@@ -38,14 +38,14 @@
     "system_card": "Not specified",
     "tech_report": "Not specified"
   },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
   "specifications": {
     "architecture_type": "dense decoder-only",
     "context_length": "32,768 tokens (config.json max_position_embeddings)",
-    "input_output": [
-      "text input",
-      "text output"
-    ],
-    "model_size": "27.0 GiB of safetensors weights (28,992,159,440 bytes) in BF16",
+    "input_output": "Not specified",
+    "model_size": "13.5 GiB of safetensors weights (14,496,080,928 bytes) in BF16",
     "num_parameters": "7,248,023,552 parameters (safetensors metadata)",
     "precision": "BF16 (safetensors weight dtype)"
   },

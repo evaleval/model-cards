@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "80 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "3 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "vicgalle (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "vicgalle/ConfigurableSOLAR-10.7B",
+    "model_type": "Not specified",
+    "name": "ConfigurableSOLAR-10.7B",
+    "release_date": "2024-03-10 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "c5c844a7447d952d1a959b2542fb3aeec5e85133"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "ConfigurableSOLAR"
+  },
+  "links": {
+    "citation": "@misc{gallego2024configurable,\n      title={Configurable Safety Tuning of Language Models with Synthetic Preference Data}, \n      author={Victor Gallego},\n      year={2024},\n      eprint={2404.00495},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/vicgalle/ConfigurableSOLAR-10.7B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "20.0 GiB of safetensors weights (21,463,098,376 bytes) in F16",
+    "num_parameters": "10,731,524,096 parameters (safetensors metadata)",
+    "precision": "F16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was fine-tuned with configurable safety tuning (CST), as described in the cited arXiv paper, on the vicgalle/configurable-system-prompt-multitask dataset.",
+    "data_cutoff": "Not specified",
+    "training_data": "This checkpoint is a fine-tune of a base LLM, trained on the vicgalle/configurable-system-prompt-multitask dataset using the configurable safety tuning (CST) approach.",
+    "training_data_size": "Not specified"
+  }
+}

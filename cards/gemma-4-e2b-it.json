@@ -1,0 +1,174 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "3,220,376 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "937 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU Pro",
+        "metric": "Not specified",
+        "score": "60.0%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AIME 2026 no tools",
+        "metric": "Not specified",
+        "score": "37.5%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench v6",
+        "metric": "Not specified",
+        "score": "44.0%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Codeforces ELO",
+        "metric": "Elo",
+        "score": "633",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA Diamond",
+        "metric": "Not specified",
+        "score": "43.4%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Tau2",
+        "metric": "Not specified",
+        "score": "24.5%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BigBench Extra Hard",
+        "metric": "Not specified",
+        "score": "21.9%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMMLU",
+        "metric": "Not specified",
+        "score": "67.4%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMMU Pro",
+        "metric": "Not specified",
+        "score": "44.2%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "OmniDocBench 1.5",
+        "metric": "Not specified",
+        "score": "0.290",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH-Vision",
+        "metric": "Not specified",
+        "score": "52.4%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MedXPertQA MM",
+        "metric": "Not specified",
+        "score": "23.5%",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CoVoST",
+        "metric": "Not specified",
+        "score": "33.47",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "FLEURS",
+        "metric": "Not specified",
+        "score": "0.09",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MRCR v2 8 needle 128k",
+        "metric": "Not specified",
+        "score": "19.1%",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "google/gemma-4-e2b-it",
+    "model_type": "Not specified",
+    "name": "gemma-4-e2b-it",
+    "release_date": "2026-03-02 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "3e22461f65e89153144f8adb70e3b8c2cc9845a7"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "google/gemma-4-E2B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "gemma 4 e2b"
+  },
+  "links": {
+    "citation": "@misc{gemmateam2026gemma4,\n      title={Gemma 4 Technical Report}, \n      author={Gemma Team},\n      year={2026},\n      eprint={2607.02770},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2607.02770}, \n}",
+    "code_repository": "https://github.com/bebechien/gemma",
+    "model_card": "https://huggingface.co/google/gemma-4-e2b-it",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Confidential data in prompt",
+        "description": "Confidential information might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight checkpoint with Apache-2.0 license and no stated safeguards or evaluation for confidential data handling -> users can self-host and send prompts containing confidential information to the model",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-data-in-prompt.html"
+      },
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight checkpoint with Apache-2.0 license and no stated content filtering or IP protections -> users can prompt it with copyrighted or proprietary text",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "generative language model in the gemma family with no reported hallucination or factual-accuracy evaluation in the card summary -> plausible ungrounded outputs",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "open-weight instruct-tuned model with no reported reliability or calibration evaluations -> users may over-trust its outputs in downstream decisions",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": "Not specified",
+    "model_size": "9.5 GiB of safetensors weights (10,246,621,918 bytes) in BF16",
+    "num_parameters": "5,123,178,051 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

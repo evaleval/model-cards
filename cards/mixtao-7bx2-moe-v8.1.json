@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "17,048 downloads (Hub 30-day window, as of 2026-09-06)",
+    "likes": "56 likes on the Hub (as of 2026-09-06)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "mixtao (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "zhengr/MixTAO-7Bx2-MoE-v8.1",
+    "model_type": "Mixture of Experts (MoE)",
+    "name": "MixTAO-7Bx2-MoE",
+    "release_date": "2024-02-26 (Hugging Face repository creation date)",
+    "summary": "MixTAO-7Bx2-MoE is a Mixture of Experts (MoE) model intended for large model technology experiments, with iterative improvements eventually aiming toward high-level large language models.",
+    "version": "71282580b69b2f9263a502eec0deeafbdfca4089"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "MixTAO 7Bx2 MoE v8.1"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/zhengr/MixTAO-7Bx2-MoE-v8.1",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "mixture-of-experts",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "24.0 GiB of safetensors weights (25,758,329,512 bytes) in BF16",
+    "num_parameters": "12,879,138,816 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}
