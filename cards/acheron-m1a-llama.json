@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "0 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "bfuzzy1 (Hub organization)",
+    "license": "other",
+    "model_id": "bfuzzy1/acheron-m1a-llama",
+    "model_type": "text-generation",
+    "name": "acheron-m1a-llama",
+    "release_date": "2025-01-10 (Hugging Face repository creation date)",
+    "summary": "The model is identified by the repository path bfuzzy1/acheron-m1a-llama.",
+    "version": "efcece3870c90cca8d072f2838bfcc6b21e896ef"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "acheron m1a llama"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/bfuzzy1/acheron-m1a-llama",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "0.0 GiB of safetensors weights (28,341,144 bytes)",
+    "num_parameters": "Not specified",
+    "precision": "Not specified"
+  },
+  "training_context": {
+    "adaptations": "The model is derived from bfuzzy1/acheron-m as its base model.",
+    "data_cutoff": "Not specified",
+    "training_data": "The checkpoint was trained on a dataset mix that includes ai2-adapt-dev/gsm8k_math_ifeval_ground_truth_mixed.",
+    "training_data_size": "Not specified"
+  }
+}

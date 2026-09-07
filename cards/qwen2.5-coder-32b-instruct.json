@@ -1,0 +1,255 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "1,703,797 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "2,125 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "HumanEval",
+        "metric": "score",
+        "score": "92.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "score",
+        "score": "87.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "score",
+        "score": "90.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "score",
+        "score": "75.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BigCodeBench",
+        "metric": "score",
+        "score": "49.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BigCodeBench",
+        "metric": "score",
+        "score": "27.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench Pass@1",
+        "metric": "pass@1",
+        "score": "31.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Python",
+        "metric": "Not specified",
+        "score": "92.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Java",
+        "metric": "Not specified",
+        "score": "80.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C++",
+        "metric": "Not specified",
+        "score": "79.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C#",
+        "metric": "Not specified",
+        "score": "82.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TS",
+        "metric": "Not specified",
+        "score": "86.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "JS",
+        "metric": "Not specified",
+        "score": "85.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "PHP",
+        "metric": "Not specified",
+        "score": "78.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Bash",
+        "metric": "Not specified",
+        "score": "48.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "79.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "76.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "55.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "93.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "77.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GaoKao2023en",
+        "metric": "Not specified",
+        "score": "68.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GaoKao2023en",
+        "metric": "Not specified",
+        "score": "62.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "OlympiadBench",
+        "metric": "Not specified",
+        "score": "42.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "OlympiadBench",
+        "metric": "Not specified",
+        "score": "79.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CollegeMath",
+        "metric": "Not specified",
+        "score": "47.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CollegeMath",
+        "metric": "Not specified",
+        "score": "68.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AIME24",
+        "metric": "Not specified",
+        "score": "20.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AIME24",
+        "metric": "Not specified",
+        "score": "41.8",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "The developer constructed an internal annotated code preference benchmark called Code Arena, similar to Arena Hard, to evaluate alignment with human preferences, and reports that the results demonstrate the model's advantages in preference alignment.",
+    "results_summary": "The developer reports that the 32B Instruct model is the current state-of-the-art open-source code model, matching GPT-4o on coding capabilities and achieving top open-source performance on EvalPlus, LiveCodeBench, and BigCodeBench. It also scores 73.7 on Aider, 65.9 on McEval, and 75.2 on MdEval, with competitive performance against GPT-4o.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2.5-Coder-32B-Instruct",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-Coder-32B-Instruct",
+    "release_date": "2024-11-06 (Hugging Face repository creation date)",
+    "summary": "Qwen2.5-Coder-32B-Instruct is the instruction-tuned 32B model in the Qwen2.5-Coder series, described as a current state-of-the-art open-source code model with coding capabilities comparable to GPT-4o.",
+    "version": "381fc969f78efac66bc87ff7ddeadb7e73c218a7"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-Coder-32B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5 Coder"
+  },
+  "links": {
+    "citation": "@article{hui2024qwen2,\n      title={Qwen2. 5-Coder Technical Report},\n      author={Hui, Binyuan and Yang, Jian and Cui, Zeyu and Yang, Jiaxi and Liu, Dayiheng and Zhang, Lei and Liu, Tianyu and Zhang, Jiajun and Yu, Bowen and Dang, Kai and others},\n      journal={arXiv preprint arXiv:2409.12186},\n      year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2.5-Coder",
+    "model_card": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2409.12186"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight code model with no reported filtering or safety evaluation for code prompts -> users may paste copyrighted code into prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Confidential data in prompt",
+        "description": "Confidential information might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight code model with no reported data handling or privacy safeguards -> users may include confidential code or data in prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-data-in-prompt.html"
+      },
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "code generation model evaluated only on coding benchmarks, no factual grounding or hallucination evaluation reported -> may generate plausible but incorrect code/APIs",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "reported as state-of-the-art matching GPT-4o on coding, with no calibration or human oversight guidance -> users may over-trust generated code",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "61.0 GiB of safetensors weights (65,527,841,688 bytes) in BF16",
+    "num_parameters": "32,763,876,352 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model underwent both pretraining and post-training stages.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

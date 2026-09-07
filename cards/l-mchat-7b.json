@@ -1,0 +1,85 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "8,514 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "2 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Artples (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Artples/L-MChat-7b",
+    "model_type": "Text generation",
+    "name": "L-MChat-7b",
+    "release_date": "2024-04-02 (Hugging Face repository creation date)",
+    "summary": "L-MChat-7b is a merge of the following models:",
+    "version": "b034f6dcbd8094c04f730071ea4a75e5c9ea19ac"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "FuseAI/FuseChat-7B-VaRM",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Nexusflow/Starling-LM-7B-beta",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "L MChat"
+  },
+  "links": {
+    "citation": "The model card states the model is licensed under Apache 2.0 but cannot be used to directly compete with OpenAI.",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Artples/L-MChat-7b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card only reports that the model is a slerp merge of two 7B models and gives no evaluation results, training data details, or intended-use documentation.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not describe how the underlying training data for either merged model was collected, curated, or used, so training-data transparency is lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card states only 'Primary task: Text generation' and does not define intended or prohibited uses, leaving downstream risk scope undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "13.5 GiB of safetensors weights (14,483,530,808 bytes) in BF16",
+    "num_parameters": "7,241,748,480 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is produced by a slerp merge of two 7B models: Nexusflow/Starling-LM-7B-beta and FuseAI/FuseChat-7B-VaRM, with FuseAI/FuseChat-7B-VaRM as the base model.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model is a merge of Nexusflow/Starling-LM-7B-beta layers 0-32 and FuseAI/FuseChat-7B-VaRM layers 0-32, using slerp with FuseAI/FuseChat-7B-VaRM as the base model.",
+    "training_data_size": "Not specified"
+  }
+}

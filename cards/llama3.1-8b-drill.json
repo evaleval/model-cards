@@ -1,0 +1,62 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "22 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the model turned out to be mediocre compared to its parent models, even on the IFEval task, and suggests considering those models instead.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "agentlans (Hub organization)",
+    "license": "Not specified",
+    "model_id": "agentlans/Llama3.1-8B-drill",
+    "model_type": "Instruction-following language model",
+    "name": "Llama3.1-8B-drill",
+    "release_date": "2024-12-27 (Hugging Face repository creation date)",
+    "summary": "A merge of high-scoring Llama 3.1 8B models on the IFEval task, intended to follow instructions well.",
+    "version": "a319513617fcb9dd0567b4c18a32def76256140e"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Llama3.1 drill"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/agentlans/Llama3.1-8B-drill",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "The card reports the model is mediocre compared to its parent models even on IFEval, so users may over-trust it as an instruction-following model or under-trust it despite its intended task.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

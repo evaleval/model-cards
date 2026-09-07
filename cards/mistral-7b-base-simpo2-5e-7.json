@@ -1,0 +1,65 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "16 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "TTTXXX01 (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "TTTXXX01/Mistral-7B-Base-SimPO2-5e-7",
+    "model_type": "Not specified",
+    "name": "Mistral-7B-Base-SimPO2-5e-7",
+    "release_date": "2024-08-30 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "7a271e3061165f4e1abfe26715c04e20c2ac935e"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "alignment-handbook/zephyr-7b-sft-full",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Mistral SimPO2 5e 7"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/TTTXXX01/Mistral-7B-Base-SimPO2-5e-7",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "open-weight dense decoder-only model; card gives no training footprint or efficiency info, so plausible environmental impact from training/operation is unaddressed.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": "Not specified",
+    "model_size": "13.5 GiB of safetensors weights (14,483,498,016 bytes) in BF16",
+    "num_parameters": "7,241,732,096 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

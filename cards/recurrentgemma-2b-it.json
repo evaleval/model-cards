@@ -1,0 +1,135 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "1,742 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "116 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "RealToxicity",
+        "metric": "Not specified",
+        "score": "7.60",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BOLD",
+        "metric": "Not specified",
+        "score": "39.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CrowS-Pairs",
+        "metric": "top-1",
+        "score": "43.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBQ Ambig",
+        "metric": "top-1",
+        "score": "71.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBQ Disambig",
+        "metric": "top-1",
+        "score": "50.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogender",
+        "metric": "top-1",
+        "score": "54.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "38.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoBias 12",
+        "metric": "Not specified",
+        "score": "61.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoBias 22",
+        "metric": "Not specified",
+        "score": "90.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Toxigen",
+        "metric": "Not specified",
+        "score": "58.8",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that RecurrentGemma models perform on par with Gemma models while offering faster inference and lower memory use, especially for long sequences.",
+    "safety_evals": "The developer states that ethics and safety evaluation results met internal policy thresholds for categories including child safety, content safety, representational harms, memorization, and large-scale harms."
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/recurrentgemma-2b-it",
+    "model_type": "Not specified",
+    "name": "recurrentgemma-2b-it",
+    "release_date": "2024-04-08 (Hugging Face repository creation date)",
+    "summary": "The 2B instruction-tuned version of the RecurrentGemma open language model family.",
+    "version": "2766eb5d4264c6c0357803990791f9ab9cd50f8e"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "recurrentgemma"
+  },
+  "links": {
+    "citation": "@article{recurrentgemma_2024,\n    title={RecurrentGemma},\n    url={},\n    DOI={},\n    publisher={Kaggle},\n    author={Griffin Team, Soham De, Samuel L Smith, Anushan Fernando, Alex Botev, George-Christian Muraru, Ruba Haroun, Leonard Berrada et al.},\n    year={2024}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/google/recurrentgemma-2b-it",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Gated access and license restrict external inspection of the checkpoint, and the card does not disclose model internals or detailed evaluation data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card only says RecurrentGemma was trained on the same data and processing as Gemma, without documenting collection, curation, or composition for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card identifies the model as instruction-tuned text-to-text but does not define intended or prohibited uses, leaving downstream risk scope unspecified.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "5.0 GiB of safetensors weights (5,365,782,552 bytes) in BF16",
+    "num_parameters": "2,682,862,080 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This is the 2B instruction-tuned version of RecurrentGemma.",
+    "data_cutoff": "Not specified",
+    "training_data": "RecurrentGemma was trained on the same data and with the same data processing as the Gemma model family.",
+    "training_data_size": "Not specified"
+  }
+}

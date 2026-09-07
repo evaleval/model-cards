@@ -1,0 +1,71 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "10 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "sumink (Hub organization)",
+    "license": "Not specified",
+    "model_id": "sumink/bbhqwen6",
+    "model_type": "Adjective ordering classification",
+    "name": "bbhqwen6",
+    "release_date": "2025-02-25 (Hugging Face repository creation date)",
+    "summary": "A fine-tuned Qwen2.5-3B model for the BBH Hyperbaton adjective ordering task.",
+    "version": "1b75baaea3ec9cabe8998ea5f3ee2cdb60d3de27"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5-3B"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/sumink/bbhqwen6",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Evasion attack",
+        "description": "Evasion attacks attempt to make a model output incorrect results by slightly perturbing the input data sent to the trained model.",
+        "justification": "The checkpoint is a fine-tuned classifier for the BBH Hyperbaton adjective ordering task; evasion attacks that slightly perturb input word order or phrasing could make the model output incorrect adjective-ordering classifications.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/evasion-attack.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "The card reports only a narrow adjective-ordering classification task with no accuracy or uncertainty metrics, so users may over-trust its outputs in downstream grammar/style decisions or under-trust it without stated performance evidence.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      },
+      {
+        "category": "Incorrect risk testing",
+        "description": "A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context.",
+        "justification": "The card summary provides no reported evaluations or risk metrics for this exact checkpoint, so any risk assessment based on the card would be incomplete or potentially measuring the wrong risk for the narrow task.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": "Not specified",
+    "model_size": "11.5 GiB of safetensors weights (12,343,804,032 bytes) in F32",
+    "num_parameters": "3,085,938,688 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

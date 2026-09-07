@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "10,799 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "46 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "The developer reports an MT-Bench average score of 5.4 for this model.",
+    "results_summary": "The developer reports strong performance on reasoning, language understanding, instruction following, code, and mathematics tasks.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "tiiuae (Hub organization)",
+    "license": "other",
+    "model_id": "tiiuae/Falcon3-1B-Instruct",
+    "model_type": "Transformer-based causal decoder-only architecture.",
+    "name": "Falcon3-1B-Instruct",
+    "release_date": "2024-12-14 (Hugging Face repository creation date)",
+    "summary": "Falcon3-1B-Instruct is an instruction-tuned language model focused on reasoning, language understanding, instruction following, code, and mathematics.",
+    "version": "28ba2251970a01dd1edc7ba7dad2eb71216ccfdf"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "tiiuae/Falcon3-1B-Base",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Falcon3"
+  },
+  "links": {
+    "citation": "@misc{Falcon3,\n    title = {The Falcon 3 Family of Open Models},\n    url = {https://huggingface.co/blog/falcon3},\n    author = {Falcon-LLM Team},\n    month = {December},\n    year = {2024}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/tiiuae/Falcon3-1B-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "3.1 GiB of safetensors weights (3,338,836,632 bytes) in BF16",
+    "num_parameters": "1,669,408,768 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Falcon3-1B-Instruct was post-trained on 1.2 million samples covering STEM, conversational, code, safety, and function call data.",
+    "training_data_size": "1.2 million samples"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "12 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "JayHyeon (Hub organization)",
+    "license": "Not specified",
+    "model_id": "JayHyeon/Qwen2.5-0.5B-SFT-2e-5-2ep-IRPO_5e-7-1ep_1alp_0lam",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-0.5B-SFT-2e-5-2ep-IRPO_5e-7-1ep_1alp_0lam",
+    "release_date": "2025-01-02 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "a0422084edb424f6b97840b66a28dfb42ea159b0"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/JayHyeon/Qwen2.5-0.5B-SFT-2e-5-2ep-IRPO_5e-7-1ep_1alp_0lam",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": "Not specified",
+    "model_size": "1.8 GiB of safetensors weights (1,976,161,736 bytes) in F32",
+    "num_parameters": "494,032,768 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

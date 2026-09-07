@@ -1,0 +1,107 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "19 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "jaspionjader (Hub organization)",
+    "license": "Not specified",
+    "model_id": "jaspionjader/bh-34",
+    "model_type": "Not specified",
+    "name": "bh-34",
+    "release_date": "2025-02-03 (Hugging Face repository creation date)",
+    "summary": "bh-34 is a merge of pre-trained language models created with mergekit.",
+    "version": "5531fc28cf18d5e80ea4373e551df6cb0ada096a"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/bh-30",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/bh-31",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/bh-32",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jaspionjader/bh-33",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/jaspionjader/bh-34",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card only states that bh-34 is a merge of pre-trained language models created with mergekit, with no documentation of design, development, or evaluation process.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card does not report how training data for the merged components was collected, curated, or used, so training data transparency is lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Inaccessible training data",
+        "description": "Without access to the training data, the types of explanations a model can provide are limited and more likely to be incorrect.",
+        "justification": "No training data access is provided for the merged model, limiting explanations of its outputs.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/inaccessible-training-data.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "Because the card gives no training data content or provenance, outputs cannot be traced to specific training sources.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card describes only input/output text and architecture, with no intended-use definition, so relevant risks are undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge created with the Model Stock merge method, using jaspionjader/bh-30 as the base. The merge included jaspionjader/bh-31, jaspionjader/bh-33, and jaspionjader/bh-32.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

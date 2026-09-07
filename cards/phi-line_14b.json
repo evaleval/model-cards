@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "78 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "19 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports the model is substantially more intelligent than its base, while noting a trade-off in reduced creativity and a less unpredictable tone.",
+    "safety_evals": "The developer reports low refusal rates in roleplay and assistant tasks, describing the model as permissive in roleplay contexts."
+  },
+  "identity": {
+    "developed_by": "SicariusSicariiStuff (Hub organization)",
+    "license": "mit",
+    "model_id": "SicariusSicariiStuff/Phi-Line_14B",
+    "model_type": "Role-play, creative writing, and general tasks.",
+    "name": "Phi-Line_14B",
+    "release_date": "2025-02-17 (Hugging Face repository creation date)",
+    "summary": "A roleplay-focused model with strong general task performance.",
+    "version": "eae63cb78aa4366bfa61f2d04af350eb567d50fc"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "microsoft/phi-4",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Phi Line"
+  },
+  "links": {
+    "citation": "@llm{Phi-Line_14B,\n  author = {SicariusSicariiStuff},\n  title = {Phi-Line_14B},\n  year = {2025},\n  publisher = {Hugging Face},\n  url = {https://huggingface.co/SicariusSicariiStuff/Phi-Line_14B}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/SicariusSicariiStuff/Phi-Line_14B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "16,384 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "Text input",
+      "Text output"
+    ],
+    "model_size": "27.3 GiB of safetensors weights (29,319,057,064 bytes) in BF16",
+    "num_parameters": "14,659,507,200 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was trained with the same training parameters used for Phi-lthy.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was trained on the same dataset used for Phi-lthy.",
+    "training_data_size": "Not specified"
+  }
+}

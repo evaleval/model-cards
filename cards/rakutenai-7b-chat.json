@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "244 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "67 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Rakuten (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Rakuten/RakutenAI-7B-chat",
+    "model_type": "Not specified",
+    "name": "RakutenAI-7B-chat",
+    "release_date": "2024-03-18 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "7093167c61a0be6161cb68928c939c03fe0ab87d"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Rakuten/RakutenAI-7B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "RakutenAI"
+  },
+  "links": {
+    "citation": "@misc{rakutengroup2024rakutenai7b,\n      title={RakutenAI-7B: Extending Large Language Models for Japanese}, \n      author={{Rakuten Group, Inc.} and Aaron Levine and Connie Huang and Chenguang Wang and Eduardo Batista and Ewa Szymanska and Hongyi Ding and Hou Wei Chou and Jean-François Pessiot and Johanes Effendi and Justin Chiu and Kai Torben Ohlhus and Karan Chopra and Keiji Shinzato and Koji Murakami and Lee Xiong and Lei Chen and Maki Kubota and Maksim Tkachenko and Miroku Lee and Naoki Takahashi and Prathyusha Jwalapuram and Ryutaro Tatsushima and Saurabh Jain and Sunil Kumar Yadav and Ting Cai and Wei-Te Chen and Yandi Xia and Yuki Nakayama and Yutaka Higashiyama},\n      year={2024},\n      eprint={2403.15484},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Rakuten/RakutenAI-7B-chat",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "13.7 GiB of safetensors weights (14,745,642,040 bytes) in BF16",
+    "num_parameters": "7,372,804,096 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "RakutenAI-7B-instruct and RakutenAI-7B-chat were created by fine-tuning the foundation model on a mix of open-source and internally hand-crafted datasets. The instruction-tuned and chat-tuned models used the train portions of JSNLI, RTE, KUCI, BELEBELE, JCS, JNLI, Dolly-15K, and OpenAssistant1.",
+    "training_data_size": "Not specified"
+  }
+}

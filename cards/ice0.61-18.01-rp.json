@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "11 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "icefog72 (Hub organization)",
+    "license": "Not specified",
+    "model_id": "icefog72/Ice0.61-18.01-RP",
+    "model_type": "Not specified",
+    "name": "Ice0.61-18.01-RP",
+    "release_date": "2025-01-18 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "de7284f12936f199f64446577efcf9bfc3373cfb"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Ice0.61 18.01 RP"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/icefog72/Ice0.61-18.01-RP",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card only states that the checkpoint is a merge of two pre-trained models using mergekit SLERP, with no documentation of design, development, or evaluation details.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card does not document training or tuning dataset details for this checkpoint; it only names the two merged models.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "The card provides no information about the origin, ownership, or usage terms of the data used to train the merged component models.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card gives no intended-use or usage scope for the model, only that it is a text-to-text decoder-only merge.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "13.5 GiB of safetensors weights (14,483,498,032 bytes) in BF16",
+    "num_parameters": "7,241,732,096 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was merged using the SLERP merge method, combining the models Ice0.55-17.01-RP and Ice0.58-18.01-RP.",
+    "data_cutoff": "Not specified",
+    "training_data": "This checkpoint is a merge of two pre-trained language models, Ice0.55-17.01-RP and Ice0.58-18.01-RP, created using mergekit.",
+    "training_data_size": "Not specified"
+  }
+}

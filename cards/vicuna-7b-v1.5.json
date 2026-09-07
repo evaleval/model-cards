@@ -1,0 +1,62 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "35,147 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "402 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "lmsys (Hub organization)",
+    "license": "llama2",
+    "model_id": "lmsys/vicuna-7b-v1.5",
+    "model_type": "Not specified",
+    "name": "vicuna-7b-v1.5",
+    "release_date": "2023-07-29 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "3321f76e3f527bd14065daf69dad9344000a201d"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "vicuna v1.5"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "https://github.com/lm-sys/FastChat",
+    "model_card": "https://huggingface.co/lmsys/vicuna-7b-v1.5",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "open-weight checkpoint card provides only architecture and license, with no reported training data, evaluation, or safety documentation",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "Not specified",
+    "num_parameters": "Not specified",
+    "precision": "Not specified"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

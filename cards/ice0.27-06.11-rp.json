@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "18 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "icefog72 (Hub organization)",
+    "license": "Not specified",
+    "model_id": "icefog72/Ice0.27-06.11-RP",
+    "model_type": "Not specified",
+    "name": "Ice0.27-06.11-RP",
+    "release_date": "2024-11-06 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "f2c78e71b59e0d36475217e3f265bc135f7c8505"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Ice0.27 06.11 RP"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/icefog72/Ice0.27-06.11-RP",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "13.5 GiB of safetensors weights (14,483,498,032 bytes) in BF16",
+    "num_parameters": "7,241,732,096 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge created with the SLERP merge method. The merge included the models Ice0.15-06.11-RP-orpo and IceSakeV12.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

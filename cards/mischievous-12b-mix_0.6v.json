@@ -1,0 +1,79 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "14 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "bamec66557 (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "bamec66557/MISCHIEVOUS-12B-Mix_0.6v",
+    "model_type": "Not specified",
+    "name": "MISCHIEVOUS-12B-Mix_0.6v",
+    "release_date": "2024-12-19 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "62920dbb46420a1ab2a4bdbca49d9212683bbef3"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "bamec66557/MISCHIEVOUS-12B-Mix_0.4v",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bamec66557/MISCHIEVOUS-12B-Mix_III_IV_V",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "MISCHIEVOUS Mix 0.6v"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/bamec66557/MISCHIEVOUS-12B-Mix_0.6v",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Evasion attack",
+        "description": "Evasion attacks attempt to make a model output incorrect results by slightly perturbing the input data sent to the trained model.",
+        "justification": "text-only dense decoder-only model merged from pre-trained language models with no reported safety evaluation or input filtering -> evasion attacks on text inputs are plausible",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/evasion-attack.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "open-weight text-output model with no reported evaluations or usage guidance -> users may over- or under-rely on its outputs",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "1,024,000 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "22.8 GiB of safetensors weights (24,495,648,064 bytes) in BF16",
+    "num_parameters": "12,247,802,880 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge of bamec66557/MISCHIEVOUS-12B-Mix_III_IV_V and bamec66557/MISCHIEVOUS-12B-Mix_0.4v, produced with the SLERP merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

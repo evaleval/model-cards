@@ -1,0 +1,68 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "7,867 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "178 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "allenai (Hub organization)",
+    "license": "llama3.1",
+    "model_id": "allenai/Llama-3.1-Tulu-3-8B",
+    "model_type": "Not specified",
+    "name": "Llama-3.1-Tulu-3-8B",
+    "release_date": "2024-11-20 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "666943798adbde0b1aff34626007e26986a3c107"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "allenai/Llama-3.1-Tulu-3-8B-DPO",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Llama 3.1 Tulu 3"
+  },
+  "links": {
+    "citation": "@article{lambert2024tulu3,\n  title = {Tülu 3: Pushing Frontiers in Open Language Model Post-Training},\n  author = {\n    Nathan Lambert and \n    Jacob Morrison and \n    Valentina Pyatkin and \n    Shengyi Huang and \n    Hamish Ivison and \n    Faeze Brahman and \n    Lester James V. Miranda and \n    Alisa Liu and \n    Nouha Dziri and \n    Shane Lyu and \n    Yuling Gu and \n    Saumya Malik and \n    Victoria Graf and \n    Jena D. Hwang and \n    Jiangjiang Yang and\n    Ronan Le Bras and\n    Oyvind Tafjord and\n    Chris Wilhelm and\n    Luca Soldaini and \n    Noah A. Smith and \n    Yizhong Wang and \n    Pradeep Dasigi and \n    Hannaneh Hajishirzi\n  },\n  year = {2024},\n  email = {tulu@allenai.org}\n}",
+    "code_repository": "https://github.com/allenai/open-instruct",
+    "model_card": "https://huggingface.co/allenai/Llama-3.1-Tulu-3-8B",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2411.15124"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card summary provides only basic architecture, modality, and license information, with no reported evaluations, training data, or safety testing details, so the checkpoint lacks sufficient documentation for transparency.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,687,448 bytes) in BF16",
+    "num_parameters": "8,030,326,784 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

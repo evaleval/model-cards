@@ -1,0 +1,66 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "22 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "vonjack (Hub organization)",
+    "license": "Not specified",
+    "model_id": "vonjack/SmolLM2-1.7B-Merged",
+    "model_type": "Not specified",
+    "name": "SmolLM2-1.7B-Merged",
+    "release_date": "2024-11-18 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "232d54a335220b0d83d6036f6d8df3971d3e79bb"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "HuggingFaceTB/SmolLM2-1.7B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "SmolLM2 Merged"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/vonjack/SmolLM2-1.7B-Merged",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "3.2 GiB of safetensors weights (3,422,777,952 bytes) in BF16",
+    "num_parameters": "1,711,376,384 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

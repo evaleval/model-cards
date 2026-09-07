@@ -1,0 +1,121 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "20 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "4 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Khetterman (Hub organization)",
+    "license": "Not specified",
+    "model_id": "Khetterman/Kosmos-8B-v1",
+    "model_type": "Not specified",
+    "name": "Kosmos-8B-v1",
+    "release_date": "2024-11-22 (Hugging Face repository creation date)",
+    "summary": "Kosmos-8B-v1 is a merge of 14 models created with mergekit.",
+    "version": "16ad5242ca89c6901fae1f41033f00ce455f4be0"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Arkana08/LexiMaid-L3-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Arkana08/Mythorica-L3-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Casual-Autopsy/L3-Luna-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "IlyaGusev/saiga_llama3_8b",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Khetterman/CursedMatrix-8B-v9",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "SicariusSicariiStuff/LLAMA-3_8B_Unaligned_BETA",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "ZeroXClem/L3SAO-Mix-SuperHermes-NovaPurosani-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "ZeroXClem/Llama-3-Aetheric-Hermes-Lexi-Smaug-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "ZeroXClem/Llama3.1-TheiaFire-DarkFusion-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "aloobun/CosmicBun-8B-DPO",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bluuwhale/L3-SthenoMaidBlackroot-8B-V1",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "invisietch/L3.1-EtherealRainbow-v1.0-rc1-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "jeiku/Average_Normie_v3.69_8B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Kosmos v1"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Khetterman/Kosmos-8B-v1",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge of 14 models created using mergekit, with a multistep process and remerge with some model variations for best result.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

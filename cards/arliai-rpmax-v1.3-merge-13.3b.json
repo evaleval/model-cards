@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "14 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "win10 (Hub organization)",
+    "license": "Not specified",
+    "model_id": "win10/ArliAI-RPMax-v1.3-merge-13.3B",
+    "model_type": "merge of pre-trained language models",
+    "name": "merge",
+    "release_date": "2024-11-16 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "4d3ed351827f1afc1652e13aafeb1eae79b8f562"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "win10/ArliAI-RPMax-v1.3-merge-8B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "ArliAI RPMax v1.3 merge"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "https://github.com/cg123/mergekit",
+    "model_card": "https://huggingface.co/win10/ArliAI-RPMax-v1.3-merge-13.3B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "24.7 GiB of safetensors weights (26,529,958,536 bytes) in BF16",
+    "num_parameters": "13,264,949,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge produced with the passthrough merge method, combining the model win10/ArliAI-RPMax-v1.3-merge-8B. The merge process can adjust input model embedding matrices to match the output vocabulary and combines per-model embeddings according to the selected merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

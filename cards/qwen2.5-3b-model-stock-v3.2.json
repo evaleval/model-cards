@@ -1,0 +1,111 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "16 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "2 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "bunnycore (Hub organization)",
+    "license": "Not specified",
+    "model_id": "bunnycore/Qwen2.5-3B-Model-Stock-v3.2",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-3B-Model-Stock-v3.2",
+    "release_date": "2025-02-25 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "6deeacbec222c4d286936bcddd966d26a10939e9"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Qwen/Qwen2.5-3B-Instruct",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bunnycore/QwQen-3B-LCoT",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bunnycore/Qwen-2.5-3b-R1-lora_model-v.1",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bunnycore/Qwen-2.5-s1k-R1-lora-v1.1",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bunnycore/Qwen2.5-3B-Model-Stock-v2",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "bunnycore/Qwen2.5-3B-RP-Thinker-V2",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5 Model Stock v3.2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/bunnycore/Qwen2.5-3B-Model-Stock-v3.2",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only merge recipe and base model, with no reported evaluations, training data, or intended-use details for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Merge of multiple named models via mergekit; card does not document provenance or usage terms of the component models' training data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card does not state intended use or deployment context for the merged model, leaving downstream risk scope undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Lack of testing diversity",
+        "description": "AI model risks are socio-technical, so their testing needs input from a broad set of disciplines and diverse testing practices.",
+        "justification": "No evaluation or testing information is reported for this checkpoint, so socio-technical testing across disciplines is absent.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-testing-diversity.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "6.3 GiB of safetensors weights (6,792,036,960 bytes) in BF16",
+    "num_parameters": "3,395,993,600 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge created with mergekit using the Model Stock merge method, with Qwen/Qwen2.5-3B-Instruct as the base.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

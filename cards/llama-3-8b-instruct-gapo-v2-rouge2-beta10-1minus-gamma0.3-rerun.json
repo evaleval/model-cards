@@ -1,0 +1,92 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "19 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Jimmy19991222 (Hub organization)",
+    "license": "llama3",
+    "model_id": "Jimmy19991222/llama-3-8b-instruct-gapo-v2-rouge2-beta10-1minus-gamma0.3-rerun",
+    "model_type": "Not specified",
+    "name": "llama-3-8b-instruct-gapo-v2-rouge2-beta10-1minus-gamma0.3-rerun",
+    "release_date": "2024-09-14 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "e9692d8dbe30273839763757aa9ef07a5fcf0c59"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "meta-llama/Meta-Llama-3-8B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Jimmy19991222/llama-3-8b-instruct-gapo-v2-rouge2-beta10-1minus-gamma0.3-rerun",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides only architecture, modality, access, and license; no training data, evaluation, or development details are stated for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of testing diversity",
+        "description": "AI model risks are socio-technical, so their testing needs input from a broad set of disciplines and diverse testing practices.",
+        "justification": "No reported evaluations or testing practices are documented for this checkpoint, so testing diversity cannot be established.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-testing-diversity.html"
+      },
+      {
+        "category": "Unrepresentative risk testing",
+        "description": "Testing is unrepresentative when the test inputs are mismatched with the inputs that are expected during deployment.",
+        "justification": "No deployment context or evaluation data is described, so any risk testing would be unrepresentative relative to unspecified intended use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-risk-testing.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card does not state intended use or downstream tasks, leaving the relevant risk profile undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not describe training data collection, curation, or synthetic generation for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "Not specified",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

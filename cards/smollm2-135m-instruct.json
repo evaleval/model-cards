@@ -1,0 +1,134 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "1,350,354 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "413 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MT-Bench",
+        "metric": "Not specified",
+        "score": "19.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "40.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC",
+        "metric": "Not specified",
+        "score": "37.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "Not specified",
+        "score": "66.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "29.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "28.2",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "1.4",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "MTB",
+        "metric": "Not specified",
+        "score": "6.11",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "47.54",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "19.64",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-C",
+        "metric": "Not specified",
+        "score": "42.49",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "19.06",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "HuggingFaceTB (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "HuggingFaceTB/SmolLM2-135M-Instruct",
+    "model_type": "text-generation",
+    "name": "SmolLM2",
+    "release_date": "2024-10-31 (Hugging Face repository creation date)",
+    "summary": "SmolLM2 is a family of compact language models available in three sizes: 135M, 360M, and 1.7B parameters.",
+    "version": "12fd25f77366fa6b3b4b768ec3050bf629380bac"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "quantized",
+        "model_id": "HuggingFaceTB/SmolLM2-135M",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "SmolLM2"
+  },
+  "links": {
+    "citation": "@misc{allal2025smollm2smolgoesbig,\n      title={SmolLM2: When Smol Goes Big -- Data-Centric Training of a Small Language Model}, \n      author={Loubna Ben Allal and Anton Lozhkov and Elie Bakouch and Gabriel Martín Blázquez and Guilherme Penedo and Lewis Tunstall and Andrés Marafioti and Hynek Kydlíček and Agustín Piqueres Lajarín and Vaibhav Srivastav and Joshua Lochner and Caleb Fahlgren and Xuan-Son Nguyen and Clémentine Fourrier and Ben Burtenshaw and Hugo Larcher and Haojun Zhao and Cyril Zakka and Mathieu Morlon and Colin Raffel and Leandro von Werra and Thomas Wolf},\n      year={2025},\n      eprint={2502.02737},\n      archivePrefix={arXiv},\n      primaryClass={cs.CL},\n      url={https://arxiv.org/abs/2502.02737}, \n}",
+    "code_repository": "https://hf.co/collections/HuggingFaceTB/smollm2-6723884218bcda64b34d7db9",
+    "model_card": "https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2502.02737"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "0.3 GiB of safetensors weights (269,060,552 bytes) in BF16",
+    "num_parameters": "134,515,008 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The instruct version was developed through supervised fine-tuning (SFT) using public datasets and curated datasets, followed by Direct Preference Optimization (DPO) on UltraFeedback.",
+    "data_cutoff": "Not specified",
+    "training_data": "The instruct version was developed through supervised fine-tuning (SFT) using public datasets and curated datasets, followed by Direct Preference Optimization (DPO) on UltraFeedback.",
+    "training_data_size": "Not specified"
+  }
+}

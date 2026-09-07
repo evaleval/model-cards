@@ -1,0 +1,231 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "247,508 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "174 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "70.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU-Pro",
+        "metric": "Not specified",
+        "score": "40.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GPQA",
+        "metric": "Not specified",
+        "score": "31.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Theorem QA",
+        "metric": "Not specified",
+        "score": "31.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBH",
+        "metric": "Not specified",
+        "score": "62.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "80.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "77.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-C",
+        "metric": "Not specified",
+        "score": "60.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "54.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "51.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "65.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "EvalPlus",
+        "metric": "Not specified",
+        "score": "54.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MultiPL-E",
+        "metric": "Not specified",
+        "score": "46.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "79.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "44.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "83.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CMMLU",
+        "metric": "Not specified",
+        "score": "83.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Exam",
+        "metric": "Not specified",
+        "score": "59.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Understanding",
+        "metric": "Not specified",
+        "score": "72.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Mathematics",
+        "metric": "Not specified",
+        "score": "57.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Multi-Translation",
+        "metric": "Not specified",
+        "score": "31.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Exam",
+        "metric": "Not specified",
+        "score": "59.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Understanding",
+        "metric": "Not specified",
+        "score": "72.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Mathematics",
+        "metric": "Not specified",
+        "score": "57.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Translation",
+        "metric": "Not specified",
+        "score": "31.5",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that the Qwen2 family surpasses most prior open-weight models, including Qwen1.5, and is competitive with proprietary models across language understanding, generation, multilingual proficiency, coding, mathematics, and reasoning.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2-7B",
+    "model_type": "Not specified",
+    "name": "Qwen2-7B",
+    "release_date": "2024-06-04 (Hugging Face repository creation date)",
+    "summary": "Qwen2 is a series of base and instruction-tuned large language models in five sizes, including Qwen2-7B.",
+    "version": "453ed1575b739b5b03ce3758b23befdb0967f40e"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Qwen2"
+  },
+  "links": {
+    "citation": "@article{qwen2,\n  title={Qwen2 Technical Report},\n  year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2",
+    "model_card": "https://huggingface.co/Qwen/Qwen2-7B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only family-level benchmark claims and no model design, training-data, or evaluation details for this exact checkpoint, so its development/evaluation process is insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card states only that the family was pre-trained on 'over 7 trillion tokens' with no dataset composition, curation, or filtering details for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card says the base model is not recommended for direct text generation and that post-training should be applied, but does not define intended uses or misuse boundaries for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      },
+      {
+        "category": "Improper usage",
+        "description": "Improper usage occurs when a model is used for a purpose that it was not originally designed for.",
+        "justification": "Because the card explicitly warns that the base model is not recommended for direct text generation, using it directly for text generation would be an improper use.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/improper-usage.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,231,271,872 bytes) in BF16",
+    "num_parameters": "7,615,616,512 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The base language model is not recommended for direct text generation; post-training such as SFT, RLHF, or continued pretraining should be applied.",
+    "data_cutoff": "Not specified",
+    "training_data": "The Qwen2 family of dense models, excluding the 0.5B variant, was pre-trained on a large-scale dataset of over 7 trillion tokens.",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "0 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports a single evaluation loss of 1.0180 on the evaluation set. Broader benchmark comparisons in the source describe a different model family and are not attributed to this checkpoint.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "dwikitheduck (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "dwikitheduck/gen-inst-1",
+    "model_type": "Not specified",
+    "name": "gen-inst-1",
+    "release_date": "2024-11-18 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "7d90c00b735d18da65ebef8fd7e6d79a908c55b0"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-14B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "gen inst 1"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/dwikitheduck/gen-inst-1",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "text input",
+      "text output"
+    ],
+    "model_size": "27.5 GiB of safetensors weights (29,540,133,960 bytes) in BF16",
+    "num_parameters": "14,770,033,664 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "This checkpoint is a fine-tune of Qwen/Qwen2.5-14B-Instruct, trained on the dwikitheduck/genesist-inst dataset with completion-style examples.",
+    "training_data_size": "Not specified"
+  }
+}

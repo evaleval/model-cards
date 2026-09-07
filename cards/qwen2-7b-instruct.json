@@ -1,0 +1,207 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "388,915 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "687 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "TheroemQA",
+        "metric": "Not specified",
+        "score": "25.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MT-Bench",
+        "metric": "Not specified",
+        "score": "8.41",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Evalplus",
+        "metric": "Not specified",
+        "score": "70.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench",
+        "metric": "Not specified",
+        "score": "26.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C-Eval",
+        "metric": "Not specified",
+        "score": "77.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AlignBench",
+        "metric": "Not specified",
+        "score": "7.21",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Theorem QA",
+        "metric": "Not specified",
+        "score": "25.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "LiveCodeBench v1",
+        "metric": "Not specified",
+        "score": "26.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MixEval",
+        "metric": "Not specified",
+        "score": "76.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval strict-prompt",
+        "metric": "Not specified",
+        "score": "54.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Knowledge",
+        "metric": "Not specified",
+        "score": "61.54",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Knowledge",
+        "metric": "Not specified",
+        "score": "73.75",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Exam",
+        "metric": "Not specified",
+        "score": "66.66",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Comprehension",
+        "metric": "Not specified",
+        "score": "59.63",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Comprehension",
+        "metric": "Not specified",
+        "score": "63.09",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Coding",
+        "metric": "Not specified",
+        "score": "34.74",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Coding",
+        "metric": "Not specified",
+        "score": "36.41",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Reasoning",
+        "metric": "Not specified",
+        "score": "58.22",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "56.96",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Avg.",
+        "metric": "Not specified",
+        "score": "62.23",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval",
+        "metric": "Not specified",
+        "score": "54.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval",
+        "metric": "Not specified",
+        "score": "53.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "IFEval",
+        "metric": "Not specified",
+        "score": "-1.0",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "The developer states that Qwen2-7B-Instruct shows advantages over recently released state-of-the-art models, with especially strong performance on coding and Chinese-related metrics.",
+    "results_summary": "The developer reports that Qwen2-7B-Instruct remains competitive against recently released state-of-the-art models, with particularly strong results on coding and Chinese-language benchmarks. The model also handles contexts up to 128k tokens nearly flawlessly.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2-7B-Instruct",
+    "model_type": "Not specified",
+    "name": "Qwen2-7B-Instruct",
+    "release_date": "2024-06-04 (Hugging Face repository creation date)",
+    "summary": "An instruction-tuned 7B Qwen2 language model, part of a series that includes base and instruction-tuned models for chat and agent purposes; the 7B Instruct variant supports extended context lengths up to 128K tokens.",
+    "version": "f2826a00ceef68f0f2b946d945ecc0477ce4450c"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2-7B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2"
+  },
+  "links": {
+    "citation": "@article{qwen2,\n  title={Qwen2 Technical Report},\n  year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2",
+    "model_card": "https://huggingface.co/Qwen/Qwen2-7B-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2407.10671"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "instruction-tuned chat model with reported strong coding/Chinese benchmarks but no reported factuality or grounding evaluation -> hallucination risk in open-ended text generation",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,231,271,872 bytes) in BF16",
+    "num_parameters": "7,615,616,512 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was post-trained with supervised fine-tuning and direct preference optimization after pretraining on a large corpus.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

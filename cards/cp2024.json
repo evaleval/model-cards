@@ -1,0 +1,86 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "22 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "cpayne1303 (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "cpayne1303/cp2024",
+    "model_type": "Not specified",
+    "name": "cp2024",
+    "release_date": "2024-11-26 (Hugging Face repository creation date)",
+    "summary": "A small model built on the llama2 architecture with 30 million parameters.",
+    "version": "fc88418dbee4f93305e0165aff266e43498314c8"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "llama2"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/cpayne1303/cp2024",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card states only 'uncleaned C4 English dataset' and 'first 1,000,000 rows' with no dataset composition or preprocessing details, so training data details are insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Unrepresentative data",
+        "description": "Unrepresentative data occurs when the training or fine-tuning data is not sufficiently representative of the underlying population or does not measure the phenomenon of interest. Synthetic data might not fully capture the complexity and nuances of real-world data. Causes include possible limitations in the seed data quality, biases in generation methods, or inadequate domain knowledge. Thus, AI models might struggle to generalize effectively to real-world scenarios.",
+        "justification": "Training on the first 1,000,000 rows of uncleaned C4 English is a non-random slice of web text, so it may not represent broader English usage or downstream populations.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-data.html"
+      },
+      {
+        "category": "Data bias",
+        "description": "Historical and societal biases might be present in data that are used to train and fine-tune models. Biases can also be inherited from seed data or exacerbated by synthetic data generation methods.",
+        "justification": "Using uncleaned C4 English web data without stated cleaning or debiasing plausibly carries historical and societal biases from that source.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-bias.html"
+      },
+      {
+        "category": "Data contamination",
+        "description": "Data contamination occurs when incorrect data is used for training. For example, data that is not aligned with model's purpose or data that is already set aside for other development tasks such as testing and evaluation.",
+        "justification": "The card reports no evaluation set or filtering; training on the first 1,000,000 rows of C4 could include benchmark or test content, and no contamination check is documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-contamination.html"
+      },
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card gives architecture and data scale but no training/evaluation details or inner-workings insights, so model design and development documentation is insufficient.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "512 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "0.1 GiB of safetensors weights (62,345,936 bytes) in BF16",
+    "num_parameters": "31,168,896 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The checkpoint was trained on about 2 billion tokens drawn from the first 1,000,000 rows of the uncleaned C4 English dataset.",
+    "training_data_size": "Approximately 2 billion tokens."
+  }
+}

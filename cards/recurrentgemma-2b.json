@@ -1,0 +1,261 @@
+{
+  "access_and_adoption": {
+    "access_type": "gated",
+    "downloads": "2,924 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "99 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "top-1",
+        "score": "38.4",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "71.0",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "PIQA",
+        "metric": "Not specified",
+        "score": "78.5",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "SocialIQA",
+        "metric": "Not specified",
+        "score": "51.8",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "BoolQ",
+        "metric": "Not specified",
+        "score": "71.3",
+        "setting": "0-shot"
+      },
+      {
+        "benchmark": "WinoGrande",
+        "metric": "score",
+        "score": "67.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CommonsenseQA",
+        "metric": "Not specified",
+        "score": "63.7",
+        "setting": "7-shot"
+      },
+      {
+        "benchmark": "OpenBookQA",
+        "metric": "Not specified",
+        "score": "51.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-e",
+        "metric": "Not specified",
+        "score": "78.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "ARC-c",
+        "metric": "Not specified",
+        "score": "52.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TriviaQA",
+        "metric": "Not specified",
+        "score": "52.5",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "Natural Questions",
+        "metric": "Not specified",
+        "score": "11.5",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "pass@1",
+        "score": "21.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "28.8",
+        "setting": "3-shot"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "13.4",
+        "setting": "maj@1"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "11.0",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "AGIEval",
+        "metric": "Not specified",
+        "score": "39.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BIG-Bench",
+        "metric": "Not specified",
+        "score": "55.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "56.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "RealToxicity",
+        "metric": "Not specified",
+        "score": "9.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BOLD",
+        "metric": "Not specified",
+        "score": "52.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "CrowS-Pairs",
+        "metric": "top-1",
+        "score": "41.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBQ Ambig",
+        "metric": "top-1",
+        "score": "62.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BBQ Disambig",
+        "metric": "top-1",
+        "score": "58.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogender",
+        "metric": "top-1",
+        "score": "55.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TruthfulQA",
+        "metric": "Not specified",
+        "score": "42.7",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoBias 12",
+        "metric": "Not specified",
+        "score": "56.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "WinoBias 22",
+        "metric": "Not specified",
+        "score": "75.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Toxigen",
+        "metric": "Not specified",
+        "score": "50.0",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that RecurrentGemma models perform comparably to Gemma models while being faster during inference and requiring less memory, especially on long sequences.",
+    "safety_evals": "The developer states that ethics and safety evaluation results are within acceptable thresholds for internal policies covering child safety, content safety, representational harms, memorization, and large-scale harms."
+  },
+  "identity": {
+    "developed_by": "google (Hub organization)",
+    "license": "gemma",
+    "model_id": "google/recurrentgemma-2b",
+    "model_type": "Not specified",
+    "name": "recurrentgemma-2b",
+    "release_date": "2024-04-06 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "3620f4ca9c5d16ee56c00180474a3201ec7f734a"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "recurrentgemma"
+  },
+  "links": {
+    "citation": "@article{recurrentgemma_2024,\n    title={RecurrentGemma},\n    url={},\n    DOI={},\n    publisher={Kaggle},\n    author={Griffin Team, Alexsandar Botev and Soham De and Samuel L Smith and Anushan Fernando and George-Christian Muraru and Ruba Haroun and Leonard Berrada et al.},\n    year={2024}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/google/recurrentgemma-2b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "gated base text model trained on the same data as Gemma with no post-training or alignment described -> users may input copyrighted text into prompts, and the card does not describe mitigation for IP in prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Confidential data in prompt",
+        "description": "Confidential information might be included as a part of the prompt that is sent to the model.",
+        "justification": "gated base text model with no post-training or alignment described -> users may input confidential information into prompts, and the card does not describe mitigation for confidential data in prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-data-in-prompt.html"
+      },
+      {
+        "category": "Hallucination",
+        "description": "Hallucinations generate factually inaccurate or untruthful content relative to the model's training data or input. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality. Hallucinations can compromise model performance, accuracy, and relevance.",
+        "justification": "base text-generation model trained on large web-scale data with no post-training or alignment described -> may generate factually inaccurate or ungrounded text",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "base text model with no post-training or alignment described and only developer-reported safety evaluations -> users may over-trust its outputs in downstream decision-making without evidence of reliability",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      },
+      {
+        "category": "Incorrect risk testing",
+        "description": "A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context.",
+        "justification": "reported safety evaluations are only stated to be within internal thresholds for broad categories, with no metrics or details provided -> the card's risk testing may not fully measure the relevant risks",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "Not specified",
+    "context_length": "Not specified",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "10.0 GiB of safetensors weights (10,731,506,136 bytes) in F32",
+    "num_parameters": "2,682,862,080 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This is the 2B base version of RecurrentGemma, so no post-training or alignment is described for this checkpoint.",
+    "data_cutoff": "Not specified",
+    "training_data": "The 2B base RecurrentGemma checkpoint was trained on the same data and with the same processing as the Gemma model family.",
+    "training_data_size": "Not specified"
+  }
+}

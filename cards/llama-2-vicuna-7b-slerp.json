@@ -1,0 +1,85 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "27 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "laislemke (Hub organization)",
+    "license": "llama2",
+    "model_id": "laislemke/LLaMA-2-vicuna-7b-slerp",
+    "model_type": "Not specified",
+    "name": "LLaMA-2-vicuna-7b-slerp",
+    "release_date": "2024-07-03 (Hugging Face repository creation date)",
+    "summary": "LLaMA-2-vicuna-7b-slerp is a merge of lmsys/vicuna-7b-v1.5 and togethercomputer/LLaMA-2-7B-32K created with LazyMergekit.",
+    "version": "610a00e5e1c0c9bce6378820c3b76f69162b4bf5"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "lmsys/vicuna-7b-v1.5",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "togethercomputer/LLaMA-2-7B-32K",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "LLaMA 2 vicuna slerp"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/laislemke/LLaMA-2-vicuna-7b-slerp",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only merge recipe and architecture; no training data, evaluation, or development details for this exact checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "Merge of two open-weight models with no stated provenance or verification of the underlying training data lineage.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card does not define intended use or deployment context for this text-to-text merged model.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "12.6 GiB of safetensors weights (13,476,864,936 bytes) in BF16",
+    "num_parameters": "6,738,415,616 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This checkpoint is a merge of LLaMA-2-vicuna-7b-slerp and other models, created using LazyMergekit with the slerp merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

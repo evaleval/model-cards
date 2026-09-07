@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "112 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "10 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "The developer reports that in German RAG evaluation the model is on par with 8-billion-parameter models and, at 1.5 billion parameters, is well-suited for mobile deployment on smartphones and tablets.",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "VAGOsolutions (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "VAGOsolutions/SauerkrautLM-1.5b",
+    "model_type": "A finetuned model based on Qwen/Qwen2-1.5B.",
+    "name": "VAGO solutions SauerkrautLM-1.5b",
+    "release_date": "2024-06-12 (Hugging Face repository creation date)",
+    "summary": "SauerkrautLM-1.5b is a finetuned version of Qwen/Qwen2-1.5B.",
+    "version": "8f5170f03e6b0355dd920adc3a7e65d0417ee14e"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "SauerkrautLM"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/VAGOsolutions/SauerkrautLM-1.5b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card reports only high-level training data (German CPT, 700K SFT, 70K DPO) and no details on data sources, curation, or evaluation methodology, so design/development transparency is limited.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "The card states German-language continuous pretraining and SFT/DPO sample counts but does not document the training/tuning dataset contents, sources, or curation details.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "The card does not describe where the German CPT, SFT, or DPO data came from or their usage terms, so data origin and traceability are uncertain.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Unrepresentative data",
+        "description": "Unrepresentative data occurs when the training or fine-tuning data is not sufficiently representative of the underlying population or does not measure the phenomenon of interest. Synthetic data might not fully capture the complexity and nuances of real-world data. Causes include possible limitations in the seed data quality, biases in generation methods, or inadequate domain knowledge. Thus, AI models might struggle to generalize effectively to real-world scenarios.",
+        "justification": "The card claims German RAG performance on par with 8B models but does not report evaluation breadth or data coverage, so generalization beyond that setting is unclear.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-data.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "2.9 GiB of safetensors weights (3,087,467,144 bytes) in BF16",
+    "num_parameters": "1,543,714,304 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was fine-tuned with supervised fine-tuning (SFT) on 700K samples over 3 epochs, then aligned with direct preference optimization (DPO) on 70K samples.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model is a German-language continuous pretraining of the base model, using Spectrum CPT on 25% of layers.",
+    "training_data_size": "6.1 billion German tokens"
+  }
+}

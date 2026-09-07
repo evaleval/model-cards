@@ -1,0 +1,159 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "1,652 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "29 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "0.43",
+        "setting": "zero shot"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "0.50",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "Arc challenge",
+        "metric": "Not specified",
+        "score": "0.44",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Arc easy",
+        "metric": "Not specified",
+        "score": "0.71",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Boolq",
+        "metric": "Not specified",
+        "score": "0.76",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Copa",
+        "metric": "Not specified",
+        "score": "0.83",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Hellaswag",
+        "metric": "Not specified",
+        "score": "0.74",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Openbookqa",
+        "metric": "Not specified",
+        "score": "0.42",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Piqa",
+        "metric": "Not specified",
+        "score": "0.79",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Sciq",
+        "metric": "Not specified",
+        "score": "0.91",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Winogrande",
+        "metric": "Not specified",
+        "score": "0.67",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Truthfulqa",
+        "metric": "Not specified",
+        "score": "0.39",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8k",
+        "metric": "Not specified",
+        "score": "0.11",
+        "setting": "8-shot"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports evaluation results for the model across a range of benchmarks, including MMLU, ARC, Boolq, Copa, HellaSwag, Openbookqa, Piqa, Sciq, Winogrande, Truthfulqa, and GSM8k. Scores vary by task, with higher performance on Sciq and Copa and lower performance on GSM8k and Truthfulqa.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "ibm-granite (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "ibm-granite/granite-7b-base",
+    "model_type": "Not specified",
+    "name": "granite-7b-base",
+    "release_date": "2024-04-19 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "3694001fa74a2aa9a6eff07774cbcb68b73e78f2"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "granite"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/ibm-granite/granite-7b-base",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card reports only benchmark scores and architecture/access/license, with no documentation of design, development, training data, or evaluation process, so the checkpoint plausibly raises lack of model transparency.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Inaccessible training data",
+        "description": "Without access to the training data, the types of explanations a model can provide are limited and more likely to be incorrect.",
+        "justification": "The card summary does not provide access to training data, so explanations of model outputs are limited and more likely to be incorrect.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/inaccessible-training-data.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "The card summary does not disclose training data content, so the content used to generate outputs is not accessible/traceable.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card summary lacks information about how training data was collected, curated, or used, making model behavior harder to explain.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "25.1 GiB of safetensors weights (26,953,696,096 bytes) in F32",
+    "num_parameters": "6,738,415,616 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

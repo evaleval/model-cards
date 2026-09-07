@@ -1,0 +1,102 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "18 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "marcuscedricridia (Hub organization)",
+    "license": "Not specified",
+    "model_id": "marcuscedricridia/r1o-et",
+    "model_type": "Not specified",
+    "name": "r1o-et",
+    "release_date": "2025-03-02 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "a8ab5a8e1b27d0ac3cca9e60f40a09bc0ce547db"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "huihui-ai/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "marcuscedricridia/cursa-o1-7b",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "suayptalha/Clarus-7B-v0.2",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "r1o et"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/marcuscedricridia/r1o-et",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only mergekit recipe and base components, with no reported evaluations or training-data details for this exact checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of data transparency",
+        "description": "Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation. ",
+        "justification": "Card names the merged source models but does not document their training datasets or any synthetic data generation details.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html"
+      },
+      {
+        "category": "Inaccessible training data",
+        "description": "Without access to the training data, the types of explanations a model can provide are limited and more likely to be incorrect.",
+        "justification": "The checkpoint is a merge of pre-trained models; the underlying training data is not accessible from the card, limiting explanation of outputs.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/inaccessible-training-data.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "Because the training data of the merged components is not accessible, content provenance for generated outputs cannot be traced.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "Card states only that it is a text-to-text model merge, with no intended-use or misuse definition.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,225,652,144 bytes) in BF16",
+    "num_parameters": "7,612,806,656 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge created with mergekit, using the Linear DARE merge method with marcuscedricridia/cursa-o1-7b as the base.",
+    "data_cutoff": "Not specified",
+    "training_data": "The target checkpoint is a merge of pre-trained language models; the merge included huihui-ai/DeepSeek-R1-Distill-Qwen-7B-abliterated-v2 and suayptalha/Clarus-7B-v0.2.",
+    "training_data_size": "Not specified"
+  }
+}

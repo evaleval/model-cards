@@ -1,0 +1,83 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "23 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "win10 (Hub organization)",
+    "license": "Not specified",
+    "model_id": "win10/Qwen2.5-2B-Instruct",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-2B-Instruct",
+    "release_date": "2024-10-11 (Hugging Face repository creation date)",
+    "summary": "The model is a merge of several models created with LazyMergekit.",
+    "version": "6cc7fca3447d50772978d2d7dec255abdc73d54b"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/win10/Qwen2.5-2B-Instruct",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card only states the model is a merge created with LazyMergekit and gives no training data, evaluation, or development details, so the checkpoint itself lacks transparency.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card does not document how the merged model's training data was collected, curated, or used, so training data transparency is lacking for this checkpoint.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Lack of testing diversity",
+        "description": "AI model risks are socio-technical, so their testing needs input from a broad set of disciplines and diverse testing practices.",
+        "justification": "The card reports no evaluations or testing practices for this merged checkpoint, so there is no evidence of diverse socio-technical testing.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-testing-diversity.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card gives no intended-use or usage definition for this merged model, leaving downstream risk assessment underspecified.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": "Not specified",
+    "model_size": "5.4 GiB of safetensors weights (5,800,542,152 bytes) in BF16",
+    "num_parameters": "2,900,235,776 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge of other models, created using LazyMergekit.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

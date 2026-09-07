@@ -1,0 +1,92 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "14 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "ehristoforu (Hub organization)",
+    "license": "Not specified",
+    "model_id": "ehristoforu/QwenQwen2.5-7B-IT-Dare",
+    "model_type": "Not specified",
+    "name": "QwenQwen2.5-7B-IT-Dare",
+    "release_date": "2025-01-29 (Hugging Face repository creation date)",
+    "summary": "A merged language model created with mergekit, combining pre-trained models.",
+    "version": "376d1c82e6fd973fb927f8540535d39e8f4c6168"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-7B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/ehristoforu/QwenQwen2.5-7B-IT-Dare",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card gives only merge recipe (DARE TIES, base Qwen/Qwen2.5-7B-Instruct) and no evaluation or training-data details for this checkpoint, so inner workings and development/evaluation process are undocumented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card does not document how the constituent models' training data were collected, curated, or used; it only names the base model and merge method.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Inaccessible training data",
+        "description": "Without access to the training data, the types of explanations a model can provide are limited and more likely to be incorrect.",
+        "justification": "The merged model's training data are not accessible from the card; only the base model name and merge method are given, limiting data-based explanations of outputs.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/inaccessible-training-data.html"
+      },
+      {
+        "category": "Untraceable attribution",
+        "description": "The content of the training data used for generating the model's output is not accessible.",
+        "justification": "Because the card only states that the model is a DARE TIES merge of multiple pre-trained models, the content of the training data behind generated outputs is not traceable.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/untraceable-attribution.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card defines no intended uses or use limitations for this open-weight text-in/text-out model, so relevant risks cannot be scoped to a specific deployment.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,225,551,456 bytes) in F16",
+    "num_parameters": "7,612,756,480 parameters (safetensors metadata)",
+    "precision": "F16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was merged using the DARE TIES merge method, with Qwen/Qwen2.5-7B-Instruct as the base model.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model is a merge of multiple models, produced using the DARE TIES merge method with Qwen/Qwen2.5-7B-Instruct as the base.",
+    "training_data_size": "Not specified"
+  }
+}

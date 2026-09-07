@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "29 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "4 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "prithivMLmods (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "prithivMLmods/Gauss-Opus-14B-R999",
+    "model_type": "text-generation",
+    "name": "**Gauss-Opus-14B-R999**",
+    "release_date": "2025-03-03 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "9afffe850012930627d52009505314f52b66f08c"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-14B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Gauss Opus R999"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/prithivMLmods/Gauss-Opus-14B-R999",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "27.5 GiB of safetensors weights (29,540,133,904 bytes) in BF16",
+    "num_parameters": "14,770,033,664 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a fine-tune using specialized datasets in mathematics, physics, and formal logic, with an emphasis on structured, high-accuracy outputs.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was fine-tuned on specialized datasets in mathematics, physics, and formal logic.",
+    "training_data_size": "Not specified"
+  }
+}

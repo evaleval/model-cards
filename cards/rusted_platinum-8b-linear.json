@@ -1,0 +1,107 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "18 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "DreadPoor (Hub organization)",
+    "license": "Not specified",
+    "model_id": "DreadPoor/Rusted_Platinum-8B-LINEAR",
+    "model_type": "Not specified",
+    "name": "Rusted_Platinum-8B-LINEAR",
+    "release_date": "2025-03-06 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "f5f5afcf6613327ba43343b0b3a099be5333a733"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "FuseAI/FuseChat-Llama-3.1-8B-SFT",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Sao10K/L3-8B-Stheno-v3.2",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "kik41/lora-sarcasm-more-llama-3-8b-v2",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "kik41/lora-type-expository-llama-3-8b-v2",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Rusted Platinum LINEAR"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/DreadPoor/Rusted_Platinum-8B-LINEAR",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Evasion attack",
+        "description": "Evasion attacks attempt to make a model output incorrect results by slightly perturbing the input data sent to the trained model.",
+        "justification": "open-weight text-to-text model with no reported safety evaluation or robustness testing -> evasion attacks on downstream tasks",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/evasion-attack.html"
+      },
+      {
+        "category": "Over- or under-reliance",
+        "description": "In AI-assisted decision-making tasks, reliance measures how much a person trusts (and potentially acts on) a model's output. Over-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect. Under-reliance is the opposite, where the person doesn't trust the model but should.",
+        "justification": "open-weight base/chat model with no reported safety evaluation or calibration -> users may over-trust outputs in downstream decision-making",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html"
+      },
+      {
+        "category": "Confidential data in prompt",
+        "description": "Confidential information might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight model with no stated data handling or privacy safeguards -> users may paste confidential text into prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-data-in-prompt.html"
+      },
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight model with no stated IP safeguards -> users may include copyrighted text in prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Legal accountability",
+        "description": "Determining who is responsible for an AI model is challenging without good documentation and governance processes. The use of synthetic data in model development adds further complexity, since the lack of standardized frameworks for recording synthetic data design choices and verification steps makes accountability harder to establish.",
+        "justification": "open-weight checkpoint card lacks documentation of training data, evaluations, and governance -> accountability for outputs is unclear",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/legal-accountability.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "398 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "22 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "85.37",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP",
+        "metric": "Not specified",
+        "score": "74.32",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "GSM8K",
+        "metric": "Not specified",
+        "score": "93.10",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH",
+        "metric": "Not specified",
+        "score": "76.40",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "74.68",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU Pro",
+        "metric": "Not specified",
+        "score": "54.50",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "76.40",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "nvidia (Hub organization)",
+    "license": "cc-by-nc-4.0",
+    "model_id": "nvidia/AceInstruct-7B",
+    "model_type": "text-generation",
+    "name": "AceInstruct-7B",
+    "release_date": "2025-01-15 (Hugging Face repository creation date)",
+    "summary": "AceInstruct is a family of supervised fine-tuned models for coding, mathematics, and general-purpose tasks.",
+    "version": "3bbb14f63afd2dc890c7932bfffb4f6dc3bfa1e8"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "AceInstruct"
+  },
+  "links": {
+    "citation": "@article{acemath2024,\n  title={AceMath: Advancing Frontier Math Reasoning with Post-Training and Reward Modeling},\n  author={Liu, Zihan and Chen, Yang and Shoeybi, Mohammad and Catanzaro, Bryan and Ping, Wei},\n  journal={arXiv preprint},\n  year={2024}\n}",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/nvidia/AceInstruct-7B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "14.2 GiB of safetensors weights (15,231,271,864 bytes) in BF16",
+    "num_parameters": "7,615,616,512 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model was produced by supervised fine-tuning (SFT) on general SFT datasets, starting from Qwen2.5-Base.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model is a fine-tune of Qwen2.5-Base, trained with general SFT datasets.",
+    "training_data_size": "Not specified"
+  }
+}

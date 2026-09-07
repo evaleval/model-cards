@@ -1,0 +1,55 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "21 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "netcat420 (Hub organization)",
+    "license": "mit",
+    "model_id": "netcat420/MFANN3bv0.18",
+    "model_type": "text-generation",
+    "name": "MFANN3bv0.18",
+    "release_date": "2024-07-25 (Hugging Face repository creation date)",
+    "summary": "A Hugging Face transformers model card for a text-generation model.",
+    "version": "3e792e3413217b63ea9caa0e8b8595fbeb236a69"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/netcat420/MFANN3bv0.18",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "10.4 GiB of safetensors weights (11,118,785,112 bytes) in F32",
+    "num_parameters": "2,779,683,840 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "The checkpoint was trained on the netcat420/MFANN dataset.",
+    "training_data_size": "Not specified"
+  }
+}

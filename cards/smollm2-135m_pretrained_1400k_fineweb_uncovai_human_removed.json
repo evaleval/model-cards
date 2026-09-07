@@ -1,0 +1,68 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "18 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "0 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "FlofloB (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "FlofloB/smollm2-135M_pretrained_1400k_fineweb_uncovai_human_removed",
+    "model_type": "Not specified",
+    "name": "smollm2-135M_pretrained_1400k_fineweb_uncovai_human_removed",
+    "release_date": "2025-01-28 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "f2851eedb367100fa0ca50ed25ff610a83713de2"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "FlofloB/smollm2-135M_pretrained_1200k_fineweb_uncovai_human_removed",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/FlofloB/smollm2-135M_pretrained_1400k_fineweb_uncovai_human_removed",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Impact on the environment",
+        "description": "AI, and large generative models in particular, might produce increased carbon emissions and increase water usage for their training and operation.",
+        "justification": "open-weight 135M dense decoder-only model trained on 1400k steps of FineWeb data; training a model of this size on this scale still consumes compute/energy, and the card reports no efficiency or environmental mitigations.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/impact-on-the-environment.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "0.5 GiB of safetensors weights (538,090,408 bytes) in F32",
+    "num_parameters": "134,515,008 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

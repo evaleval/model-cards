@@ -1,0 +1,80 @@
+# Model Card: Fireball\-12B\-v1\.13a Philosophers
+
+> This is an automated candidate generated from public sources. It has not been human-reviewed or released as an official model card.
+
+Paired JSON: [fireball\-12b\-v1\.13a\-philosophers\.json](<./fireball-12b-v1.13a-philosophers.json>)<br>
+SHA-256: `0a7932e1f80e6dca84fb0003976922bb3b85c6565bb8b3790ec9c1c908471aa7`
+
+## Identity
+
+| Field | Value |
+| --- | --- |
+| Model ID | EpistemeAI/Fireball\-12B\-v1\.13a\-philosophers |
+| Name | Fireball\-12B\-v1\.13a Philosophers |
+| Developed by | EpistemeAI \(Hub organization\) |
+| Model type | text\-generation |
+| License | apache\-2\.0 |
+| Release date | 2024\-08\-28 \(Hugging Face repository creation date\) |
+| Version | bfa6d293b986fac4fa23f62bd484de3c81763e17 |
+| Summary | A fine\-tuned text\-generation model specialized in philosophy of science, math, and epistemology, intended to produce higher\-quality responses than Llama\-3\.1\-8B and Google Gemma 2 9B\. |
+
+## Lineage
+
+| Field | Value |
+| --- | --- |
+| Base models | EpistemeAI/Fireball\-Mistral\-Nemo\-12B\-cot\-orcas (base model; Kind: finetune) |
+| Model family | Fireball v1\.13a philosophers |
+
+## Specifications
+
+| Field | Value |
+| --- | --- |
+| Architecture type | dense decoder\-only |
+| Num parameters | 12,247,782,400 parameters \(safetensors metadata\) |
+| Context length | 1,024,000 tokens \(config\.json max\_position\_embeddings\) |
+| Precision | F16 \(safetensors weight dtype\) |
+| Model size | 22\.8 GiB of safetensors weights \(24,495,606,736 bytes\) in F16 |
+| Input / output | input: text<br>output: text |
+
+## Training Context
+
+| Field | Value |
+| --- | --- |
+| Training data | The model is a super fine\-tune of EpistemeAI/Fireball\-Mistral\-Nemo\-12B\-cot\-orcas, trained on philosophy of science, math, and epistemology datasets, and further fine\-tuned with various datasets\. |
+
+## Access and Adoption
+
+| Field | Value |
+| --- | --- |
+| Access type | open\-weight |
+| Downloads | 24 downloads \(Hub 30\-day window, as of 2026\-09\-07\) |
+| Likes | 3 likes on the Hub \(as of 2026\-09\-07\) |
+
+## Evaluation
+
+| Field | Value |
+| --- | --- |
+| Results summary | The developer states that this model is a further fine\-tune on philosophy of science, math, and epistemology data, and that it provides higher quality responses than Llama\-3\.1\-8B and Google Gemma 2 9B\. |
+
+## Links
+
+| Field | Value |
+| --- | --- |
+| Model card | [https://huggingface\.co/EpistemeAI/Fireball\-12B\-v1\.13a\-philosophers](<https://huggingface.co/EpistemeAI/Fireball-12B-v1.13a-philosophers>) |
+
+## Risks
+
+_No specified fields are available in the publication data._
+
+### Possible Risks
+
+| Risk | Why it applies here | Description |
+| --- | --- | --- |
+| [Lack of model transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html>) | Card reports only a broad description of training data and no evaluation details or documentation of design/development process for this checkpoint\. | Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model\. |
+| [Lack of training data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html>) | Card does not provide detailed collection/curation information for the philosophy of science, math, and epistemology datasets or any synthetic data generation processes\. | Proper documentation contains information about how a model&\#x27;s data was collected, curated, and used to train a model, including any synthetic data generation processes\. Without proper documentation it might be harder to satisfactorily explain the behavior of the model\. |
+| [Uncertain data provenance](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html>) | Card names base datasets but does not trace ownership/origin/transformations of the fine\-tuning data\. | Data provenance refers to the traceability of data \(including synthetic data\), which includes its ownership, origin, transformations, and generation\. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation\. |
+| [Hallucination](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/hallucination.html>) | Open\-weight text\-generation model specialized in philosophy of science, math, and epistemology with no reported factual grounding or evaluation, plausibly producing inaccurate content in these domains\. | Hallucinations generate factually inaccurate or untruthful content relative to the model&\#x27;s training data or input\. Hallucinations are also sometimes referred to lack of faithfulness or lack of groundedness\. In some instances, synthetic data that is generated by large language models might include hallucinations that result in the data possibly being inaccurate, fabricated, or disconnected from reality\. Hallucinations can compromise model performance, accuracy, and relevance\. |
+
+---
+
+Unavailable agreed fields (not specified in the publication data): `lineage.derivatives`, `training_context.training_data_size`, `training_context.data_cutoff`, `training_context.adaptations`, `evaluation.benchmark_scores`, `evaluation.human_evals`, `evaluation.safety_evals`, `links.system_card`, `links.tech_report`, `links.code_repository`, `links.citation`.

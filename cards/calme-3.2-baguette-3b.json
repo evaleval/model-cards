@@ -1,0 +1,80 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "32 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "The developer notes that this is a very small model, so performance may be limited for some prompts and it may be sensitive to hyperparameters.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "MaziyarPanahi (Hub organization)",
+    "license": "other",
+    "model_id": "MaziyarPanahi/calme-3.2-baguette-3b",
+    "model_type": "Not specified",
+    "name": "MaziyarPanahi/calme-3.2-baguette-3b",
+    "release_date": "2024-11-07 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "55787a3c65b2dac59b6888f4878683e1d7075580"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-3B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "calme 3.2 baguette"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/MaziyarPanahi/calme-3.2-baguette-3b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "The card gives only a brief summary and no evaluation or safety documentation for this exact checkpoint, so its design and evaluation process are insufficiently documented.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "The card names two fine-tuning datasets but does not describe how they were collected, curated, or processed, limiting transparency about training data.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Poor model accuracy",
+        "description": "Poor model accuracy occurs when a model's performance is insufficient to the task it was designed for. Low accuracy might occur if the model is not correctly engineered, or if the model's expected inputs change.",
+        "justification": "The developer notes this is a very small model with limited performance for some prompts and sensitivity to hyperparameters, indicating possible insufficient accuracy for its intended general tasks.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/poor-model-accuracy.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "10.3 GiB of safetensors weights (11,040,403,984 bytes) in F32",
+    "num_parameters": "3,085,383,680 parameters (safetensors metadata)",
+    "precision": "F32 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a fine-tuned iteration of Qwen/Qwen2.5-3B, adapted to improve performance on general tasks in French and English.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model was fine-tuned from Qwen/Qwen2.5-3B using the datasets MaziyarPanahi/french_instruct_sharegpt and MaziyarPanahi/calme-legalkit-v0.2.",
+    "training_data_size": "Not specified"
+  }
+}

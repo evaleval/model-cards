@@ -1,0 +1,88 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "17 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Youlln (Hub organization)",
+    "license": "Not specified",
+    "model_id": "Youlln/ECE-PRYMMAL0.5B-Youri",
+    "model_type": "Not specified",
+    "name": "ECE-PRYMMAL0.5B-Youri",
+    "release_date": "2024-10-07 (Hugging Face repository creation date)",
+    "summary": "ECE-PRYMMAL0.5B-Youri is a merge of Qwen2-0.5B and Qwen2.5-0.5B created with LazyMergekit.",
+    "version": "1477d3deff98f35f523aa222bc0442278d464566"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Qwen/Qwen2-0.5B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Qwen/Qwen2.5-0.5B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "ECE PRYMMAL0.5B Youri"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Youlln/ECE-PRYMMAL0.5B-Youri",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "Lack of model transparency",
+        "description": "Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model.",
+        "justification": "Card provides only architecture, merge recipe, and access type; no design, development, evaluation, or inner-workings documentation is reported.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html"
+      },
+      {
+        "category": "Lack of training data transparency",
+        "description": "Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes. Without proper documentation it might be harder to satisfactorily explain the behavior of the model.",
+        "justification": "Card does not report how the merged model's training/merge data was collected, curated, or used, so training-data documentation is lacking.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html"
+      },
+      {
+        "category": "Uncertain data provenance",
+        "description": "Data provenance refers to the traceability of data (including synthetic data), which includes its ownership, origin, transformations, and generation. Proving that the data is the same as the original source with correct usage terms is difficult without standardized methods for verifying data sources or generation.",
+        "justification": "The card identifies base models but gives no traceability of the underlying data sources, transformations, or generation for the merge.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-provenance.html"
+      },
+      {
+        "category": "Incomplete usage definition",
+        "description": "Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model. As the use changes, the relevant risks might correspondingly change.",
+        "justification": "The card states only that it is a model/merge and gives no intended-use or deployment context, leaving downstream risk assessment undefined.",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": "Not specified",
+    "model_size": "1.2 GiB of safetensors weights (1,260,367,448 bytes) in BF16",
+    "num_parameters": "630,167,424 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

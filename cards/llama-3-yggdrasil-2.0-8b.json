@@ -1,0 +1,71 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "20 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Locutusque (Hub organization)",
+    "license": "Not specified",
+    "model_id": "Locutusque/Llama-3-Yggdrasil-2.0-8B",
+    "model_type": "Not specified",
+    "name": "Llama-3-Yggdrasil-2.0-8B",
+    "release_date": "2024-06-05 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "f9d9d9c307d5fc719c1a825ff220c3ec1ed0f73c"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "Locutusque/Llama-3-NeuralHercules-5.0-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "NousResearch/Hermes-2-Theta-Llama-3-8B",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "NousResearch/Meta-Llama-3-8B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Llama 3 Yggdrasil 2.0"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Locutusque/Llama-3-Yggdrasil-2.0-8B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "15.0 GiB of safetensors weights (16,060,556,336 bytes) in BF16",
+    "num_parameters": "8,030,261,248 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

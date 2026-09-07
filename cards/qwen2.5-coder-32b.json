@@ -1,0 +1,356 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "1,681 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "160 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "65.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HumanEval",
+        "metric": "Not specified",
+        "score": "60.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MBPP MBPP+",
+        "metric": "Not specified",
+        "score": "68.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BigCodeBench",
+        "metric": "Not specified",
+        "score": "53.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "BigCodeBench",
+        "metric": "Not specified",
+        "score": "26.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Python",
+        "metric": "Not specified",
+        "score": "65.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Python",
+        "metric": "Not specified",
+        "score": "81.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Python",
+        "metric": "Not specified",
+        "score": "49.2",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Python",
+        "metric": "Not specified",
+        "score": "82.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C++",
+        "metric": "Not specified",
+        "score": "68.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C#",
+        "metric": "Not specified",
+        "score": "68.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C#",
+        "metric": "Not specified",
+        "score": "68.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "C#",
+        "metric": "Not specified",
+        "score": "91.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Java",
+        "metric": "Not specified",
+        "score": "70.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Java",
+        "metric": "Not specified",
+        "score": "56.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Java",
+        "metric": "Not specified",
+        "score": "86.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "PHP",
+        "metric": "Not specified",
+        "score": "64.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TS",
+        "metric": "Not specified",
+        "score": "66.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Bash",
+        "metric": "Not specified",
+        "score": "39.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "JS",
+        "metric": "Not specified",
+        "score": "67.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "63.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average ∗",
+        "metric": "Not specified",
+        "score": "88.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "57.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "86.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "36.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "66.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "51.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Average",
+        "metric": "Not specified",
+        "score": "78.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Humaneval-FIM Java JavaScript",
+        "metric": "Not specified",
+        "score": "91.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Humaneval-FIM Java JavaScript",
+        "metric": "Not specified",
+        "score": "89.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TypeScript",
+        "metric": "Not specified",
+        "score": "54.9",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "TypeScript",
+        "metric": "Not specified",
+        "score": "87.0",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Chunk Completion",
+        "metric": "Not specified",
+        "score": "57.3",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Chunk Completion",
+        "metric": "Not specified",
+        "score": "82.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Function completion",
+        "metric": "Not specified",
+        "score": "16.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Function completion",
+        "metric": "Not specified",
+        "score": "50.8",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Line",
+        "metric": "Not specified",
+        "score": "90.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Line",
+        "metric": "Not specified",
+        "score": "13.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Function",
+        "metric": "Not specified",
+        "score": "57.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "Function",
+        "metric": "Not specified",
+        "score": "65.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "API",
+        "metric": "Not specified",
+        "score": "87.6",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MATH 4-shot",
+        "metric": "Not specified",
+        "score": "57.2",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "GSM8K 4-shot",
+        "metric": "Not specified",
+        "score": "91.1",
+        "setting": "4-shot"
+      },
+      {
+        "benchmark": "MMLUSTEM 5-shot",
+        "metric": "Not specified",
+        "score": "75.1",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "TheoremQA 5-shot",
+        "metric": "Not specified",
+        "score": "43.1",
+        "setting": "5-shot"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "79.1",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "50.4",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "MMLU",
+        "metric": "Not specified",
+        "score": "77.5",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "HellaSwag",
+        "metric": "Not specified",
+        "score": "83.0",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "The developer reports that Qwen2.5-Coder-32B is the current state-of-the-art open-source code LLM, with coding abilities matching GPT-4o. It also achieves state-of-the-art code completion performance on five benchmarks: Humaneval-Infilling, CrossCodeEval, CrossCodeLongEval, RepoEval, and SAFIM.",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Qwen (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Qwen/Qwen2.5-Coder-32B",
+    "model_type": "Not specified",
+    "name": "Qwen2.5-Coder-32B",
+    "release_date": "2024-11-08 (Hugging Face repository creation date)",
+    "summary": "Not specified",
+    "version": "2e12b5f7bc878d424d222e224ed40aee564ec45f"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "Qwen/Qwen2.5-32B",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2.5 Coder"
+  },
+  "links": {
+    "citation": "@article{hui2024qwen2,\n      title={Qwen2. 5-Coder Technical Report},\n      author={Hui, Binyuan and Yang, Jian and Cui, Zeyu and Yang, Jiaxi and Liu, Dayiheng and Zhang, Lei and Liu, Tianyu and Zhang, Jiajun and Yu, Bowen and Dang, Kai and others},\n      journal={arXiv preprint arXiv:2409.12186},\n      year={2024}\n}",
+    "code_repository": "https://github.com/QwenLM/Qwen2.5-Coder",
+    "model_card": "https://huggingface.co/Qwen/Qwen2.5-Coder-32B",
+    "system_card": "Not specified",
+    "tech_report": "https://arxiv.org/abs/2409.12186"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "32,768 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "61.0 GiB of safetensors weights (65,527,841,688 bytes) in BF16",
+    "num_parameters": "32,763,876,352 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a pretraining-stage base model; no post-training or alignment is applied. The documentation recommends applying post-training such as SFT, RLHF, or continued pretraining before conversational use.",
+    "data_cutoff": "Not specified",
+    "training_data": "The model is a pretrained base model built on Qwen2.5, trained on 5.5 trillion tokens including source code, text-code grounding, synthetic data, and other data.",
+    "training_data_size": "5.5 trillion tokens"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "26 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "1 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "CoolSpring (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "CoolSpring/Qwen2-0.5B-Abyme-merge3",
+    "model_type": "Not specified",
+    "name": "Qwen2-0.5B-Abyme-merge3",
+    "release_date": "2024-07-27 (Hugging Face repository creation date)",
+    "summary": "Qwen2-0.5B-Abyme-merge3 is a merged model created with LazyMergekit.",
+    "version": "cf6c8001e857ee3575882d4b0cc920ec40ac2a32"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "merge",
+        "model_id": "CoolSpring/Qwen2-0.5B-Abyme",
+        "relation": "base_model"
+      },
+      {
+        "kind": "merge",
+        "model_id": "Qwen/Qwen2-0.5B-Instruct",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Qwen2 Abyme merge3"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/CoolSpring/Qwen2-0.5B-Abyme-merge3",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": [
+      {
+        "category": "IP information in prompt",
+        "description": "Copyrighted information or other intellectual property might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight text model with no reported data filtering or usage restrictions -> users may include copyrighted material in prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/ip-information-in-prompt.html"
+      },
+      {
+        "category": "Confidential data in prompt",
+        "description": "Confidential information might be included as a part of the prompt that is sent to the model.",
+        "justification": "open-weight text model with no reported data handling safeguards -> users may send confidential information in prompts",
+        "url": "https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/confidential-data-in-prompt.html"
+      }
+    ]
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "131,072 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "1.2 GiB of safetensors weights (1,259,328,080 bytes) in BF16",
+    "num_parameters": "629,647,744 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "The model is a merge of other models, created with LazyMergekit using the dare_ties merge method.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

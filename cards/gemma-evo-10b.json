@@ -1,0 +1,61 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "26 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "5 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": "Not specified",
+    "human_evals": "Not specified",
+    "results_summary": "Not specified",
+    "safety_evals": "Not specified"
+  },
+  "identity": {
+    "developed_by": "Aashraf995 (Hub organization)",
+    "license": "apache-2.0",
+    "model_id": "Aashraf995/Gemma-Evo-10B",
+    "model_type": "Not specified",
+    "name": "Gemma-Evo-10B",
+    "release_date": "2024-12-13 (Hugging Face repository creation date)",
+    "summary": "A merge of pre-trained language models created using mergekit.",
+    "version": "5ec9c5763ca6662dd897cd292e08014ec10b0d74"
+  },
+  "lineage": {
+    "base_models": [
+      {
+        "kind": "finetune",
+        "model_id": "gmonsoon/SahabatAI-Lion-9B-TIES-v1",
+        "relation": "base_model"
+      }
+    ],
+    "derivatives": "Not specified",
+    "model_family": "Not specified"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/Aashraf995/Gemma-Evo-10B",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "8,192 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "18.9 GiB of safetensors weights (20,318,474,544 bytes) in BF16",
+    "num_parameters": "10,159,209,984 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "This model is a merge created with the Model Stock merge method, using allknowingroger/GemmaSlerp5-10B as the base and including the listed models in the merge.",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}

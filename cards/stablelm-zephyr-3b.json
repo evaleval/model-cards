@@ -1,0 +1,68 @@
+{
+  "access_and_adoption": {
+    "access_type": "open-weight",
+    "downloads": "13,268 downloads (Hub 30-day window, as of 2026-09-07)",
+    "likes": "261 likes on the Hub (as of 2026-09-07)"
+  },
+  "evaluation": {
+    "benchmark_scores": [
+      {
+        "benchmark": "MT-Bench",
+        "metric": "score",
+        "score": "6.64",
+        "setting": "Not specified"
+      },
+      {
+        "benchmark": "AlpacaEval",
+        "metric": "win rate",
+        "score": "76.00",
+        "setting": "Not specified"
+      }
+    ],
+    "human_evals": "Not specified",
+    "results_summary": "StableLM Zephyr 3B is a 3 billion parameter instruction-tuned model trained with DPO on public and synthetic datasets; the developer reports MT-Bench and AlpacaEval results for this model.",
+    "safety_evals": "The developer evaluated the model on 488 malicious prompts using standard harmfulness protocols, reporting that it reduced harmful outputs by 55 compared with Zephyr-7b-β as judged by GPT-4. Internal red teaming found the model generally avoids harmful information unless prompted, but can produce potentially harmful outputs or misinformation when requested."
+  },
+  "identity": {
+    "developed_by": "stabilityai (Hub organization)",
+    "license": "other",
+    "model_id": "stabilityai/stablelm-zephyr-3b",
+    "model_type": "Not specified",
+    "name": "`StableLM Zephyr 3B`",
+    "release_date": "2023-11-21 (Hugging Face repository creation date)",
+    "summary": "StableLM Zephyr 3B is a 3 billion parameter instruction-tuned language model trained with publicly available and synthetic datasets using Direct Preference Optimization, with evaluation based on MT Bench and Alpaca.",
+    "version": "fe1fd5e36ccb8cb2cb1dc225ab6d2962692b9837"
+  },
+  "lineage": {
+    "base_models": "Not specified",
+    "derivatives": "Not specified",
+    "model_family": "stablelm zephyr"
+  },
+  "links": {
+    "citation": "Not specified",
+    "code_repository": "Not specified",
+    "model_card": "https://huggingface.co/stabilityai/stablelm-zephyr-3b",
+    "system_card": "Not specified",
+    "tech_report": "Not specified"
+  },
+  "risks": {
+    "possible_risks": "Not specified"
+  },
+  "specifications": {
+    "architecture_type": "dense decoder-only",
+    "context_length": "4,096 tokens (config.json max_position_embeddings)",
+    "input_output": [
+      "input: text",
+      "output: text"
+    ],
+    "model_size": "5.2 GiB of safetensors weights (5,590,927,496 bytes) in BF16",
+    "num_parameters": "2,795,443,200 parameters (safetensors metadata)",
+    "precision": "BF16 (safetensors weight dtype)"
+  },
+  "training_context": {
+    "adaptations": "Not specified",
+    "data_cutoff": "Not specified",
+    "training_data": "Not specified",
+    "training_data_size": "Not specified"
+  }
+}
