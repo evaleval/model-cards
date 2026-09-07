@@ -3,7 +3,7 @@
 Ported verbatim from evaleval/model-cards at 8b3b5b9 so a card rendered here and a card
 rendered by the public repository are the same bytes; only the two imports were
 repointed at this package's contract and validator. The renderer consumes the
-seven-section projection alone. It never sees the binding ledger.
+eight-section projection alone. It never sees the binding ledger.
 """
 
 from __future__ import annotations
@@ -64,7 +64,9 @@ def _markdown_text(value: Any) -> str:
             separators=(",", ":"),
             sort_keys=True,
         )
-    escaped = _html_escape(value, quote=True)
+    # quotes stay literal: escaping them yields &#x27; and &quot;, whose # and ; the
+    # Markdown escape below would then break into a visible entity (322 cards, 2026-09-08)
+    escaped = _html_escape(value, quote=False)
     escaped = _MARKDOWN_SPECIAL_RE.sub(r"\\\1", escaped)
     return escaped.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
 

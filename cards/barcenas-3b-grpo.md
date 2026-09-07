@@ -70,7 +70,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |
-| [Membership inference attack](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/membership-inference-attack.html>) | Trained on openai/gsm8k and open\-weight, so an attacker can run the checkpoint locally and perform membership inference on that known public training dataset\. | A membership inference attack repeatedly queries a model to determine if a given input was part of the model&\#x27;s training\. More specifically, given a trained model and a data sample, an attacker appropriately samples the input space, observing outputs to deduce whether that sample was part of the model&\#x27;s training\. |
+| [Membership inference attack](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/membership-inference-attack.html>) | Trained on openai/gsm8k and open\-weight, so an attacker can run the checkpoint locally and perform membership inference on that known public training dataset\. | A membership inference attack repeatedly queries a model to determine if a given input was part of the model's training\. More specifically, given a trained model and a data sample, an attacker appropriately samples the input space, observing outputs to deduce whether that sample was part of the model's training\. |
 
 ---
 

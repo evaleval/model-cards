@@ -5,16 +5,16 @@ This checks the last step, the one Stage B does on its own: whether the sentence
 writer produced is entailed by the evidence it cited. FactReasoner does that with an NLI
 extractor and a probabilistic layer over the atoms of each claim.
 
-It is non-blocking by construction. A contradiction withholds the field it belongs to; a
+It is non-blocking by construction. A contradiction flags the field it belongs to; a
 neutral or unsupported atom is recorded and nothing else; and when the pass cannot run at
 all, the card records that it did not run and why, because a validation step that is
 silently absent reads exactly like one that passed.
 
 Availability is checked, never assumed. The pass needs the fact_reasoner package, the
 merlin binary, and a serving route that returns token logprobs, because without them
-every atom sits at 0.5 and the layer reports nothing. Probed 2026-09-04: the pinned route
-(deepseek/deepseek-v4-flash-0731 on Together) returns no logprobs, and the Hugging Face
-router refuses this token, so the recorded outcome on every card today is unavailable.
+every atom sits at 0.5 and the layer reports nothing. The composer's own route has none,
+so the pass runs on its own route (FACTREASONER_MODEL, FACTREASONER_PROVIDER) and only
+when MODELCARDS_FACTCHECK is set; otherwise the card records that it did not run.
 """
 
 from __future__ import annotations

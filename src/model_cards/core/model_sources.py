@@ -13,7 +13,7 @@ dir, so the composer's --source-bundle replay reads a model bundle with no new f
   source_bundle/            the hashed README/config snapshot (records.SourceBundle)
   _paper_cache/<arxiv>.json docling text, shared by every target that binds that paper
 
-Paper policy (build-brief notes): a derivative repo usually carries the BASE model's
+Paper policy: a derivative repo usually carries the BASE model's
 arXiv tag, and Hub tags are sometimes plain wrong (Qwen3-8B tags the YaRN paper,
 gemma-3 tags HellaSwag, Llama-3.1 tags a carbon-footprint paper). The binding tier
 says whether the tagged paper introduces THIS model (every distinctive name token in

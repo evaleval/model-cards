@@ -39,7 +39,7 @@ SHA-256: `72fe9903f76f0b6a1daa06a07331fba35783bdd0b57bfecb8be6f87e7a3cfdd9`
 
 | Field | Value |
 | --- | --- |
-| Adaptations | The model is a fine\-tune of unsloth/llama\-3\.2\-3b\-instruct\-bnb\-4bit, trained with Unsloth and Hugging Face&\#x27;s TRL library\. |
+| Adaptations | The model is a fine\-tune of unsloth/llama\-3\.2\-3b\-instruct\-bnb\-4bit, trained with Unsloth and Hugging Face's TRL library\. |
 
 ## Access and Adoption
 
@@ -71,7 +71,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 | [Lack of data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html>) | Card does not describe the emotion\-classification fine\-tuning dataset, its composition, or its provenance\. | Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation\.  |
 | [Unrepresentative data](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/unrepresentative-data.html>) | Fine\-tuned for English emotion classification but no dataset representativeness or coverage information is reported, so the tuning data may not represent the target population\. | Unrepresentative data occurs when the training or fine\-tuning data is not sufficiently representative of the underlying population or does not measure the phenomenon of interest\. Synthetic data might not fully capture the complexity and nuances of real\-world data\. Causes include possible limitations in the seed data quality, biases in generation methods, or inadequate domain knowledge\. Thus, AI models might struggle to generalize effectively to real\-world scenarios\. |
 | [Data bias](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-bias.html>) | No information about the fine\-tuning data is provided, so historical or societal biases in the emotion\-classification training data cannot be ruled out\. | Historical and societal biases might be present in data that are used to train and fine\-tune models\. Biases can also be inherited from seed data or exacerbated by synthetic data generation methods\. |
-| [Poor model accuracy](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/poor-model-accuracy.html>) | No evaluation results are reported for the emotion\-classification task, so the checkpoint&\#x27;s accuracy on that task is unsubstantiated\. | Poor model accuracy occurs when a model&\#x27;s performance is insufficient to the task it was designed for\. Low accuracy might occur if the model is not correctly engineered, or if the model&\#x27;s expected inputs change\. |
+| [Poor model accuracy](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/poor-model-accuracy.html>) | No evaluation results are reported for the emotion\-classification task, so the checkpoint's accuracy on that task is unsubstantiated\. | Poor model accuracy occurs when a model's performance is insufficient to the task it was designed for\. Low accuracy might occur if the model is not correctly engineered, or if the model's expected inputs change\. |
 
 ---
 

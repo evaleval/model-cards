@@ -67,7 +67,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |
-| [Incorrect risk testing](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html>) | The card reports safety evaluations only as &\#x27;none of the tested models appear to be fully jailbroken&\#x27;, which is a narrow jailbreak test and does not measure other risks such as hallucination or data privacy, so the selected metric may incompletely measure the risk\. | A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context\. |
+| [Incorrect risk testing](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html>) | The card reports safety evaluations only as 'none of the tested models appear to be fully jailbroken', which is a narrow jailbreak test and does not measure other risks such as hallucination or data privacy, so the selected metric may incompletely measure the risk\. | A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context\. |
 
 ---
 

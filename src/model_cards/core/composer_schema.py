@@ -4,7 +4,7 @@ This is the model-card counterpart of the benchmark schema the adjacent composer
 carries as its default. The paths and their order come from schema.py (the seven
 published sections plus the private provenance_and_quality); this module adds what the
 composer needs on top: which source each field is extracted from, the per-field hints
-and negative guidelines (from the 2026-07-06 build-brief notes), the enum
+and negative guidelines, the enum
 vocabularies, which fields are deterministic (structured channel: config.json, hub
 model_info, safetensors, model-index) and therefore only echoed by Stage B, and the
 Stage-B group split. The contract is not reopened here: no field is added, removed or
@@ -171,7 +171,7 @@ CURATOR_FIELDS: Dict[str, Dict[str, Any]] = {
                        "hint": "The reference the developer asks to be cited, as stated"},
 }
 
-# Negative guidelines, from the 2026-07-06 build-brief notes.
+# Negative guidelines: what a field must not be filled with.
 FIELD_CAPS: Dict[str, str] = {
     "lineage.base_models": "hub metadata only (base_model tags); NEVER inferred from README prose, which fine-tunes copy from the base card",
     "lineage.model_family": "the developer-stated family name only; no fact may be inherited through family membership",
@@ -264,7 +264,7 @@ VALUE_FIELDS = {
 }
 
 # EAV audits these first: numbers, data and lineage splice silently across checkpoints.
-# The list is the one named in the 2026-09-04 brief, plus the two fields whose value is a
+# The high-stakes list, plus the two fields whose value is a
 # family statement often enough to matter.
 HIGH_STAKES_FIELDS = frozenset({
     "specifications.num_parameters", "specifications.context_length",

@@ -69,7 +69,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |
-| [Legal accountability](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/legal-accountability.html>) | open\-weight fine\-tune with license &\#x27;other&\#x27; and no documentation of governance or evaluation details in the card | Determining who is responsible for an AI model is challenging without good documentation and governance processes\. The use of synthetic data in model development adds further complexity, since the lack of standardized frameworks for recording synthetic data design choices and verification steps makes accountability harder to establish\. |
+| [Legal accountability](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/legal-accountability.html>) | open\-weight fine\-tune with license 'other' and no documentation of governance or evaluation details in the card | Determining who is responsible for an AI model is challenging without good documentation and governance processes\. The use of synthetic data in model development adds further complexity, since the lack of standardized frameworks for recording synthetic data design choices and verification steps makes accountability harder to establish\. |
 
 ---
 

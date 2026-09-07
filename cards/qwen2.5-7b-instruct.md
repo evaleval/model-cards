@@ -41,7 +41,7 @@ SHA-256: `2eb456470e67f6ff8f61ba09f73a5c3be071ca235a0ea8b8d834867839728b49`
 | Field | Value |
 | --- | --- |
 | Training data | The checkpoint underwent both pretraining and post\-training stages\. |
-| Adaptations | The model&\#x27;s training included both pretraining and post\-training stages\. |
+| Adaptations | The model's training included both pretraining and post\-training stages\. |
 
 ## Access and Adoption
 
@@ -74,8 +74,8 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 | --- | --- | --- |
 | [Lack of model transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html>) | Card reports only architecture, training stages, and access; no evaluation results, training\-data details, or safety testing are documented for this checkpoint\. | Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model\. |
 | [Lack of data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html>) | Card states the model underwent pretraining and post\-training but gives no dataset composition, curation, or synthetic\-data details for this checkpoint\. | Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation\.  |
-| [Lack of training data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html>) | No information is provided about how training data were collected, curated, or used, making model behavior harder to explain\. | Proper documentation contains information about how a model&\#x27;s data was collected, curated, and used to train a model, including any synthetic data generation processes\. Without proper documentation it might be harder to satisfactorily explain the behavior of the model\. |
-| [Incomplete usage definition](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html>) | Card lists only &\#x27;causal language model&\#x27; as the task and gives no intended\-use or deployment context, leaving downstream risk scope undefined\. | Since foundation models can be used for many purposes, a model&\#x27;s intended use is important for defining the relevant risks of that model\. As the use changes, the relevant risks might correspondingly change\. |
+| [Lack of training data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/data-transparency.html>) | No information is provided about how training data were collected, curated, or used, making model behavior harder to explain\. | Proper documentation contains information about how a model's data was collected, curated, and used to train a model, including any synthetic data generation processes\. Without proper documentation it might be harder to satisfactorily explain the behavior of the model\. |
+| [Incomplete usage definition](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html>) | Card lists only 'causal language model' as the task and gives no intended\-use or deployment context, leaving downstream risk scope undefined\. | Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model\. As the use changes, the relevant risks might correspondingly change\. |
 
 ---
 

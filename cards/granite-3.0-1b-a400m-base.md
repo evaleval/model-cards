@@ -69,7 +69,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |
-| [Over\- or under\-reliance](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html>) | open\-weight base model with no safety alignment and no reported safety evaluations \-&gt; users may over\-trust its outputs despite lack of alignment | In AI\-assisted decision\-making tasks, reliance measures how much a person trusts \(and potentially acts on\) a model&\#x27;s output\. Over\-reliance occurs when a person puts too much trust in a model, accepting a model&\#x27;s output when the model&\#x27;s output is likely incorrect\. Under\-reliance is the opposite, where the person doesn&\#x27;t trust the model but should\. |
+| [Over\- or under\-reliance](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/over-or-under-reliance.html>) | open\-weight base model with no safety alignment and no reported safety evaluations \-&gt; users may over\-trust its outputs despite lack of alignment | In AI\-assisted decision\-making tasks, reliance measures how much a person trusts \(and potentially acts on\) a model's output\. Over\-reliance occurs when a person puts too much trust in a model, accepting a model's output when the model's output is likely incorrect\. Under\-reliance is the opposite, where the person doesn't trust the model but should\. |
 
 ---
 

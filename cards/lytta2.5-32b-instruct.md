@@ -51,7 +51,7 @@ _No specified fields are available in the publication data._
 | Field | Value |
 | --- | --- |
 | Results summary | The developer reports disappointment with the model, describing it as worse than expected, disobedient, and suited mainly to unconventional or NSFW creative writing\. |
-| Human evaluations | The developer&\#x27;s stated assessment is that the model is worse than expected, unhinged, completely disobedient, highly intelligent and creative, and probably only suitable for bizarre NSFW or outlandish creative writing\. |
+| Human evaluations | The developer's stated assessment is that the model is worse than expected, unhinged, completely disobedient, highly intelligent and creative, and probably only suitable for bizarre NSFW or outlandish creative writing\. |
 
 ## Links
 

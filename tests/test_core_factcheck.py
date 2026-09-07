@@ -94,7 +94,7 @@ def test_the_pass_is_off_by_default_and_the_card_records_that(tmp_path, monkeypa
     art = CL.compose_model_card_llm(f"{MODEL}@{CREV}", root, _ScriptedLLM(), allow_unpinned=True)
     recorded = art.card["provenance_and_quality"]["provenance"]["final_claim_pass"]
     assert recorded["status"] == "disabled"
-    assert "logprobs" in recorded["reason"]
+    assert recorded["reason"] == "MODELCARDS_FACTCHECK is not set"
     assert art.metadata["final_claim_pass"]["status"] == "disabled"
 
 

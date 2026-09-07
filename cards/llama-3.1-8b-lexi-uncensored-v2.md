@@ -60,7 +60,7 @@ SHA-256: `10631fd163e853f590b588676ca842382900d831bbbeb4094cf23cfc1778baed`
 | --- | --- |
 | Model card | [https://huggingface\.co/Orenguteng/Llama\-3\.1\-8B\-Lexi\-Uncensored\-V2](<https://huggingface.co/Orenguteng/Llama-3.1-8B-Lexi-Uncensored-V2>) |
 | Code repository | [https://github\.com/meta\-llama/llama\-models](<https://github.com/meta-llama/llama-models>) |
-| Citation | The model card states that Lexi is licensed under Meta&\#x27;s Llama license and grants permission for any use, including commercial use, provided it complies with Meta&\#x27;s Llama\-3\.1 license\. |
+| Citation | The model card states that Lexi is licensed under Meta's Llama license and grants permission for any use, including commercial use, provided it complies with Meta's Llama\-3\.1 license\. |
 
 ## Risks
 

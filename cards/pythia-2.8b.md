@@ -16,7 +16,7 @@ SHA-256: `ebee8c419832ec9b0629bc80b02738ff55369f06aed317ab29685052d81e32f7`
 | License | apache\-2\.0 |
 | Release date | 2023\-02\-13 \(Hugging Face repository creation date\) |
 | Version | 2a259cdd96a4beb1cdf467512e3904197345f6a9 |
-| Summary | A transformer\-based language model from EleutherAI&\#x27;s Pythia Scaling Suite, a collection of models developed to facilitate interpretability research\. |
+| Summary | A transformer\-based language model from EleutherAI's Pythia Scaling Suite, a collection of models developed to facilitate interpretability research\. |
 
 ## Lineage
 

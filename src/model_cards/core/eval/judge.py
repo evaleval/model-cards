@@ -1,7 +1,7 @@
 """The model-card faithfulness judge: is each value in the frozen bundle?
 
 One prompt, one schema, both frozen by md5 and recorded with every result. The judge
-sees the card's 33 fields and the frozen source bundle, and nothing else: no binding
+sees the card's public fields, minus the ones the Hub itself fixes, and the frozen source bundle, and nothing else: no binding
 ledger, no quote the composer chose, no telemetry. It is asked the two questions that
 matter separately.
 

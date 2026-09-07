@@ -1,7 +1,7 @@
-"""LLM composition of a schema-v5 model card from a model source bundle, one
+"""LLM composition of a model card from a model source bundle, one
 BindingRecord per filled value.
 
-The Benchmark Card composer's own stages run with the v5 CardSchema:
+The Benchmark Card composer's own stages run with a CardSchema built from the public contract:
   model frame (typed referents) -> Stage A verbatim-quote extraction per source
   (README, paper, GitHub), verified against the bundle's own bytes -> the composer's
   assignment gates + the model relation gates -> EAV audit -> Stage B grouped
@@ -727,8 +727,7 @@ def _run_final_claim_pass(card: Dict[str, Any], bindings, bundle: SourceBundle,
 
     if not factcheck_enabled():
         return {"status": "disabled",
-                "reason": "MODELCARDS_FACTCHECK is not set; the pinned route returns no "
-                          "token logprobs, which FactReasoner needs",
+                "reason": "MODELCARDS_FACTCHECK is not set",
                 "atoms": [], "contradicted_fields": [], "claims_built": 0}
     factcheck_route_defaults()
     sources = {f.source_uri: (f.content or "") for f in bundle.files}
@@ -1087,7 +1086,7 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
         withhold_field(path, "prose_reproduces_source_excerpt")
 
     # The final-claim pass: non-blocking, and its absence is recorded rather than
-    # implied. A contradiction withholds the field it belongs to.
+    # implied.
     factcheck = _run_final_claim_pass(card, bindings, bundle, model_id)
     # A contradiction FLAGS the field; it no longer withholds it. On the first roster
     # with the pass on (2026-09-06) both contradictions were false: "Mixture-of-Experts
@@ -1132,7 +1131,7 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
         "provenance_and_quality.provenance": {
             "ledger": "artifact.bindings",
             "policy": "one BindingRecord per filled value; withheld bindings stay in the ledger",
-            "composer": "auto_benchmarkcard composer with the v5 CardSchema",
+            "composer": "auto_benchmarkcard composer with a CardSchema built from the public contract",
             "quote_verify": {k: quote_telem[k] for k in ("emitted", "verified", "rejected")},
             "gates": {"composer": gate_telem.get("summary", {}),
                       "model": model_gate_telem.get("summary", {}),

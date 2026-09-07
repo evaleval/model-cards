@@ -64,8 +64,8 @@ _No specified fields are available in the publication data._
 | Creative Writing v3 | Not specified | 75\.0 | Thinking | Not reported |
 | WritingBench | Not specified | 7\.59 | Thinking | Not reported |
 | MATH\-500 | Not specified | 97\.4 | Thinking | Not reported |
-| AIME&\#x27;24 | Not specified | 76\.0 | Thinking | Not reported |
-| AIME&\#x27;25 | Not specified | 67\.3 | Thinking | Not reported |
+| AIME'24 | Not specified | 76\.0 | Thinking | Not reported |
+| AIME'25 | Not specified | 67\.3 | Thinking | Not reported |
 | ZebraLogic | Not specified | 84\.8 | Thinking | Not reported |
 | AutoLogi | Not specified | 89\.1 | Thinking | Not reported |
 | BFCL v3 | Not specified | 68\.1 | Thinking | Not reported |
@@ -84,8 +84,8 @@ _No specified fields are available in the publication data._
 | Creative Writing v3 | Not specified | 64\.5 | Non\-thinking | Not reported |
 | WritingBench | Not specified | 7\.15 | Non\-thinking | Not reported |
 | MATH\-500 | Not specified | 87\.4 | Non\-thinking | Not reported |
-| AIME&\#x27;24 | Not specified | 29\.1 | Non\-thinking | Not reported |
-| AIME&\#x27;25 | Not specified | 20\.9 | Non\-thinking | Not reported |
+| AIME'24 | Not specified | 29\.1 | Non\-thinking | Not reported |
+| AIME'25 | Not specified | 20\.9 | Non\-thinking | Not reported |
 | ZebraLogic | Not specified | 26\.7 | Non\-thinking | Not reported |
 | AutoLogi | Not specified | 76\.5 | Non\-thinking | Not reported |
 | BFCL v3 | Not specified | 60\.2 | Non\-thinking | Not reported |

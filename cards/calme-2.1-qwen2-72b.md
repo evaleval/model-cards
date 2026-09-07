@@ -40,7 +40,7 @@ SHA-256: `85dd126636500d4fcab4759feaa5a508cf7038357c41a2497b92ed540b4c7b51`
 
 | Field | Value |
 | --- | --- |
-| Training data | This checkpoint is a fine\-tune of Qwen/Qwen2\-72B\-Instruct; the base model&\#x27;s pretraining data is not specified for this fine\-tune\. |
+| Training data | This checkpoint is a fine\-tune of Qwen/Qwen2\-72B\-Instruct; the base model's pretraining data is not specified for this fine\-tune\. |
 | Adaptations | The model is a fine\-tuned version of Qwen/Qwen2\-72B\-Instruct\. |
 
 ## Access and Adoption
@@ -71,7 +71,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 | --- | --- | --- |
 | [Lack of model transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html>) | Card provides no evaluation results, training\-data details, or post\-training specifics for this checkpoint, so its design/development/evaluation process is insufficiently documented\. | Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model\. |
 | [Lack of data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html>) | The card states the checkpoint is a fine\-tune of Qwen/Qwen2\-72B\-Instruct but does not document the fine\-tuning dataset, collection, curation, or synthetic generation\. | Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation\.  |
-| [Incomplete usage definition](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html>) | The card only says primary task is text\-generation and gives no intended\-use or deployment context, leaving downstream risk scope undefined\. | Since foundation models can be used for many purposes, a model&\#x27;s intended use is important for defining the relevant risks of that model\. As the use changes, the relevant risks might correspondingly change\. |
+| [Incomplete usage definition](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html>) | The card only says primary task is text\-generation and gives no intended\-use or deployment context, leaving downstream risk scope undefined\. | Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model\. As the use changes, the relevant risks might correspondingly change\. |
 
 ---
 

@@ -15,13 +15,20 @@ from .records import (
     TargetIdentity,
     VerifierAction,
 )
-from .render import (
-    render_html,
-    render_markdown,
-    render_static_html,
-    save_html,
-    save_markdown,
-)
+try:
+    from .render import (
+        render_html,
+        render_markdown,
+        render_static_html,
+        save_html,
+        save_markdown,
+    )
+except ModuleNotFoundError as exc:  # pragma: no cover
+    if exc.name and exc.name.split(".")[0] == "auto_benchmarkcard":
+        raise ModuleNotFoundError(
+            "the generator needs the pinned auto-benchmarkcard composer, which is not "
+            "installed: see composer-pin.json for the commit") from exc
+    raise
 from .review import (
     EffectiveBinding,
     ReviewConflictError,

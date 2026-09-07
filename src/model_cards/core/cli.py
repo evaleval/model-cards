@@ -644,7 +644,7 @@ def build_parser() -> argparse.ArgumentParser:
     inspect = subparsers.add_parser("inspect", help="inspect cards, fields, or bindings")
     inspect.add_argument("artifact", help="input CardArtifact JSON")
     selector = inspect.add_mutually_exclusive_group()
-    selector.add_argument("--field", help="canonical or indexed schema-v5 field path")
+    selector.add_argument("--field", help="canonical or indexed card field path")
     selector.add_argument("--binding", help="binding primary key")
     inspect.add_argument(
         "--format",
@@ -671,7 +671,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     reassign = subparsers.add_parser("reassign", help="append a corrected assignment")
     _add_review_common(reassign)
-    reassign.add_argument("--field", help="corrected schema-v5 field path")
+    reassign.add_argument("--field", help="corrected card field path")
     value = reassign.add_mutually_exclusive_group()
     value.add_argument("--value", help="corrected literal string value")
     value.add_argument("--value-json", help="corrected JSON value")
@@ -696,7 +696,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("artifact", "card", "public"),
         default="artifact",
         help="full auditable artifact, bare internal card, or the published "
-             "seven-section projection (validated, source-clean)",
+             "eight-section projection (validated, source-clean)",
     )
     export.add_argument(
         "--generation-time",

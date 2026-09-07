@@ -52,7 +52,7 @@ SHA-256: `580fd1e1513c213ff6263b129294e1449b4d7b28f6a7cafc4751a5c1431ded5a`
 
 | Field | Value |
 | --- | --- |
-| Results summary | The developer reports a range of benchmark results for Qwen1\.5\-14B, including scores for exams, understanding, math, and translation, as well as additional capability evaluations\. The model also has a chat variant with separate evaluation results, but the base model&\#x27;s headline results are the four benchmark scores listed in the structured field\. |
+| Results summary | The developer reports a range of benchmark results for Qwen1\.5\-14B, including scores for exams, understanding, math, and translation, as well as additional capability evaluations\. The model also has a chat variant with separate evaluation results, but the base model's headline results are the four benchmark scores listed in the structured field\. |
 
 ### Benchmark Scores
 
@@ -80,9 +80,9 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 | Risk | Why it applies here | Description |
 | --- | --- | --- |
 | [Lack of model transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-model-transparency.html>) | Card reports only benchmark scores and gives no details on training data, architecture internals, or evaluation methodology for this checkpoint\. | Lack of model transparency is due to insufficient documentation of the model design, development, and evaluation process and the absence of insights into the inner workings of the model\. |
-| [Incomplete usage definition](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html>) | Base model card advises applying post\-training before text generation, so intended use is not fully defined for this checkpoint\. | Since foundation models can be used for many purposes, a model&\#x27;s intended use is important for defining the relevant risks of that model\. As the use changes, the relevant risks might correspondingly change\. |
+| [Incomplete usage definition](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incomplete-usage-definition.html>) | Base model card advises applying post\-training before text generation, so intended use is not fully defined for this checkpoint\. | Since foundation models can be used for many purposes, a model's intended use is important for defining the relevant risks of that model\. As the use changes, the relevant risks might correspondingly change\. |
 | [Lack of data transparency](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/lack-of-data-transparency.html>) | Card does not document training or tuning dataset details for Qwen1\.5\-14B\. | Lack of data transparency might be due to insufficient documentation of training or tuning dataset details, including synthetic data generation\.  |
-| [Poor model accuracy](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/poor-model-accuracy.html>) | Card reports only a limited set of benchmark scores and no task\-specific accuracy evidence, so performance sufficiency is not established\. | Poor model accuracy occurs when a model&\#x27;s performance is insufficient to the task it was designed for\. Low accuracy might occur if the model is not correctly engineered, or if the model&\#x27;s expected inputs change\. |
+| [Poor model accuracy](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/poor-model-accuracy.html>) | Card reports only a limited set of benchmark scores and no task\-specific accuracy evidence, so performance sufficiency is not established\. | Poor model accuracy occurs when a model's performance is insufficient to the task it was designed for\. Low accuracy might occur if the model is not correctly engineered, or if the model's expected inputs change\. |
 
 ---
 

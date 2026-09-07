@@ -66,7 +66,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |
-| [Incorrect risk testing](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html>) | The card&\#x27;s only reported safety evaluation is a refusal count on 3,000 orthogonality tests, which measures refusal behavior rather than the specific safety risks of an open\-weight refusal\-direction model, so the selected metric may be incomplete for this checkpoint\. | A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context\. |
+| [Incorrect risk testing](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html>) | The card's only reported safety evaluation is a refusal count on 3,000 orthogonality tests, which measures refusal behavior rather than the specific safety risks of an open\-weight refusal\-direction model, so the selected metric may be incomplete for this checkpoint\. | A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context\. |
 
 ---
 

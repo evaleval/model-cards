@@ -97,10 +97,9 @@ def build_llm():
 
 
 def factcheck_enabled() -> bool:
-    """Whether the final-claim pass runs. Off by default: the pinned route returns no
-    token logprobs (probed 2026-09-04), so FactReasoner's probabilistic layer would leave
-    every atom at 0.5 and report nothing. Turning it on needs a route that has them,
-    which is a provider decision."""
+    """Whether the final-claim pass runs. Off by default, because it needs a route that
+    returns token logprobs, which the composer's route does not; with the flag set it runs
+    on the FactReasoner route named by the environment."""
     return os.environ.get("MODELCARDS_FACTCHECK", "").strip() in ("1", "true", "yes")
 
 

@@ -1,6 +1,6 @@
 """Regenerate cards/ from a pipeline run directory.
 
-    python scripts/publish_cards.py --run ../model-card-system/runs/roster12-a --out cards
+    python scripts/publish_cards.py --run runs/<run> --out cards
 
 Takes the published projection each run already wrote, names it after the model rather
 than the bundle slug, and writes the JSON with its Markdown companion. The Markdown

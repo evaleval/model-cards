@@ -1,6 +1,6 @@
 """The public projection: what leaves this pipeline, and the checks it has to pass.
 
-A card artifact carries the seven published sections plus the private
+A card artifact carries the eight published sections plus the private
 provenance_and_quality section and the whole binding ledger. The public export is the
 seven sections and nothing else, validated against the published JSON Schema, with two
 guards the contract asks for:
@@ -51,7 +51,7 @@ def published_schema() -> dict:
 
 
 def public_projection(card: Mapping[str, Mapping[str, Any]]) -> dict:
-    """The seven published sections, without provenance keys or the private section."""
+    """The eight published sections, without provenance keys or the private section."""
     return {section: {field: card[section][field] for field in fields}
             for section, fields in PUBLIC_SECTIONS.items()}
 

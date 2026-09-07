@@ -2,7 +2,7 @@
 
 Stage B writes prose, so it may rephrase. It may not introduce a number or a model,
 dataset or benchmark identifier that no cited quote contains. That is the cheapest
-detector for the error class the AAAI evaluation named, because a spliced value almost
+detector for the error class the earlier evaluation of generated benchmark cards named, because a spliced value almost
 always shows up as a number or a name that is in the sources but not in the quotes this
 particular value cited: "the quote said 73.5 and the card says 99.0" and "the quote is
 about OLMo-2-13B and the card says OLMo-2-7B" are both caught here, without a model call.

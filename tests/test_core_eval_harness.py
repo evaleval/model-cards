@@ -165,7 +165,12 @@ def test_the_paid_runner_refuses_a_model_it_cannot_price():
     assert "no pricing entry" in done.stderr
     text = (ROOT / "scripts" / "run_eval.py").read_text(encoding="utf-8")
     assert "--max-cost-usd" in text and "required=True" in text
-    assert "temperature=0" in text
+    # Failure class: undocumented_decoding_change. claude-sonnet-5 answers 400
+    # "`temperature` is deprecated for this model" (2026-09-07), so the instrument sends
+    # no temperature at all. The absence has to stay explained where the call is made,
+    # or the next reader cannot tell a pinned decoding from a forgotten one.
+    assert "temperature=" not in text
+    assert "`temperature` is deprecated for this model" in text
 
 
 def test_the_target_list_deduplicates_on_the_hubs_canonical_id(tmp_path, monkeypatch):
@@ -241,7 +246,6 @@ def test_the_screen_runner_caps_its_searches_and_its_spend():
     assert '"max_uses": args.max_searches' in text
     assert "--max-searches" in text
     screen = text[text.index("def cmd_screen("):text.index("def cmd_summarize(")]
-    assert "temperature=0" in screen
     assert "if spent >= args.max_cost_usd" in screen
     assert "no pricing entry" in screen
 

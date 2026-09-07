@@ -38,7 +38,7 @@ SHA-256: `c0650f03e3146c9d80eea25ca3fbaf9c5ad53723ade6031c8cc89dc917a6eff7`
 
 | Field | Value |
 | --- | --- |
-| Adaptations | The model was trained with Unsloth and Hugging Face&\#x27;s TRL library, which the source states enabled two\-fold faster training\. |
+| Adaptations | The model was trained with Unsloth and Hugging Face's TRL library, which the source states enabled two\-fold faster training\. |
 
 ## Access and Adoption
 

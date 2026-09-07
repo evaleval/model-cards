@@ -1,8 +1,8 @@
 """Deterministic Markdown rendering for agreed public Model Cards.
 
-The renderer consumes only the seven-section publication projection.  It does
-not inspect or render local evidence, validation, lifecycle, environmental, or
-risk artifacts.
+The renderer consumes only the eight-section publication projection. It never sees
+the binding ledger, the sources or any local artifact; the risks it renders are the
+card's own public field.
 """
 
 from __future__ import annotations
@@ -64,7 +64,9 @@ def _markdown_text(value: Any) -> str:
             separators=(",", ":"),
             sort_keys=True,
         )
-    escaped = _html_escape(value, quote=True)
+    # quotes stay literal: escaping them yields &#x27; and &quot;, whose # and ; the
+    # Markdown escape below would then break into a visible entity (322 cards, 2026-09-08)
+    escaped = _html_escape(value, quote=False)
     escaped = _MARKDOWN_SPECIAL_RE.sub(r"\\\1", escaped)
     return escaped.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
 

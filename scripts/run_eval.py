@@ -12,7 +12,8 @@
         --model claude-sonnet-5 --max-cost-usd 5 --max-searches 8
 
 prepare, probes, sample and estimate are free and offline. `judge` and `screen` are the
-paid commands: one Anthropic call per card, temperature 0, a pinned model, a per-run cost
+paid commands: one Anthropic call per card, the model's own decoding (claude-sonnet-5
+rejects an explicit temperature), a pinned model, a per-run cost
 ceiling they refuse to cross, and the instrument id recorded in every result. The screen
 additionally uses server-side web search, capped per card, because its question is
 whether the card matches the public record and the frozen bundle cannot answer that.
@@ -180,8 +181,11 @@ def cmd_judge(args) -> int:
                    + json.dumps(payload, ensure_ascii=False))
         started = time.monotonic()
         try:
+            # no temperature: claude-sonnet-5 rejects the parameter outright
+            # ("`temperature` is deprecated for this model", 400, seen 2026-09-07), so
+            # the recorded decoding for this instrument is the model's own default.
             reply = client.messages.create(
-                model=args.model, max_tokens=args.max_tokens, temperature=0,
+                model=args.model, max_tokens=args.max_tokens,
                 tools=[tool], tool_choice={"type": "tool", "name": "record_verdict"},
                 messages=[{"role": "user", "content": message}])
         except Exception as exc:
@@ -242,7 +246,7 @@ def cmd_screen(args) -> int:
         started = time.monotonic()
         try:
             reply = client.messages.create(
-                model=args.model, max_tokens=args.max_tokens, temperature=0,
+                model=args.model, max_tokens=args.max_tokens,
                 tools=tools, messages=[{"role": "user", "content": message}])
         except Exception as exc:
             failed += 1

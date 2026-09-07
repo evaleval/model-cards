@@ -55,7 +55,7 @@ SHA-256: `ecae87d19ae6dd49ead345c4e28f777e35ed065613b4c08bbbcbf8f9993121cd`
 | Field | Value |
 | --- | --- |
 | Results summary | The developer reports that perplexity continued to decrease, ARC scores remained stable, and the model stayed coherent even at long contexts, while retaining an unhinged style\. |
-| Human evaluations | The developer&\#x27;s readme states the model remains quite coherent even at 10k\+ context, while still being quite unhinged\. |
+| Human evaluations | The developer's readme states the model remains quite coherent even at 10k\+ context, while still being quite unhinged\. |
 
 ## Links
 

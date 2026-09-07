@@ -70,7 +70,7 @@ _Entries of the IBM AI Risk Atlas selected from what this card's own fields say.
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |
-| [Incorrect risk testing](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html>) | Card reports child safety and content safety evaluations but no evaluation for other risks such as hallucination or privacy, so the reported safety testing may be incomplete for the model&\#x27;s broad multimodal use\. | A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context\. |
+| [Incorrect risk testing](<https://www.ibm.com/docs/en/watsonx/saas?topic=SSYOK8/wsj/ai-risk-atlas/incorrect-risk-testing.html>) | Card reports child safety and content safety evaluations but no evaluation for other risks such as hallucination or privacy, so the reported safety testing may be incomplete for the model's broad multimodal use\. | A metric selected to measure or track a risk is incorrectly selected, incompletely measuring the risk, or measuring the wrong risk for the given context\. |
 
 ---
 

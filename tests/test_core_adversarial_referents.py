@@ -1,6 +1,6 @@
 """The nine ways a genuine quote lands on the wrong card, one fixture each.
 
-The AAAI evaluation named one error class above the others: a quote that is real, taken
+The earlier evaluation of generated benchmark cards named one error class above the others: a quote that is real, taken
 from a real source, and assigned to the wrong field, entity, checkpoint, table row or
 evaluation setting. Each test below is one shape of that error, with the failure class
 it guards named in its docstring. They run against the gates, the referent repair, the
