@@ -95,6 +95,11 @@ class Links(BaseModel):
     provenance: Optional[Dict[str, Dict[str, Any]]] = None
 
 
+class Risks(BaseModel):
+    possible_risks: Union[List[Any], str] = Field(default=NOT_SPECIFIED, description="AI Risk Atlas entries selected for THIS checkpoint from what the card itself says, as {category, description, url, justification} rows; filled by the risk stage, never authored from prose")
+    provenance: Optional[Dict[str, Dict[str, Any]]] = None
+
+
 class ProvenanceAndQuality(BaseModel):
     provenance: Union[Dict[str, Any], str] = Field(default=NOT_SPECIFIED)
     flagged_fields: Union[Dict[str, Any], str] = Field(default=NOT_SPECIFIED)
@@ -111,6 +116,7 @@ SECTION_MODELS: Dict[str, Any] = {
     "access_and_adoption": AccessAndAdoption,
     "evaluation": Evaluation,
     "links": Links,
+    "risks": Risks,
     "provenance_and_quality": ProvenanceAndQuality,
 }
 
@@ -294,7 +300,7 @@ def model_card_schema() -> CardSchema:
         list_fields={"input_output"},
         list_caps={"specifications.input_output": 6},
         groups=GROUPS,
-        det_only_sections={"provenance_and_quality"},
+        det_only_sections={"risks", "provenance_and_quality"},
         stage_b_rules=STAGE_B_RULES,
         extraction_system=EXTRACTION_SYSTEM,
         not_applicable=NOT_APPLICABLE,

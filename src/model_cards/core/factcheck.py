@@ -45,22 +45,50 @@ def route_from_env() -> Dict[str, str]:
     return {
         "model": os.environ.get("FACTREASONER_MODEL", ""),
         "api_base": os.environ.get("FACTREASONER_API_BASE", ""),
+        "provider": os.environ.get("FACTREASONER_PROVIDER", ""),
         "has_key": bool(os.environ.get("FACTREASONER_API_KEY")),
     }
 
 
-def probe_logprobs(model: str, api_base: str, api_key: str, timeout: float = 60.0
-                   ) -> Tuple[bool, str]:
-    """One tiny call: does this route return token logprobs?"""
+def provider_body(provider: str) -> Dict[str, Any]:
+    """OpenRouter provider preferences that make the router honour `logprobs`."""
+    order = [x.strip() for x in (provider or "").split(",") if x.strip()]
+    if not order:
+        return {}
+    return {"provider": {"order": order, "allow_fallbacks": False}}
+
+
+PROBE_RETRIES = 4
+PROBE_BACKOFF_S = 3.0
+
+
+def probe_logprobs(model: str, api_base: str, api_key: str, timeout: float = 60.0,
+                   provider: str = "") -> Tuple[bool, str]:
+    """One tiny call: does this route return token logprobs?
+
+    Without a pinned provider OpenRouter answers from whichever endpoint is cheapest,
+    and most of them drop `logprobs` silently; the 2026-09-05 probes of four models
+    all came back empty for that reason, not because no provider has them."""
     try:
+        import time
+
         import httpx
-        from openai import OpenAI
+        from openai import OpenAI, RateLimitError
 
         client = OpenAI(api_key=api_key, base_url=api_base,
                         timeout=httpx.Timeout(timeout, connect=10.0), max_retries=1)
-        reply = client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": "Reply with one word: yes"}],
-            max_tokens=4, temperature=0, logprobs=True, top_logprobs=2)
+        reply = None
+        for attempt in range(PROBE_RETRIES):
+            try:
+                reply = client.chat.completions.create(
+                    model=model, messages=[{"role": "user", "content": "Reply with one word: yes"}],
+                    max_tokens=4, temperature=0, logprobs=True, top_logprobs=2,
+                    extra_body=provider_body(provider) or None)
+                break
+            except RateLimitError:
+                if attempt == PROBE_RETRIES - 1:
+                    raise
+                time.sleep(PROBE_BACKOFF_S * (2 ** attempt))
         choice = reply.choices[0]
         content = getattr(choice, "logprobs", None)
         if content is None or not getattr(content, "content", None):
@@ -70,12 +98,8 @@ def probe_logprobs(model: str, api_base: str, api_key: str, timeout: float = 60.
         return False, f"logprobs probe failed: {type(exc).__name__}: {exc}"[:200]
 
 
-def availability(*, probe: bool = True) -> Tuple[bool, str]:
-    """Whether the final-claim pass can run here, and the reason when it cannot."""
-    try:
-        import fact_reasoner  # noqa: F401
-    except Exception as exc:
-        return False, f"fact_reasoner is not importable: {type(exc).__name__}"
+def merlin_path() -> str:
+    """The merlin binary FactReasoner's probabilistic layer shells out to, or ""."""
     merlin = os.environ.get("MERLIN_BIN")
     if not merlin:
         try:
@@ -84,7 +108,24 @@ def availability(*, probe: bool = True) -> Tuple[bool, str]:
             merlin = str(Config.MERLIN_BIN)
         except Exception:
             merlin = ""
-    if not merlin or not Path(merlin).is_file():
+    return merlin if merlin and Path(merlin).is_file() else ""
+
+
+def cache_dir() -> str:
+    """FactReasoner's NLI cache; the library default is a path relative to the cwd."""
+    import tempfile
+
+    return os.environ.get("FACTREASONER_CACHE_DIR") or str(
+        Path(tempfile.gettempdir()) / "model_cards_core_factreasoner_cache")
+
+
+def availability(*, probe: bool = True) -> Tuple[bool, str]:
+    """Whether the final-claim pass can run here, and the reason when it cannot."""
+    try:
+        import fact_reasoner  # noqa: F401
+    except Exception as exc:
+        return False, f"fact_reasoner is not importable: {type(exc).__name__}"
+    if not merlin_path():
         return False, "the merlin binary is not present"
     route = route_from_env()
     if not (route["model"] and route["api_base"] and route["has_key"]):
@@ -93,7 +134,10 @@ def availability(*, probe: bool = True) -> Tuple[bool, str]:
     if not probe:
         return True, "route configured, logprobs not probed"
     ok, reason = probe_logprobs(route["model"], route["api_base"],
-                                os.environ["FACTREASONER_API_KEY"])
+                                os.environ["FACTREASONER_API_KEY"],
+                                provider=route["provider"])
+    if ok and route["provider"]:
+        reason = f"logprobs available from {route['provider']}"
     return ok, reason
 
 
@@ -174,24 +218,71 @@ def final_claim_pass(card: Dict[str, Any], bindings, source_texts: Dict[str, str
         )
 
         route = route_from_env()
-        results = evaluate_factuality_two_tier(
-            formatted_rag_results=claims,
-            source_text="\n\n".join(source_texts.values()),
-            model=route["model"])
+        # the library defaults are paths relative to the cwd ("merlin/bin/merlin",
+        # "factreasoner_cache"), which is wherever the batch happened to be started
+        results = None
+        for attempt in range(PROBE_RETRIES):
+            try:
+                results = evaluate_factuality_two_tier(
+                    formatted_rag_results=claims,
+                    source_text="\n\n".join(source_texts.values()),
+                    model=route["model"],
+                    merlin_path=merlin_path(),
+                    cache_dir=cache_dir())
+                break
+            except Exception as exc:  # noqa: BLE001
+                if "429" not in str(exc) or attempt == PROBE_RETRIES - 1:
+                    raise
+                import time
+
+                time.sleep(PROBE_BACKOFF_S * (2 ** attempt))
     except Exception as exc:
         logger.warning("final-claim pass failed: %s", exc)
         return {**base, "status": "failed", "reason": f"{type(exc).__name__}: {exc}"[:200]}
 
+    return {**base, **read_outcomes(claims, results), "status": "ok", "reason": reason}
+
+
+CONTRADICTED_BELOW = 0.3
+
+
+def read_outcomes(claims: Dict[str, Any], results: Dict[str, Any]) -> Dict[str, Any]:
+    """Per-atom outcomes from FactReasoner's result, keyed back to the card fields.
+
+    The composer tool returns {"results": {counts}, "marginals": [{"variable",
+    "probabilities", "p_true"}], "escalation": {...}, ...}. The first version of this
+    reader iterated "results" as if it were the atom list and died on the first key,
+    which is what the 2026-09-05 integration audit flagged and the first end-to-end run
+    on 2026-09-06 confirmed. An atom is contradicted below CONTRADICTED_BELOW, neutral at
+    exactly 0.5 (no informative relation, after escalation "not in the source"),
+    supported above 0.5, and uncertain in between.
+    """
+
     by_id = {atom["id"]: atom for atom in claims["atoms"]}
     outcomes, contradicted = [], []
-    for entry in results.get("results", results.get("atoms", [])) or []:
-        atom_id = str(entry.get("id") or entry.get("atom_id") or "")
+    for entry in results.get("marginals") or []:
+        atom_id = str(entry.get("variable") or "")
         field = (by_id.get(atom_id) or {}).get("field")
-        label = str(entry.get("label") or entry.get("decision") or "").lower()
+        p_true = entry.get("p_true")
+        if not isinstance(p_true, (int, float)):
+            label = "unscored"
+        elif p_true < CONTRADICTED_BELOW:
+            label = "contradicted"
+        elif p_true == 0.5:
+            label = "neutral"
+        elif p_true > 0.5:
+            label = "supported"
+        else:
+            label = "uncertain"
         outcomes.append({"field": field, "atom": atom_id, "label": label,
-                         "score": entry.get("score") or entry.get("probability")})
-        if field and "contradict" in label:
+                         "p_true": p_true, "text": (by_id.get(atom_id) or {}).get("text")})
+        if field and label == "contradicted":
             contradicted.append(field)
-    return {"status": "ok", "reason": reason, "atoms": outcomes,
+    summary = results.get("results") or {}
+    return {"atoms": outcomes,
             "contradicted_fields": sorted(set(contradicted)),
-            "claims_built": len(claims["atoms"])}
+            "factuality_score": summary.get("factuality_score"),
+            "escalation": results.get("escalation"),
+            "label_counts": {label: sum(1 for o in outcomes if o["label"] == label)
+                             for label in ("supported", "neutral", "uncertain",
+                                           "contradicted", "unscored")}}

@@ -25,7 +25,7 @@ from typing import Any, Dict, List
 
 from ..schema import NOT_APPLICABLE, NOT_SPECIFIED, PUBLIC_FIELD_PATHS, get_field_value
 
-JUDGE_PROMPT_VERSION = "model-card-judge-v1"
+JUDGE_PROMPT_VERSION = "model-card-judge-v2"
 
 # Fields whose value is copied from a machine-readable field of the snapshot, not read
 # out of prose. Judging them measures the Hub's own metadata, not the card.
@@ -33,6 +33,8 @@ JUDGE_SKIP = frozenset({
     "identity.model_id", "identity.version", "links.model_card",
     "access_and_adoption.downloads", "access_and_adoption.likes",
     "specifications.model_size",
+    # selected from a taxonomy by what the card says, not read out of a source
+    "risks.possible_risks",
 })
 
 JUDGE_PROMPT = """You are a careful faithfulness judge for an AI model card.
@@ -98,6 +100,13 @@ JUDGE_SCHEMA: Dict[str, Any] = {
     },
 }
 
+# Bundle files the judge does not see: the datastore join and the risk taxonomy are not
+# sources a card value is read from. config.json, model_info.json and extras.json ARE:
+# the first screen (2026-09-06) held text sources only and called 121 structured-channel
+# values unsupported (release_date, precision, num_parameters, architecture_type,
+# context_length) that a reader of the JSON would have confirmed in one look.
+JUDGE_SOURCE_SKIP = frozenset({"eee.json", "risk-atlas.json"})
+
 SOURCE_CAP = 280_000  # characters, about 70k tokens; bounds the largest full-paper bundle
 
 
@@ -137,7 +146,7 @@ def build_input(artifact, *, source_cap: int = SOURCE_CAP) -> Dict[str, Any]:
     sources, used = [], 0
     for source in artifact.source_bundle.files if artifact.source_bundle else []:
         text = (source.content or "").strip()
-        if not text or source.name.endswith(".json"):
+        if not text or source.name in JUDGE_SOURCE_SKIP:
             continue
         room = source_cap - used
         if room <= 0:

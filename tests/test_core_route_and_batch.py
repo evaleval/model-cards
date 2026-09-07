@@ -22,7 +22,7 @@ from model_cards.core.cli import build_parser
 
 
 def test_route_pin_is_the_recorded_binding():
-    """route_pin_drift: the defaults are the pin recorded in vault/llm_config.md."""
+    """route_pin_drift: the defaults are the pin recorded with every run."""
     for key in ("MODELCARDS_OPENROUTER_MODEL", "MODELCARDS_PROVIDER_ORDER",
                 "MODELCARDS_TEMPERATURE", "MODELCARDS_MAX_TOKENS"):
         os.environ.pop(key, None)

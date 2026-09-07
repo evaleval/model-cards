@@ -14,7 +14,7 @@ from auto_benchmarkcard.tools.composer import validator as V
 def test_v5_schema_has_exactly_the_frozen_paths():
     sch = CS.model_card_schema()
     assert tuple(CS.field_paths(sch)) == CARD_FIELD_PATHS
-    assert len(CARD_FIELD_PATHS) == 38
+    assert len(CARD_FIELD_PATHS) == 39
     assert sch.composed_sections == ["identity", "lineage", "specifications", "training_context",
                                      "access_and_adoption", "evaluation", "links"]
     sch.assert_groups_cover()

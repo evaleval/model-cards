@@ -145,6 +145,32 @@ def _normalize_evidence_text(value: str) -> str:
     return _WHITESPACE_RE.sub(" ", value.translate(_TYPOGRAPHIC_TRANSLATION)).strip()
 
 
+def structured_document(name: str, content: str) -> Any:
+    """The document a structured pointer resolves against, for one bundle file.
+
+    JSON files denote themselves, so /architectures on a config.json is the key the
+    file actually has and a reader can follow the pointer into the bytes the evidence
+    names. README.md is not JSON, so its structured pointers address the parsed YAML
+    frontmatter under /card_data, which is the only structured thing in it.
+
+    This is the single definition of the pointer namespace. The span builder resolves
+    against it before minting evidence and the artifact validator resolves against it
+    on load, so a pointer that survives one survives the other.
+    """
+
+    if name == "README.md":
+        return {"card_data": parse_frontmatter(content)}
+    if name in ("config.json", "extras.json", "risk-atlas.json"):
+        try:
+            return json.loads(content)
+        except ValueError as exc:
+            raise ValueError(f"structured evidence requires valid JSON: {name}") from exc
+    raise ValueError(
+        "structured file evidence is supported only for README.md frontmatter, "
+        "config.json, extras.json and risk-atlas.json"
+    )
+
+
 def _resolve_json_pointer(document: Any, pointer: str) -> Any:
     if pointer == "":
         return document
@@ -917,36 +943,9 @@ class CardArtifact(_FrozenModel):
                                     "file-backed exact evidence span does not match source content"
                                 )
                         if evidence.structured_pointer is not None:
-                            if source_file.name == "README.md":
-                                structured_document: Any = {
-                                    "card_data": parse_frontmatter(source_file.content)
-                                }
-                            elif source_file.name == "config.json":
-                                try:
-                                    config_document = json.loads(source_file.content)
-                                except ValueError as exc:
-                                    raise ValueError(
-                                        "structured config evidence requires valid JSON"
-                                    ) from exc
-                                structured_document = {"config": config_document}
-                            elif source_file.name == "extras.json":
-                                # the collector's own JSON sidecar: the revision's
-                                # safetensors bytes and README frontmatter, which
-                                # model_info does not return. It is a plain document, so
-                                # its pointers resolve against it directly.
-                                try:
-                                    structured_document = json.loads(source_file.content)
-                                except ValueError as exc:
-                                    raise ValueError(
-                                        "structured extras evidence requires valid JSON"
-                                    ) from exc
-                            else:
-                                raise ValueError(
-                                    "structured file evidence is supported only for README.md "
-                                    "frontmatter, config.json and extras.json"
-                                )
                             resolved_fragment = _resolve_json_pointer(
-                                structured_document, evidence.structured_pointer
+                                structured_document(source_file.name, source_file.content),
+                                evidence.structured_pointer,
                             )
                             if resolved_fragment != evidence.structured_fragment:
                                 raise ValueError(

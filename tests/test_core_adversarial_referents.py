@@ -16,6 +16,7 @@ import pytest
 from model_cards.core import model_frame as MF
 from model_cards.core import model_gates as MG
 from model_cards.core.support import unsupported_leaves
+from model_cards.core import table_scores as TS
 from model_cards.core.table_scores import read_metric, read_setting, reconcile_rows, target_score_rows
 
 REV = "7df9a82518afdecae4e8c026b27adccc8c1f0032"
@@ -328,3 +329,398 @@ def test_reason_codes_stay_machine_readable():
         assert REASON_CODE_RE.fullmatch(gate_reason), gate_reason
     for gate_reason in (f"numeric_value_of_{r}_not_this_checkpoint" for r in MF.RELATIONS):
         assert REASON_CODE_RE.fullmatch(gate_reason), gate_reason
+
+
+# 10 -----------------------------------------------------------------------------------
+def test_a_family_roster_sentence_is_not_the_first_listed_checkpoint_s_own_fact():
+    """Failure class: family_roster_sentence_as_a_checkpoint_fact. The Qwen2-0.5B card of
+    2026-09-05 published identity.model_type = "Pretrained and instruction-tuned models
+    of 5 sizes, including Qwen2-0.5B, Qwen2-1.5B, Qwen2-7B, Qwen2-57B-A14B, and
+    Qwen2-72B", relation exact_target. The comparison rule could not catch it: the target
+    is the FIRST name in the list, so target_at < others_at read as target-is-subject.
+    An enumeration of three or more models is about the family however it is ordered."""
+    roster = ("Pretrained and instruction-tuned models of 5 sizes, including Qwen2-0.5B, "
+              "Qwen2-1.5B, Qwen2-7B, and Qwen2-72B")
+    frame = _frame("Qwen/Qwen2-0.5B", readme=roster,
+                   llm=_LLM(siblings=["Qwen2-1.5B", "Qwen2-7B", "Qwen2-72B"],
+                            aliases=["Qwen2"]))
+    kept, withheld = _gate(frame, [_rec("identity.model_type", roster, "target")])
+
+    assert kept == []
+    assert [(r["field"], r["withhold_reason"]) for r in withheld] == [
+        ("identity.model_type", "roster_sentence_enumerates_the_family")]
+    # and it is visible in the ledger, not dropped to a counter
+    assert withheld[0]["quote"] == roster
+
+
+def test_two_models_named_is_still_the_ordinary_comparison_rule():
+    """Failure class: family_roster_sentence_as_a_checkpoint_fact. The roster rule must
+    not swallow the two-model case, where word order does decide the subject."""
+    frame = _frame("allenai/OLMo-2-1124-7B", readme="OLMo-2-1124-7B outperforms Llama-3.1-8B.",
+                   llm=_LLM(comparisons=["Llama-3.1-8B"]))
+    repaired = MG.resolve_model_referents(
+        [_rec("evaluation.results_summary",
+              "OLMo-2-1124-7B outperforms Llama-3.1-8B on MMLU.", "target")], frame)
+    assert repaired[0].get("comparison") is False
+    assert repaired[0]["referent"] == "target"
+
+
+# 11 -----------------------------------------------------------------------------------
+def test_a_base_checkpoint_never_carries_its_post_trained_sibling_s_name():
+    """Failure class: base_alias_manufactures_the_sibling_name. Qwen3-8B-Base's alias set
+    contained the literal string "Qwen3-8B", because the suffix builder used only the
+    post-training stage tokens and "base" is not one. table_scores._label_matches then
+    matched the sibling's column truthfully, and the base card of 2026-09-05 published 42
+    of its 57 rows from the post-trained model, 22 of them with setting "Thinking", which
+    a base checkpoint does not have."""
+    base = MF._target_node("Qwen/Qwen3-8B-Base", REV, {"readme_markdown": ""})
+    derivative = MF._target_node("Qwen/Qwen3-8B", REV, {"readme_markdown": ""})
+
+    assert "Qwen3-8B" not in base["aliases"]
+    assert "Qwen3 8B" not in base["aliases"]
+    assert "Qwen3-8B-Base" in base["aliases"]
+    # and the two alias sets no longer intersect, which is the invariant that matters
+    assert not set(base["aliases"]) & set(derivative["aliases"])
+
+    # the same for a pt / it pair, whose stage token is spelled differently
+    pt = MF._target_node("google/gemma-3-4b-pt", REV, {"readme_markdown": ""})
+    it = MF._target_node("google/gemma-3-4b-it", REV, {"readme_markdown": ""})
+    assert not set(pt["aliases"]) & set(it["aliases"])
+
+
+def test_the_post_trained_column_is_not_the_base_card_s_row():
+    """Failure class: base_alias_manufactures_the_sibling_name, end to end through the
+    table reader with the Qwen3 report's own two tables."""
+    paper = (
+        "## 3.3 Pre-training Evaluation\n"
+        "| | Llama-3-8B Base | Qwen2.5-7B Base | Qwen3-8B Base |\n"
+        "| --- | --- | --- | --- |\n"
+        "| MMLU | 66.60 | 74.16 | 76.89 |\n"
+        "\n"
+        "## 4.6 Post-training Evaluation\n"
+        "| | DeepSeek-R1-Distill-Qwen-14B | Qwen3-4B | Qwen3-8B |\n"
+        "| --- | --- | --- | --- |\n"
+        "| MMLU-Redux | 84.1 | 83.7 | 87.5 |\n"
+    )
+    base = MF._target_node("Qwen/Qwen3-8B-Base", REV, {"readme_markdown": ""})
+    rows = target_score_rows(paper, [base["name"], *base["aliases"]], "docling")
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("MMLU", "76.89")]
+
+    derivative = MF._target_node("Qwen/Qwen3-8B", REV, {"readme_markdown": ""})
+    rows = target_score_rows(paper, [derivative["name"], *derivative["aliases"]], "docling")
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("MMLU-Redux", "87.5")]
+
+
+# 12 -----------------------------------------------------------------------------------
+def test_a_base_model_table_is_not_the_chat_card_s_table():
+    """Failure class: table_section_scope_ignored. The DeepSeek-V3 report labels a column
+    "DeepSeek-V3" in BOTH its base-model table and its chat-model table; only the section
+    heading tells them apart. Reading the column alone published five pre-training rows on
+    the chat card of 2026-09-05. The section path was already recorded on the evidence."""
+    paper = (
+        "We pretrain DeepSeek-V3-Base and then post-train it into DeepSeek-V3.\n"
+        "# 4. Evaluation Results\n"
+        "## Base Model\n"
+        "### Standard Benchmarks\n"
+        "| Benchmark (Metric) | # Shots | DeepSeek-V2 | DeepSeek-V3 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| MMLU (Acc.) | 5-shot | 78.4 | 87.1 |\n"
+        "\n"
+        "## Chat Model\n"
+        "### Standard Benchmarks\n"
+        "| Benchmark (Metric) | DeepSeek V2.5 | DeepSeek-V3 |\n"
+        "| --- | --- | --- |\n"
+        "| MMLU (Acc.) | 80.6 | 88.5 |\n"
+    )
+    chat = MF._target_node("deepseek-ai/DeepSeek-V3", REV, {"readme_markdown": ""})
+    rows = target_score_rows(paper, [chat["name"], *chat["aliases"]], "docling",
+                             TS.target_stage("deepseek-ai/DeepSeek-V3", paper))
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("MMLU", "88.5")]
+
+    base = MF._target_node("deepseek-ai/DeepSeek-V3-Base", REV, {"readme_markdown": ""})
+    rows = target_score_rows(paper, [base["name"], *base["aliases"], "DeepSeek-V3"],
+                             "docling", TS.target_stage("deepseek-ai/DeepSeek-V3-Base"))
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("MMLU", "87.1")]
+
+
+def test_a_target_with_no_stage_in_its_name_reads_every_table():
+    """Failure class: table_section_scope_ignored. The scope rule must not silence a
+    checkpoint whose name declares no stage, which is most community models."""
+    paper = ("## Base Model\n"
+             "| Benchmark | Mistral-7B-v0.3 |\n| --- | --- |\n| MMLU | 62.5 |\n")
+    node = MF._target_node("mistralai/Mistral-7B-v0.3", REV, {"readme_markdown": ""})
+    rows = target_score_rows(paper, [node["name"], *node["aliases"]], "docling",
+                             TS.target_stage("mistralai/Mistral-7B-v0.3"))
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("MMLU", "62.5")]
+
+
+# 13 -----------------------------------------------------------------------------------
+def test_a_table_row_supports_only_the_target_s_own_column():
+    """Failure class: number_lifted_from_another_model_s_column. The Tulu 3 70B DPO card
+    of 2026-09-06 published "a Safety (6 task avg.) score of 94.4 for this model". The
+    cited quote was the whole row "Safety (6 task avg.) | 94.4 | 89.0 | 88.3 | ..." under
+    a header naming seven models; 94.4 is the SFT sibling's column, 89.0 is the DPO
+    model's. Leaf support passed 94.4 because it was in the quote. A row quote now
+    reduces to the target's cell, and to the label alone when the target has no column."""
+    header = ["Benchmark (eval)", "Tülu 3 70B SFT", "Tülu 3 DPO 70B", "Tülu 3 70B",
+              "Llama 3.1 70B Instruct"]
+    row = "Safety (6 task avg.) | 94.4 | 89.0 | 88.3 | 76.5 |"
+    dpo = ["Llama-3.1-Tulu-3-70B-DPO", "Tülu 3 DPO 70B", "Tulu 3 70B DPO"]
+    assert TS.row_quote_for_target(row, header, dpo) == "Safety (6 task avg.) | 89.0"
+    final = ["Llama-3.1-Tulu-3-70B", "Tülu 3 70B"]
+    assert TS.row_quote_for_target(row, header, final) == "Safety (6 task avg.) | 88.3"
+    # no column for the target: the row supports no number
+    assert TS.row_quote_for_target(row, header, ["Qwen3-8B"]) == "Safety (6 task avg.)"
+    # not a table row, or no header: untouched
+    assert TS.row_quote_for_target("It scores 94.4.", None, dpo) == "It scores 94.4."
+    # the reduced quote is what the leaf-support check sees
+    assert unsupported_leaves("a Safety score of 94.4",
+                              [TS.row_quote_for_target(row, header, dpo)]) == ["94.4"]
+    assert unsupported_leaves("a Safety score of 89.0",
+                              [TS.row_quote_for_target(row, header, dpo)]) == []
+
+
+# 14 -----------------------------------------------------------------------------------
+def test_a_sentence_about_the_other_stage_is_not_this_checkpoint_s_fact():
+    """Failure class: other_stage_sentence_on_this_checkpoint. Four base cards of
+    2026-09-06 (Llama 3.2 1B and 3B, Llama 3.1 8B, Qwen1.5 7B) published as their own
+    results_summary a sentence the README says of "the Llama 3.2 instruction-tuned text
+    only models". No model name, so the comparison rule had nothing to see; a stage word
+    is enough to know the sentence is about the other member of the pair."""
+    readme = ("Llama-3.2-1B and Llama-3.2-1B-Instruct are released together. "
+              "The Llama 3.2 instruction-tuned text only models are optimized for multilingual "
+              "dialogue use cases. They outperform many of the available open source and closed "
+              "chat models on common industry benchmarks.")
+    base = _frame("meta-llama/Llama-3.2-1B", readme=readme)
+    assert any(n["name"] == "Llama-3.2-1B-Instruct" for n in base["nodes"])
+    kept, withheld = _gate(base, [
+        _rec("evaluation.results_summary",
+             "The Llama 3.2 instruction-tuned text only models are optimized for multilingual "
+             "dialogue use cases.", "target", doc="hf_readme")])
+    assert kept == []
+    assert [(r["field"], r["withhold_reason"]) for r in withheld] == [
+        ("evaluation.results_summary", "sentence_about_the_other_stage")]
+
+    # on the instruct checkpoint the guard stays silent: whatever the family policy then
+    # decides, the sentence is not refused for being about the other stage
+    instruct = _frame("meta-llama/Llama-3.2-1B-Instruct", readme=readme)
+    assert any(n["name"] == "Llama-3.2-1B" for n in instruct["nodes"])
+    kept, withheld = _gate(instruct, [
+        _rec("evaluation.results_summary",
+             "The Llama 3.2 instruction-tuned text only models are optimized for multilingual "
+             "dialogue use cases.", "target", doc="hf_readme")])
+    assert "sentence_about_the_other_stage" not in [r.get("withhold_reason") for r in withheld]
+
+    # and a sentence about pretrained models is not the instruct checkpoint's
+    kept, withheld = _gate(instruct, [
+        _rec("training_context.training_data",
+             "The pretrained models were trained on 9 trillion tokens.", "target", doc="hf_readme")])
+    assert kept == [] and withheld[0]["withhold_reason"] == "sentence_about_the_other_stage"
+
+
+# 15 -----------------------------------------------------------------------------------
+def test_the_sentence_above_a_table_scopes_it_even_without_a_caption():
+    """Failure class: table_section_scope_ignored (lead-in form). The Gemma 4 26B A4B
+    base card of 2026-09-06 took all 15 rows of a README table whose introduction two
+    lines above read "Evaluation results marked in the table are for instruction-tuned
+    models." There was no "Table N" caption, so the caption reader saw nothing."""
+    readme = ("## Benchmark Results\n\n"
+              "These models were evaluated against a large collection of datasets. "
+              "Evaluation results marked in the table are for instruction-tuned models.\n\n"
+              "| | Gemma 4 31B | Gemma 4 26B A4B |\n| --- | --- | --- |\n| MMLU | 91.2 | 86.4 |\n")
+    aliases = ["gemma-4-26b-a4b", "Gemma 4 26B A4B", "gemma 4 26b a4b"]
+    base_rows = target_score_rows(readme, aliases, "hf_readme", "base")
+    assert base_rows == []
+    inst_rows = target_score_rows(readme, aliases, "hf_readme", "post")
+    assert [(r["benchmark"], r["score"]) for r in inst_rows] == [("MMLU", "86.4")]
+    unknown_rows = target_score_rows(readme, aliases, "hf_readme", None)
+    assert len(unknown_rows) == 1
+
+
+
+# 16 -----------------------------------------------------------------------------------
+def test_a_family_identity_statement_is_allowed_on_every_member():
+    """Failure class: family_identity_withheld_on_every_derivative. identity.summary was
+    Not specified on 45 of 74 cards (2026-09-06) and the ledger said why 63 times:
+    family_statement_not_this_checkpoint. The README's one-line description is a family
+    sentence on nearly every instruct and derivative card. What the family is, who made
+    it, what it does and what it is called are identity, not inheritance, so they are
+    allowed on any member at relation family. Training data and results still are not."""
+    readme = ("Qwen2 is a language model series including decoder language models of different "
+              "sizes. Qwen2 was pretrained on 7 trillion tokens.")
+    instruct = _frame("Qwen/Qwen2-0.5B-Instruct", readme=readme, tier="family_reference",
+                      llm=_LLM(aliases=["Qwen2"]))
+    kept, withheld = _gate(instruct, [
+        _rec("identity.summary",
+             "Qwen2 is a language model series including decoder language models of different sizes.",
+             "family:qwen2", doc="hf_readme"),
+        _rec("training_context.training_data_size", "Qwen2 was pretrained on 7 trillion tokens.",
+             "family:qwen2", doc="hf_readme"),
+    ])
+    assert [(r["field"], r["relation"]) for r in kept] == [("identity.summary", "family")]
+    assert [(r["field"], r["withhold_reason"]) for r in withheld] == [
+        ("training_context.training_data_size", "family_statement_not_this_checkpoint")]
+
+
+# 17 -----------------------------------------------------------------------------------
+def test_the_bare_family_name_is_the_base_checkpoint_under_a_base_model_heading():
+    """Failure class: base_column_named_without_its_suffix. The DeepSeek-V3 report labels
+    the base model's column "DeepSeek-V3" in its "Base Model" tables, and the chat model's
+    column "DeepSeek-V3" in its "Chat Model" tables. DeepSeek-V3-Base matched nothing
+    (0 rows, 2026-09-06). Under a heading that says base, the bare name is the base."""
+    paper = ("# 4. Evaluation Results\n## Base Model\n### Standard Benchmarks\n"
+             "| Benchmark (Metric) | # Shots | DeepSeek-V2 | DeepSeek-V3 |\n| --- | --- | --- | --- |\n"
+             "| MMLU (Acc.) | 5-shot | 78.4 | 87.1 |\n\n"
+             "## Chat Model\n### Standard Benchmarks\n"
+             "| Benchmark (Metric) | DeepSeek V2.5 | DeepSeek-V3 |\n| --- | --- | --- |\n"
+             "| MMLU (Acc.) | 80.6 | 88.5 |\n")
+    base = MF._target_node("deepseek-ai/DeepSeek-V3-Base", REV, {"readme_markdown": ""})
+    rows = target_score_rows(paper, [base["name"], *base["aliases"]], "docling", "base")
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("MMLU", "87.1")]
+    # and never the chat table, whose heading says the other stage
+    assert all(r["score"] != "88.5" for r in rows)
+    assert TS.bare_base_names(["DeepSeek-V3-Base", "DeepSeek V3 Base", "gemma-3-4b-pt"]) == [
+        "DeepSeek-V3", "DeepSeek V3", "gemma-3-4b"]
+
+
+# 18 -----------------------------------------------------------------------------------
+def test_a_sentence_that_names_both_stages_is_not_about_the_other_one():
+    """Failure class: both_stages_sentence_refused_as_other_stage. The other-stage rule
+    of 2026-09-06 reads "instruction-tuned variants" on a base card as a sentence about
+    the sibling. The Gemma 2 README describes the release with both members in one
+    sentence, and refusing it left google/gemma-2-9b with no model_type and no
+    adaptations at all (2026-09-07). A sentence that names this checkpoint's stage as
+    well is about the release."""
+    readme = ("Gemma is a family of lightweight models.\n"
+              "They are text-to-text, decoder-only large language models, available in English, "
+              "with open weights for both pre-trained variants and instruction-tuned variants.\n"
+              "gemma-2-9b-it is the instruction-tuned version.\n")
+    frame = _frame("google/gemma-2-9b", readme=readme, tier="none")
+    assert MG._stage_of(frame) == "base"
+    both = ("They are text-to-text, decoder-only large language models, available in English, "
+            "with open weights for both pre-trained variants and instruction-tuned variants.")
+    kept, withheld = _gate(frame, [_rec("identity.model_type", both, "target", doc="hf_readme")])
+    assert [r["field"] for r in kept] == ["identity.model_type"]
+    assert withheld == []
+    # the one-stage sentence of 2026-09-06 is still refused
+    only_other = ("The Llama 3.2 instruction-tuned text only models are optimized for "
+                  "multilingual dialogue use cases.")
+    kept, withheld = _gate(frame, [_rec("evaluation.results_summary", only_other, "target",
+                                        doc="hf_readme")])
+    assert kept == []
+    assert [r["withhold_reason"] for r in withheld] == ["sentence_about_the_other_stage"]
+    assert MG.names_both_stages("the pretrained and instruction-tuned checkpoints") is True
+    assert MG.names_both_stages("the instruction-tuned models") is False
+
+
+# 19 -----------------------------------------------------------------------------------
+def test_the_technology_a_family_was_built_from_is_not_the_referent():
+    """Failure class: technology_source_steals_the_referent. "Gemma is a family of
+    lightweight, state-of-the-art open models from Google, built from the same research
+    and technology used to create the Gemini models" names exactly one model, Gemini, so
+    the sole-other-model rule rebound the sentence to Gemini and identity.summary was
+    withheld as a comparison model's fact on every Gemma card (2026-09-07). A model named
+    as the technology this one came out of is not the subject of the sentence."""
+    readme = ("Gemma is a family of lightweight, state-of-the-art open models from Google, "
+              "built from the same research and technology used to create the Gemini models.\n")
+    frame = _frame("google/gemma-2-9b", readme=readme, tier="none",
+                   llm=_LLM(comparisons=["Gemini"]))
+    quote = ("Gemma is a family of lightweight, state-of-the-art open models from Google, "
+             "built from the same research and technology used to create the Gemini models.")
+    repaired = MG.resolve_model_referents([_rec("identity.summary", quote, "target",
+                                                doc="hf_readme")], frame)
+    assert repaired[0]["referent"] == "target"
+    assert repaired[0]["referent_resolution"] == "technology_source_named_not_the_subject"
+    # the ordinary sole-other-model rule is untouched: a plain sentence about Gemini is
+    # Gemini's, not this checkpoint's
+    plain = "Gemini is a multimodal model trained on a large corpus."
+    repaired = MG.resolve_model_referents([_rec("identity.summary", plain, "target",
+                                                doc="hf_readme")], frame)
+    assert repaired[0]["referent"] == "comparison:gemini"
+
+
+# 20 -----------------------------------------------------------------------------------
+def test_a_column_label_in_the_developers_own_shorthand_is_the_targets_column():
+    """Failure class: stage_token_order_and_omitted_version_in_column_labels. The Gemma 2
+    README labels its columns "Gemma PT 9B" and "Gemma 2 IT 9B". String equality against
+    the repo name matched neither, so google/gemma-2-9b and google/gemma-2-9b-it were
+    published with no benchmark scores and no safety evaluations at all (2026-09-07),
+    the largest single gap on both cards."""
+    pt = ("| Benchmark | Metric | Gemma PT 9B | Gemma PT 27B |\n"
+          "| --- | --- | --- | --- |\n"
+          "| MMLU | 5-shot, top-1 | 71.3 | 75.2 |\n")
+    it = ("| Benchmark | Metric | Gemma 2 IT 9B | Gemma 2 IT 27B |\n"
+          "| --- | --- | --- | --- |\n"
+          "| RealToxicity | average | 8.25 | 8.84 |\n")
+    base = MF._target_node("google/gemma-2-9b", REV, {"readme_markdown": ""})
+    base_aliases = [base["name"], *base["aliases"]]
+    rows = target_score_rows(pt, base_aliases, "hf_readme", "base", own_readme=True)
+    assert [(r["benchmark"], r["score"], r["setting"]) for r in rows] == [
+        ("MMLU", "71.3", "5-shot")]
+    # the 27B sibling's column is never the 9B's, and the instruction-tuned table is not
+    # the base card's table
+    assert all(r["score"] != "75.2" for r in rows)
+    assert target_score_rows(it, base_aliases, "hf_readme", "base", own_readme=True) == []
+
+    inst = MF._target_node("google/gemma-2-9b-it", REV, {"readme_markdown": ""})
+    inst_aliases = [inst["name"], *inst["aliases"]]
+    rows = target_score_rows(it, inst_aliases, "hf_readme", "post", own_readme=True)
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("RealToxicity", "8.25")]
+    assert target_score_rows(pt, inst_aliases, "hf_readme", "post", own_readme=True) == []
+    # the version may only be left out in the checkpoint's own README, and only when the
+    # sources say which stage this checkpoint is
+    assert target_score_rows(pt, base_aliases, "docling", "base") == []
+    assert target_score_rows(pt, base_aliases, "hf_readme", None, own_readme=True) == []
+
+
+# 21 -----------------------------------------------------------------------------------
+def test_the_category_column_is_not_the_benchmark():
+    """Failure class: category_column_read_as_benchmark. The Llama 3.2 README puts a
+    Category column before the Benchmark column and leaves it empty on every continuation
+    row. The reader took the first cell, so meta-llama/Llama-3.2-3B published a benchmark
+    called "General" with MMLU's number and lost every row whose category cell was blank
+    (2026-09-07). The DeepSeek-V3 card published four the same way: English, Code, Math,
+    Chinese."""
+    readme = ("| Category | Benchmark | \\# Shots | Metric | Llama 3.2 1B | Llama 3.2 3B |\n"
+              "| ----- | ----- | :---: | :---: | :---: | :---: |\n"
+              "| General | MMLU | 5 | macro\\_avg/acc\\_char | 32.2 | 58 |\n"
+              "|  | AGIEval English | 3-5 | average/acc\\_char | 23.3 | 39.2 |\n"
+              "| Reading comprehension | SQuAD | 1 | em | 49.2 | 67.7 |\n")
+    node = MF._target_node("meta-llama/Llama-3.2-3B", REV, {"readme_markdown": ""})
+    rows = target_score_rows(readme, [node["name"], *node["aliases"]], "hf_readme", "base",
+                             own_readme=True)
+    assert [(r["benchmark"], r["score"], r["setting"], r["metric"]) for r in rows] == [
+        ("MMLU", "58", "5-shot", "accuracy"),
+        ("AGIEval English", "39.2", "3-5 shot", "accuracy"),
+        ("SQuAD", "67.7", "1-shot", "exact match")]
+    assert all(r["benchmark"] not in ("General", "Reading comprehension") for r in rows)
+
+
+# 22 -----------------------------------------------------------------------------------
+def test_the_instruction_tuned_table_belongs_to_the_instruction_tuned_card():
+    """Failure classes: precision_decoration_in_column_label and
+    instruct_table_read_by_the_base_card. The Llama 3.2 README puts its instruct results
+    under "Instruction Tuned Models" and labels the unquantized column "Llama 3.2 3B
+    bf16" beside the quantized SpinQuant and QLoRA columns. The instruct card read none
+    of it; the base card, whose name and README never mention a sibling, read thirteen
+    rows of it (2026-09-07). Under a heading that says instruction-tuned, the bare name
+    is the instruct model, bf16 is its serving precision, and a quantized re-upload is
+    still a different checkpoint. A base checkpoint that declares no base model of its
+    own does not read that section at all."""
+    readme = ("## Benchmarks\n### Instruction Tuned Models\n"
+              "| Benchmark | Llama 3.2 3B bf16 | Llama 3.2 3B Spin Quant | Llama 3.2 3B QLoRA |\n"
+              "| --- | --- | --- | --- |\n"
+              "| MMLU | 63.4 | 60.0 | 62.4 |\n")
+    node = MF._target_node("meta-llama/Llama-3.2-3B-Instruct", REV, {"readme_markdown": ""})
+    rows = target_score_rows(readme, [node["name"], *node["aliases"]], "hf_readme", "post",
+                             own_readme=True)
+    assert [(r["benchmark"], r["score"]) for r in rows] == [("MMLU", "63.4")]
+    assert all(r["score"] not in ("60.0", "62.4") for r in rows)
+    # the base checkpoint of the same release: no stage token in its name, no base model
+    # tag, and its README never spells the sibling out
+    assert TS.target_stage("meta-llama/Llama-3.2-3B", readme, []) == "base"
+    base = MF._target_node("meta-llama/Llama-3.2-3B", REV, {"readme_markdown": ""})
+    assert target_score_rows(readme, [base["name"], *base["aliases"]], "hf_readme", "base",
+                             own_readme=True) == []
+    assert TS.bare_post_names(["Llama-3.2-3B-Instruct", "Llama 3.2 3B Instruct"]) == [
+        "Llama-3.2-3B", "Llama 3.2 3B"]

@@ -21,7 +21,7 @@ from model_cards.core.public import (
     public_projection,
     validate_public_card,
 )
-from model_cards.public_markdown import render_public_markdown
+from model_cards.core.public_markdown import render_public_markdown
 from model_cards.core.schema import NOT_SPECIFIED, blank_card, set_field_value
 
 

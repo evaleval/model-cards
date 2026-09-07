@@ -37,6 +37,8 @@ from .calls import (
     capped_generate,
 )
 from .support import unsupported_leaves
+from .risks import TAXONOMY_FILE, TAXONOMY_URI, frozen_taxonomy, run_risk_stage
+from .table_scores import row_quote_for_target
 from .spans import (
     CompositionError, _stable_json, _digest_text, _structured_evidence,
     _target_manifest_evidence, _text_evidence,
@@ -342,19 +344,57 @@ _PIPELINE_MODALITIES = {
 }
 
 
+_BYTES_PER_PARAM = {"F64": 8, "F32": 4, "BF16": 2, "F16": 2, "F8_E4M3": 1, "F8_E5M2": 1,
+                    "I8": 1, "U8": 1, "F8": 1, "I32": 4, "I64": 8, "BOOL": 1, "I16": 2}
+
+
+def _size_contradicts_precision(total_bytes: int, parameters, dtype) -> bool:
+    """Whether the weight bytes cannot be that many parameters at that precision.
+
+    A repo that ships two complete weight formats used to have both summed, publishing
+    27.0 GiB for a 7B BF16 model, exactly double. The collector picks one format now;
+    this refuses the value outright when the arithmetic still does not work, because a
+    model size a reader can divide by the parameter count has to survive that division.
+    """
+
+    width = _BYTES_PER_PARAM.get(str(dtype or "").upper())
+    if not width or not isinstance(parameters, int) or parameters <= 0:
+        return False
+    return total_bytes > parameters * width * 1.5
+
+
+_CHECKPOINT_DEICTIC_RE = re.compile(
+    r"^\s*(?:this|the)\s+(?:checkpoint|model|release)\b", re.IGNORECASE)
+
+
+def _written_as_the_checkpoint(value: Any) -> bool:
+    """Whether prose opens by asserting something of THIS checkpoint.
+
+    A family-relation value may describe the family; it may not begin "This checkpoint
+    is" or "The model was", because the public card shows the sentence and not the
+    relation, and a reader takes the sentence at its word.
+    """
+    if not isinstance(value, str):
+        return False
+    return bool(_CHECKPOINT_DEICTIC_RE.match(value))
+
+
 def _table_score_specs(bundle: SourceBundle, bridge: ComposerBridge, frame: Dict[str, Any],
-                       files_by_doc: Dict[str, SourceFile]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+                       files_by_doc: Dict[str, SourceFile],
+                       card_stage: str | None = None) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """benchmark_scores rows from README and paper tables whose row label is the target."""
     from .table_scores import reconcile_rows, target_score_rows
     target = next(n for n in frame["nodes"] if n["id"] == frame.get("target_id", "target"))
     aliases = [target["name"], *target.get("aliases", [])]
+    stage = card_stage
     collected: List[Dict[str, Any]] = []
     seen = set()
     for doc in (DOC_README, DOC_PAPER, DOC_HTML):
         src = files_by_doc.get(doc)
         if src is None or not src.content:
             continue
-        for r in target_score_rows(src.content, aliases, doc):
+        for r in target_score_rows(src.content, aliases, doc, stage,
+                                   own_readme=doc == DOC_README):
             key = (r["benchmark"], r["score"], r["setting"], doc)
             if key in seen:
                 continue
@@ -536,7 +576,7 @@ def _det_facts(bundle: SourceBundle, hf: Dict[str, Any], paper_sidecar: Dict[str
 
     arch, inputs = derive_architecture_type(config)
     if arch and config_file is not None:
-        pointer = "/config/architectures" if config.get("architectures") else "/config/model_type"
+        pointer = "/architectures" if config.get("architectures") else "/model_type"
         fragment = config.get("architectures") if config.get("architectures") else config.get("model_type")
         facts["specifications.architecture_type"] = arch
         specs.append({"path": "specifications.architecture_type", "value": arch,
@@ -547,7 +587,7 @@ def _det_facts(bundle: SourceBundle, hf: Dict[str, Any], paper_sidecar: Dict[str
         val = f"{ctx:,} tokens (config.json max_position_embeddings)"
         facts["specifications.context_length"] = val
         specs.append({"path": "specifications.context_length", "value": val,
-                      "evidence": _structured_evidence(bundle, config_file, "/config/max_position_embeddings", ctx)})
+                      "evidence": _structured_evidence(bundle, config_file, "/max_position_embeddings", ctx)})
     st = hf.get("safetensors") if isinstance(hf.get("safetensors"), dict) else {}
     total = st.get("total")
     if isinstance(total, int) and info_span(f'"total": {total}'):
@@ -610,9 +650,10 @@ def _det_facts(bundle: SourceBundle, hf: Dict[str, Any], paper_sidecar: Dict[str
     # model_size: the bytes of THIS revision's weight files, with the dtype they carry.
     # The Hub returns file sizes only when they are asked for, so collect records them.
     st_bytes = extras.get("safetensors_bytes")
-    if isinstance(st_bytes, int) and st_bytes > 0 and extras_file is not None:
+    dtype = max(params, key=lambda k: params[k]) if params else None
+    if (isinstance(st_bytes, int) and st_bytes > 0 and extras_file is not None
+            and not _size_contradicts_precision(st_bytes, total, dtype)):
         gib = st_bytes / (1024 ** 3)
-        dtype = max(params, key=lambda k: params[k]) if params else None
         val = (f"{gib:,.1f} GiB of safetensors weights ({st_bytes:,} bytes)"
                + (f" in {dtype}" if dtype else ""))
         facts["specifications.model_size"] = val
@@ -740,6 +781,7 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
         ("model_info.json", f"https://huggingface.co/api/models/{model_id}?revision={rev}", "application/json", info_text),
         ("extras.json", f"https://huggingface.co/api/models/{model_id}?revision={rev}&files_metadata=1", "application/json", extras_text),
         ("eee.json", "https://huggingface.co/datasets/evaleval/EEE_datastore", "application/json", eee_text),
+        (TAXONOMY_FILE, TAXONOMY_URI, "application/json", frozen_taxonomy(bundle_root)),
     ])
     files = {f.name: f for f in bundle.files}
     files_by_doc = {}
@@ -754,6 +796,9 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
         files_by_doc[DOC_HTML] = files["pages.md"]
 
     doc_index = docstructure.build_index(paper_text) if paper_text else None
+    from .table_scores import target_stage
+    target_stage_of_card = target_stage(model_id, " ".join(f.content or "" for f in bundle.files),
+                                        hf.get("base_model_tags") or [])
     frame = build_model_frame(model_id, rev, hf, doc_index=doc_index, paper_text=paper_text,
                               github_text=(github or {}).get("text") or "", eee=b["eee"],
                               paper_tier=(b["paper_sidecar"].get("binding") or {}).get("tier", "none"),
@@ -789,7 +834,8 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
                                       files["model_info.json"], extras, files.get("extras.json"),
                                       paper_text=paper_text,
                                       github_text=(github or {}).get("text") or "")
-    score_rows, score_specs = _table_score_specs(bundle, bridge, frame, files_by_doc)
+    score_rows, score_specs = _table_score_specs(bundle, bridge, frame, files_by_doc,
+                                                 target_stage_of_card)
     score_conflicts = [spec["conflict"] for spec in score_specs if "conflict" in spec]
     if score_rows:
         det_facts["evaluation.benchmark_scores"] = score_rows
@@ -938,7 +984,17 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
                        AssignmentOrigin.LLM_INFERRED)
                 continue
             spans = [_span_for_item(bundle, bridge, files_by_doc, it, doc_index) for it in cited]
-            missing = unsupported_leaves(value, [it.get("quote", "") for it in cited],
+            # a table-row quote supports only the target's own column; the other cells
+            # are other models' numbers and the writer has taken them before
+            target_aliases = [target_node.get("name", ""), *target_node.get("aliases", [])]
+            quotes_for_support = [
+                row_quote_for_target(sp.exact_text or it.get("quote", ""),
+                                     list(sp.table_header) if sp.table_header else None,
+                                     target_aliases, stage=target_stage_of_card,
+                                     own_readme=it.get("doc") == DOC_README)
+                for it, sp in zip(cited, spans)
+            ]
+            missing = unsupported_leaves(value, quotes_for_support,
                                          established=established_support)
             worst = max(cited, key=lambda it: _RELATION_RANK.get(it.get("relation", "unknown"), 4))
             rel_key = worst.get("relation", "unknown")
@@ -951,9 +1007,21 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
                 # forbids one, so what reaches here is in scope; the relation stays family
                 # so the reader sees the claim is about the family, not the checkpoint
                 entity = ClaimEntity(label=ref_node.get("name") or "model family")
-                action, reason, origin = (VerifierAction.ACCEPT,
-                                          "family_statement_allowed_for_this_field",
-                                          AssignmentOrigin.LLM_INFERRED)
+                if _written_as_the_checkpoint(value):
+                    # the ledger says family, the sentence says "This checkpoint is": the
+                    # writer rescoped a family statement into a checkpoint fact. On the
+                    # Qwen3-8B-Base card of 2026-09-06 that made a base model "produced
+                    # through the Strong-to-Weak Distillation pipeline", a post-training
+                    # stage its siblings went through and it did not, and the
+                    # FactReasoner pass scored it 0.9998 supported because the source
+                    # does say that about the family.
+                    action, reason, origin = (VerifierAction.WITHHOLD,
+                                              "family_statement_written_as_the_checkpoint",
+                                              AssignmentOrigin.LLM_INFERRED)
+                else:
+                    action, reason, origin = (VerifierAction.ACCEPT,
+                                              "family_statement_allowed_for_this_field",
+                                              AssignmentOrigin.LLM_INFERRED)
             elif rel_key in ("base", "derivative"):
                 bid = ref_node.get("name") if ref_node.get("type") == "base" else None
                 entity = ClaimEntity(model_id=bid) if bid and "/" in bid else ClaimEntity(label=ref_node.get("name") or rel_key)
@@ -1021,10 +1089,37 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
     # The final-claim pass: non-blocking, and its absence is recorded rather than
     # implied. A contradiction withholds the field it belongs to.
     factcheck = _run_final_claim_pass(card, bindings, bundle, model_id)
-    for path in factcheck.get("contradicted_fields") or []:
-        withhold_field(path, "final_claim_pass_contradiction")
+    # A contradiction FLAGS the field; it no longer withholds it. On the first roster
+    # with the pass on (2026-09-06) both contradictions were false: "Mixture-of-Experts
+    # (MoE) language model" on DeepSeek-V3-Base at p_true 0.05, and "A Transformer-style
+    # dense autoregressive language model" on OLMo-2-7B at 0.16. NLI over a noun-phrase
+    # atom is not a reason to lose a value the quote supports; the flag stays visible in
+    # provenance_and_quality.flagged_fields and in the pass telemetry.
+    factcheck_flagged = sorted(set(factcheck.get("contradicted_fields") or []))
 
-    non_quality = [p for p in CARD_FIELD_PATHS if not p.startswith("provenance_and_quality.")]
+    # The risk stage reads the card as gated, so a withheld value never feeds a risk, and
+    # a family-scope value is marked as such in the text the selector sees. Each selected
+    # risk binds to its entry in the frozen taxonomy the bundle carries.
+    relations = {}
+    for bd in bindings:
+        if bd.verifier_action == VerifierAction.ACCEPT:
+            relations[bd.field_path.split("[", 1)[0]] = bd.relation_to_target.value
+    atlas_file = files.get(TAXONOMY_FILE)
+    risk_stage = run_risk_stage(card, relations, frame, llm,
+                                atlas_file.content if atlas_file is not None else "")
+    if risk_stage.get("rows"):
+        for i, (row, (pointer, entry)) in enumerate(zip(risk_stage["rows"], risk_stage["pointers"])):
+            record(f"risks.possible_risks[{i}]", row,
+                   [_structured_evidence(bundle, atlas_file, pointer, entry)],
+                   RelationToTarget.EXACT_TARGET, target_entity, VerifierAction.ACCEPT,
+                   "risk_selected_from_frozen_taxonomy", AssignmentOrigin.LLM_INFERRED)
+        set_field_value(card, "risks.possible_risks", list(risk_stage["rows"]))
+    risk_stage.pop("pointers", None)
+
+    # coverage measures what the sources yielded; the risk stage selects from a taxonomy
+    # and its empty result is not a gap in the sources
+    non_quality = [p for p in CARD_FIELD_PATHS
+                   if not p.startswith("provenance_and_quality.") and p != "risks.possible_risks"]
     missing = [p for p in non_quality if get_field_value(card, p) in (NOT_SPECIFIED, [NOT_SPECIFIED])]
     inapplicable = [p for p in non_quality if get_field_value(card, p) == NOT_APPLICABLE]
     applicable = [p for p in non_quality if p not in inapplicable]
@@ -1049,7 +1144,8 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
                                                                "claims_built",
                                                                "contradicted_fields")},
         },
-        "provenance_and_quality.flagged_fields": withheld_paths + sorted(flagged),
+        "provenance_and_quality.flagged_fields": withheld_paths + sorted(flagged)
+            + [f"{p} (final-claim pass contradiction)" for p in factcheck_flagged],
         "provenance_and_quality.missing_fields": missing,
         "provenance_and_quality.coverage_score": coverage,
         "provenance_and_quality.card_info": {
@@ -1091,6 +1187,7 @@ def compose_model_card_llm(target: str, bundle_root: str | Path, llm, *,
                   "leaf_support": leaf_telemetry, "score_conflicts": score_conflicts,
                   "source_excerpts": copied,
                   "final_claim_pass": factcheck,
+                  "risk_stage": risk_stage,
                   "eee_links": eee_links(b["eee"], model_id),
                   "eav": {k: (len(v) if isinstance(v, list) else v) for k, v in eav_telem.items()},
                   "stage_b": group_telemetry},

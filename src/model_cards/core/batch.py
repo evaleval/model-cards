@@ -95,7 +95,7 @@ def _bundle_digest(source_hashes: Dict[str, Any]) -> Optional[str]:
 def _write_public(artifact, out_root: Path, slug: str) -> Dict[str, Any]:
     """The published projection and its Markdown companion, or why they were refused."""
     from .public import export_public
-    from ..public_markdown import render_public_markdown
+    from .public_markdown import render_public_markdown
 
     try:
         projection = export_public(artifact, reviewed=False)

@@ -362,3 +362,413 @@ def test_extras_channel_carries_bytes_frontmatter_and_bibtex(tmp_path, monkeypat
     assert extras["model_index_from_frontmatter"][0]["name"] == "Thing-7B"
     assert len(extras["bibtex_blocks"]) == 1
     assert manifest["channels"]["extras"]["model_index"] == "readme_frontmatter"
+
+
+def test_a_benchmark_paper_that_merely_evaluates_the_family_is_not_the_tech_report():
+    """Failure class: benchmark_paper_tagged_as_the_tech_report. google/gemma-3-4b-pt and
+    -it published https://arxiv.org/abs/2404.16816 as links.tech_report. That is
+    IndicGenBench, whose abstract reads "we evaluate a wide range of proprietary and
+    open-source LLMs including gpt-3.5, gpt-4, palm-2, mt5, gemma, bloom and llama". The
+    single word "gemma" satisfied "every distinctive name token is present", and the
+    resolver recorded the title and kept it anyway (seen 2026-09-05). The same abstract
+    exposed meta-llama/Llama-3.1-8B through the word "llama"."""
+    from model_cards.core.model_sources import name_discriminators, paper_binding_tier
+
+    indic_title = ("IndicGenBench: A Multilingual Benchmark to Evaluate Generation "
+                   "Capabilities of LLMs on Indic Languages")
+    indic_abstract = ("we evaluate a wide range of proprietary and open-source llms "
+                      "including gpt-3.5, gpt-4, palm-2, mt5, gemma, bloom and llama "
+                      "on indicgenbench in a variety of settings")
+    assert paper_binding_tier("google/gemma-3-4b-pt", indic_title, indic_abstract) \
+        == "family_reference"
+    assert paper_binding_tier("meta-llama/Llama-3.1-8B", indic_title, indic_abstract) \
+        == "family_reference"
+
+    # the real reports still bind, including the two shapes that motivated the rule
+    assert paper_binding_tier(
+        "google/gemma-3-4b-pt", "Gemma 3 Technical Report",
+        "We introduce Gemma 3, a multimodal addition to the Gemma family.") == "introduces_target"
+    assert paper_binding_tier(
+        "Qwen/Qwen3-8B-Base", "Qwen3 Technical Report",
+        "We present Qwen3, the latest version of the Qwen model family.") == "introduces_target"
+    assert paper_binding_tier(
+        "allenai/OLMo-2-1124-7B", "2 OLMo 2 Furious",
+        "We present OLMo 2, a family of fully open language models.") == "introduces_target"
+    # the herd paper introduces Llama 3.1 under the shorter version form
+    assert paper_binding_tier(
+        "meta-llama/Llama-3.1-8B", "The Llama 3 Herd of Models",
+        "This paper presents a new set of foundation models, Llama 3.") == "introduces_target"
+    # an unrelated tag is still unrelated
+    assert paper_binding_tier(
+        "Qwen/Qwen3-8B", "YaRN: Efficient Context Window Extension of Large Language Models",
+        "We present YaRN, a compute-efficient method.") == "unrelated_tag"
+
+    assert "gemma 3" in name_discriminators("google/gemma-3-4b-pt")
+    # the repo-name splitter treats the dot as a separator, so Llama-3.1-8B discriminates
+    # on "llama 3", which is what both the herd paper and the IndicGenBench case need
+    assert "llama 3" in name_discriminators("meta-llama/Llama-3.1-8B")
+    assert "llama" not in name_discriminators("meta-llama/Llama-3.1-8B")
+
+
+def test_two_weight_formats_in_one_repo_are_not_added_together():
+    """Failure class: duplicate_weight_format_double_counts_size.
+    mistralai/Mistral-7B-v0.3 ships consolidated.safetensors (14,496,078,512 B) next to
+    model-0000n-of-00003.safetensors (14,496,080,928 B together): the same weights in two
+    packagings. Summing both published "27.0 GiB ... in BF16" for a 7B model, exactly
+    double, on both Mistral cards of 2026-09-05."""
+    from model_cards.core import model_sources as MS
+
+    class _Sib:
+        def __init__(self, rfilename, size):
+            self.rfilename, self.size = rfilename, size
+
+    class _Info:
+        def __init__(self, siblings):
+            self.siblings = siblings
+
+    class _Api:
+        def __init__(self, siblings):
+            self._siblings = siblings
+
+        def model_info(self, *args, **kwargs):
+            return _Info(self._siblings)
+
+    def total_for(siblings, monkeypatch_target=MS):
+        import huggingface_hub
+
+        original = huggingface_hub.HfApi
+        huggingface_hub.HfApi = lambda *a, **k: _Api(siblings)
+        try:
+            return MS.safetensors_bytes("x/y", "r")
+        finally:
+            huggingface_hub.HfApi = original
+
+    both = [_Sib("consolidated.safetensors", 14_496_078_512),
+            _Sib("model-00001-of-00003.safetensors", 4_949_453_792),
+            _Sib("model-00002-of-00003.safetensors", 4_999_819_336),
+            _Sib("model-00003-of-00003.safetensors", 4_546_807_800)]
+    assert total_for(both) == 14_496_080_928  # the shards, not the 28,992,159,440 sum
+
+    assert total_for([_Sib("model.safetensors", 5_000)]) == 5_000
+    assert total_for([_Sib("consolidated.safetensors", 7_000)]) == 7_000
+    assert total_for([_Sib("config.json", 10)]) is None
+
+
+def test_a_size_that_cannot_be_that_many_parameters_is_not_published():
+    """Failure class: duplicate_weight_format_double_counts_size. The collector picks one
+    packaging now; this is the arithmetic backstop for a repo shaped some other way."""
+    from model_cards.core.compose_llm import _size_contradicts_precision as contradicts
+
+    assert contradicts(28_992_159_440, 7_248_023_552, "BF16")
+    assert not contradicts(14_496_080_928, 7_248_023_552, "BF16")
+    assert not contradicts(29_194_510_544, 7_298_716_672, "F32")
+    assert not contradicts(10 ** 12, 7_000_000_000, None)
+    assert not contradicts(5_000, None, "BF16")
+
+
+def test_a_failed_paper_fetch_is_retried_and_never_tiered_as_unrelated(tmp_path, monkeypatch):
+    """Failure class: fetch_error_tiered_as_unrelated_tag. arXiv rate-limited the fresh
+    collect of 2026-09-06; the resolver tiered every empty title as unrelated_tag and
+    silently dropped the paper channel from 126 of 247 bundles, DeepSeek-V3's technical
+    report among them. A fetch that fails after retries is recorded as fetch_failed and
+    the binding says unresolved, so a re-collect knows what to redo."""
+    from model_cards.core import model_sources as MS
+
+    monkeypatch.setattr(MS, "PAPER_FETCH_BACKOFF_S", 0.0)
+
+    class _Adapter:
+        def __init__(self, allow_network=True):
+            pass
+
+        def collect(self, target, model_info=None):
+            raise MS.ModelSourceError("offline test: no snapshot")
+
+    monkeypatch.setattr(MS, "HfModelSourceAdapter", _Adapter)
+    hf = {"id": "deepseek-ai/DeepSeek-V3", "sha": REV, "tags": ["arxiv:2412.19437"],
+          "readme_markdown": "", "base_model_tags": [], "model_index": None, "card_data": {}}
+    calls = []
+
+    def flaky(url):
+        calls.append(url)
+        if len(calls) < 3:
+            return {"fetch_error": True, "title": "", "abstract": ""}
+        return {"title": "DeepSeek-V3 Technical Report", "abstract": "We present DeepSeek-V3."}
+
+    MS.collect_model_bundle(f"deepseek-ai/DeepSeek-V3@{REV}", tmp_path / "a",
+                            hf_metadata=lambda m, r: hf, paper_meta=flaky,
+                            docling=lambda url: {"success": True, "filtered_text": "DeepSeek-V3 Technical Report"},
+                            github=lambda *a, **k: None, allow_network=False)
+    slug = "deepseek-ai-deepseek-v3-" + REV[:12]
+    sidecar = json.load(open(tmp_path / "a" / slug / "tool_output" / "paper_resolver" / "paper-verification.json"))
+    assert sidecar["binding"]["tier"] == "introduces_target"
+    assert len(calls) == 3
+
+    MS.collect_model_bundle(f"deepseek-ai/DeepSeek-V3@{REV}", tmp_path / "b",
+                            hf_metadata=lambda m, r: hf,
+                            paper_meta=lambda url: {"fetch_error": True, "title": "", "abstract": ""},
+                            docling=lambda url: {"success": False}, github=lambda *a, **k: None,
+                            allow_network=False)
+    sidecar = json.load(open(tmp_path / "b" / slug / "tool_output" / "paper_resolver" / "paper-verification.json"))
+    assert sidecar["binding"] == {"tier": "fetch_failed", "verdict": "unresolved",
+                                  "paper_url": "https://arxiv.org/abs/2412.19437",
+                                  "reason": "paper metadata could not be fetched; re-collect to resolve",
+                                  "fetch_error": True}
+    assert sidecar["candidates"][0]["tier"] == "fetch_failed"
+
+
+# The paper search trap set ------------------------------------------------------------
+# Recorded search responses, one row per trap of the 2026-09-07 test plan. A search hit
+# reaches a card only through search_title_gate AND paper_binding_tier, so every trap
+# states the tier its paper must end at. Nothing here touches the network.
+
+_TRAPS = [
+    # (model_id, base_model_tags, search hit title, the arXiv title, tier the row must get)
+    ("google/gemma-2-9b", [], "Gemma 2: Improving Open Language Models at a Practical Size",
+     "Gemma 2: Improving Open Language Models at a Practical Size",
+     "In this work we introduce Gemma 2, a new addition to the Gemma family.", "introduces_target"),
+    # the plan expected family_reference here; the live check of 2026-09-07 showed the
+    # class costs more than it earns (the 2023 LLaMA paper reached Llama-3.1-8B the same
+    # way), so a SEARCHED title that states no generation is refused for a checkpoint
+    # whose name states one. A developer's own tag pointing at the v1 paper still binds.
+    ("google/gemma-2-9b", [], "Gemma: Open Models Based on Gemini Research and Technology",
+     "Gemma: Open Models Based on Gemini Research and Technology",
+     "This work introduces Gemma, a family of lightweight open models.", "gated_out"),
+    ("google/gemma-2-9b", [], "IndicGenBench: A Multilingual Benchmark",
+     "IndicGenBench: A Multilingual Benchmark",
+     "We evaluate mT5, Gemma, BLOOM and LLaMA on Indic languages.", "gated_out"),
+    # the herd paper names this checkpoint's own discriminator ("Llama 3"), which is the
+    # form the paper itself uses, so it tiers exactly as it does when a tag points at it
+    ("meta-llama/Llama-3.2-3B", [], "The Llama 3 Herd of Models", "The Llama 3 Herd of Models",
+     "Modern artificial intelligence systems are powered by foundation models.",
+     "introduces_target"),
+    ("meta-llama/Llama-3.2-3B", [], "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+     "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+     "In this work, we develop and release Llama 2.", "gated_out"),
+    ("meta-llama/Llama-3.2-3B", [], "LLaMA-Adapter: Efficient Fine-tuning of Language Models",
+     "LLaMA-Adapter: Efficient Fine-tuning of Language Models",
+     "We present LLaMA-Adapter, a lightweight adaption method.", "gated_out"),
+    ("Qwen/Qwen1.5-7B-Chat", [], "Qwen2 Technical Report", "Qwen2 Technical Report",
+     "This report introduces the Qwen2 series.", "gated_out"),
+    ("Qwen/Qwen1.5-7B-Chat", [], "Qwen-VL: A Versatile Vision-Language Model",
+     "Qwen-VL: A Versatile Vision-Language Model",
+     "We introduce the Qwen-VL series.", "gated_out"),
+    ("01-ai/Yi-1.5-9B", [], "Yi: Open Foundation Models by 01.AI", "Yi: Open Foundation Models by 01.AI",
+     "We introduce the Yi model family.", "gated_out"),
+    ("Nexesenex/Llama_3.2_3b_Kermes_v2.1", ["meta-llama/Llama-3.2-3B"],
+     "The Llama 3 Herd of Models", "The Llama 3 Herd of Models",
+     "Modern artificial intelligence systems are powered by foundation models.",
+     "family_reference"),
+    ("jayhyeon/qwen2.5-0.5b-sft-mdpo", ["Qwen/Qwen2.5-0.5B"], "Qwen2.5 Technical Report",
+     "Qwen2.5 Technical Report", "In this report, we introduce Qwen2.5.", "family_reference"),
+    ("jayhyeon/qwen2.5-0.5b-sft-mdpo", ["Qwen/Qwen2.5-0.5B"],
+     "mDPO: Conditional Preference Optimization for Multimodal Large Language Models",
+     "mDPO: Conditional Preference Optimization for Multimodal Large Language Models",
+     "We propose mDPO, a multimodal DPO objective.", "gated_out"),
+    # "Mistral 7B" carries this repo's family-plus-size discriminator, so the tier rule
+    # reads it as the paper of this line; the point-release suffix (v0.3) is not part of
+    # any discriminator, here or on the tag path
+    ("mistralai/Mistral-7B-v0.3", [], "Mistral 7B", "Mistral 7B",
+     "We introduce Mistral 7B, a 7-billion-parameter language model.", "introduces_target"),
+]
+
+
+def _search_stub(title, arxiv_id="2408.00118"):
+    def search(query):
+        return [{"title": title, "externalIds": {"ArXiv": arxiv_id}, "abstract": "",
+                 "year": 2024, "authors": []}]
+    return search
+
+
+def test_the_paper_search_trap_set(tmp_path, monkeypatch):
+    """Failure class: search_binds_an_unrelated_paper. Every trap of the 2026-09-07 plan,
+    offline, with the tier its hit must end at. A paper that only names the family is
+    never introduces_target for a versioned checkpoint; a hit for a community fine-tune
+    is a family reference through its declared base or nothing; a paper of another
+    generation, another artifact with the family name in it (LLaMA-Adapter, Qwen-VL), and
+    a benchmark paper that merely evaluates the family are all refused."""
+    class _Adapter:
+        def __init__(self, allow_network=True):
+            pass
+
+        def collect(self, target, model_info=None):
+            raise MS.ModelSourceError("offline")
+
+    monkeypatch.setattr(MS, "HfModelSourceAdapter", _Adapter)
+    from auto_benchmarkcard.tools.eee.paper_resolver import _normalize_s2_paper as norm
+    for model_id, bases, hit_title, arxiv_title, arxiv_abstract, want in _TRAPS:
+        hf = _hf(tags=(), readme="# model\n")
+        hf["id"] = model_id
+        hf["base_model_tags"] = list(bases)
+        out = tmp_path / MS.slug_for(f"{model_id}@{REV}")
+        manifest = MS.collect_model_bundle(
+            f"{model_id}@{REV}", tmp_path, hf_metadata=lambda m, r, _hf=hf: _hf,
+            paper_meta=lambda u, t=arxiv_title, a=arxiv_abstract: {
+                "title": t, "abstract": a, "fetch_error": False},
+            docling=lambda u: {"success": True, "filtered_text": "text", "metadata": {}},
+            github=lambda *t: {"success": False}, eee_datastore=str(tmp_path / "empty"),
+            paper_search=True,
+            search_fns=[("s2_search", _search_stub(hit_title), norm)])
+        sidecar = json.load(open(out / "tool_output" / "paper_resolver" /
+                                 "paper-verification.json"))
+        row = next((r for r in sidecar["candidates"] if r.get("from") == "s2_search"), None)
+        if want == "gated_out":
+            # either the title gate refused it before the fetch, or the tier did after
+            assert row is None or row["tier"] == "unrelated_tag", f"{model_id} <- {hit_title}"
+            assert sidecar["resolved_url"] is None, f"{model_id} <- {hit_title}"
+        else:
+            assert row is not None and row["tier"] == want, f"{model_id} <- {hit_title}"
+            assert sidecar["resolved_url"] == "https://arxiv.org/abs/2408.00118"
+            assert sidecar["resolved_from"] == "s2_search"
+
+
+def test_the_search_runs_only_when_the_repo_points_at_nothing(tmp_path, monkeypatch):
+    """The search is the third source, never the first: a repo whose own tag introduces
+    it is never searched, and the search is off unless it is asked for."""
+    class _Adapter:
+        def __init__(self, allow_network=True):
+            pass
+
+        def collect(self, target, model_info=None):
+            raise MS.ModelSourceError("offline")
+
+    monkeypatch.setattr(MS, "HfModelSourceAdapter", _Adapter)
+    hf = _hf(tags=("arxiv:2501.00656",), readme="# OLMo 2\n")
+    searched = []
+
+    def never(query):
+        searched.append(query)
+        return []
+
+    common = dict(hf_metadata=lambda m, r: hf,
+                  paper_meta=lambda u: {"title": "2 OLMo 2 Furious",
+                                        "abstract": "We present OLMo 2.", "fetch_error": False},
+                  docling=lambda u: {"success": True, "filtered_text": "t", "metadata": {}},
+                  github=lambda *t: {"success": False}, eee_datastore=str(tmp_path / "empty"))
+    MS.collect_model_bundle(f"allenai/OLMo-2-1124-7B@{REV}", tmp_path / "a", paper_search=True,
+                            search_fns=[("s2_search", never, lambda p: p)], **common)
+    assert searched == []
+    monkeypatch.delenv("MODELCARDS_PAPER_SEARCH", raising=False)
+    assert MS.paper_search_enabled() is False
+    monkeypatch.setenv("MODELCARDS_PAPER_SEARCH", "1")
+    assert MS.paper_search_enabled() is True
+    assert MS.search_queries_for_model("google/gemma-2-9b")[0] == "gemma 2 technical report"
+    assert MS.head_family_token("jayhyeon/qwen2.5-0.5b-sft-mdpo") == "qwen2"
+
+
+def test_a_searched_title_must_name_this_family_and_no_other_model():
+    """Failure class: search_binds_another_models_report. The live check of 2026-09-07 ran
+    the search against the flagship targets and OpenAlex answered "Llama-3.1-FoundationAI-
+    SecurityLLM-Reasoning-8B Technical Report" for meta-llama/Llama-3.2-3B, which the first
+    gate accepted because "llama-3" is a substring of it. A family token counts only when
+    it stands as the title's own subject: nothing may continue the name after it, nothing
+    but a lead word may stand before it, and the generation it states must be this
+    checkpoint's own or an earlier part of it."""
+    gate = MS.search_title_gate
+    llama32 = "meta-llama/Llama-3.2-3B"
+    assert gate(llama32, "The Llama 3 Herd of Models") is True
+    for title in ("Llama-3.1-FoundationAI-SecurityLLM-Reasoning-8B Technical Report",
+                  "Llama-3.1-FoundationAI-SecurityLLM-Base-8B Technical Report",
+                  "Lawyer LLaMA Technical Report",
+                  "Code Llama: Open Foundation Models for Code",
+                  "LLaMA-Adapter: Efficient Fine-tuning of Language Models",
+                  "Llama 2: Open Foundation and Fine-Tuned Chat Models"):
+        assert gate(llama32, title) is False, title
+    # a generation glued to the token counts as stated: the Qwen2.5 report is not the
+    # Qwen2 checkpoint's, and the Qwen2 report is not the Qwen2.5-Math model's
+    assert gate("Qwen/Qwen2.5-32B-Instruct", "Qwen2.5 Technical Report") is True
+    assert gate("Qwen/Qwen2-72B", "Qwen2.5 Technical Report") is False
+    assert gate("Qwen/Qwen2-57B-A14B", "Qwen2 Technical Report") is True
+    assert gate("Qwen/Qwen2-57B-A14B", "Qwen2.5-Math Technical Report") is False
+    # a title that states a generation for a checkpoint whose name states none is a
+    # different generation of it
+    assert gate("google/gemma-7b", "Gemma: Open Models Based on Gemini Research and Technology") is True
+    assert gate("google/gemma-7b", "Gemma 2: Improving Open Language Models at a Practical Size") is False
+    # a version suffix is not another model: the report of this checkpoint still binds
+    assert gate("deepseek-ai/DeepSeek-V3", "DeepSeek-V3 Technical Report") is True
+    assert gate("mistralai/Mistral-7B-v0.3", "Mistral 7B") is True
+    assert gate("moonshotai/kimi-k2-instruct", "Kimi K2: Open Agentic Intelligence") is True
+
+
+def test_the_family_token_is_the_one_the_repo_puts_its_generation_next_to():
+    """Failure class: vendor_token_read_as_the_family. With "meta" as the family token of
+    meta-llama/Meta-Llama-3.1-8B, a survey titled "Evolution of meta's llama models and
+    parameter-efficient fine-tuning of large language models" passed the gate in the live
+    check of 2026-09-07. The family token is the one the repo name puts its generation
+    next to, and a checkpoint whose name carries a generation needs the title to say
+    which one: the 2023 LLaMA paper is not Llama-3.1-8B's report."""
+    assert MS.head_family_token("meta-llama/Meta-Llama-3.1-8B") == "llama"
+    assert MS.family_generation("meta-llama/Meta-Llama-3.1-8B", "llama") == "3.1"
+    assert MS.family_generation("jayhyeon/qwen2.5-0.5b-sft-mdpo", "qwen2") == "2.5"
+    assert MS.family_generation("deepseek-ai/DeepSeek-V3", "deepseek") == "3"
+    # a size and a point release are not a generation
+    assert MS.family_generation("google/gemma-7b", "gemma") is None
+    assert MS.family_generation("mistralai/Mistral-7B-v0.3", "mistral") is None
+    gate = MS.search_title_gate
+    assert gate("meta-llama/Meta-Llama-3.1-8B", "The Llama 3 Herd of Models") is True
+    assert gate("meta-llama/Meta-Llama-3.1-8B",
+                "Evolution of meta's llama models and parameter-efficient fine-tuning of "
+                "large language models") is False
+    assert gate("meta-llama/Llama-3.1-8B",
+                "LLaMA: Open and Efficient Foundation Language Models") is False
+    assert gate("google/gemma-3-4b-it",
+                "Gemma: Open Models Based on Gemini Research and Technology") is False
+    assert gate("google/gemma-3-4b-it", "Gemma 3 Technical Report") is True
+    # a checkpoint whose own name states no generation still takes its family's paper
+    assert gate("google/gemma-7b",
+                "Gemma: Open Models Based on Gemini Research and Technology") is True
+    assert gate("mistralai/mixtral-8x22b-instruct-v0.1", "Mixtral of Experts") is True
+    assert gate("google/recurrentgemma-9b",
+                "RecurrentGemma: Moving Past Transformers for Efficient Open Language Models") is True
+    # Failure class: paper_about_the_model_read_as_its_report. A preposition in front of
+    # the family name is the signature of a paper about the model, and its abstract names
+    # the checkpoint, so the tier alone said introduces_target (live check 2026-09-07).
+    assert gate("meta-llama/Meta-Llama-3-8B",
+                "Model Inversion Attacks on Llama 3: Extracting PII from Large Language "
+                "Models") is False
+    assert gate("meta-llama/Meta-Llama-3-8B", "The Llama 3 Herd of Models") is True
+    assert gate("allenai/OLMo-2-1124-7B", "2 OLMo 2 Furious") is True
+
+
+def test_the_second_search_source_is_only_asked_when_the_first_found_nothing():
+    """Failure class: collect_timed_out_in_the_search. Semantic Scholar without a key
+    sleeps a second per request and answers 429 under load; walking both sources for
+    every query ran the collect past its 900 s timeout on the first two targets of the
+    2026-09-07 re-collect. Sources are walked in order, and the next one is asked only
+    when the one before it produced no candidate."""
+    calls = []
+
+    def source(name, results):
+        def search(query):
+            calls.append((name, query))
+            return results
+        return search
+
+    hit = [{"title": "Gemma 2: Improving Open Language Models at a Practical Size",
+            "arxiv_id": "2408.00118"}]
+    found = MS.search_paper_candidates(
+        "google/gemma-2-9b", [],
+        search_fns=[("openalex_search", source("openalex", hit), lambda p: p),
+                    ("s2_search", source("s2", hit), lambda p: p)])
+    assert [c["origin"] for c in found] == ["openalex_search"]
+    assert {name for name, _ in calls} == {"openalex"}
+    calls.clear()
+    found = MS.search_paper_candidates(
+        "google/gemma-2-9b", [],
+        search_fns=[("openalex_search", source("openalex", []), lambda p: p),
+                    ("s2_search", source("s2", hit), lambda p: p)])
+    assert [c["origin"] for c in found] == ["s2_search"]
+    assert {name for name, _ in calls} == {"openalex", "s2"}
+
+
+def test_a_hyphenated_sibling_report_is_not_this_checkpoints():
+    """Failure class: sibling_line_report_bound_to_the_base_line. The recorded search of
+    2026-09-07 offered "Qwen2.5-1M Technical Report" for Qwen/Qwen2.5-32B-Instruct. A word
+    after the generation names a different member of the family, unless the checkpoint's
+    own name carries that same word, which is how Qwen2.5-Math-7B keeps its own report."""
+    gate = MS.search_title_gate
+    assert gate("Qwen/Qwen2.5-32B-Instruct", "Qwen2.5 Technical Report") is True
+    assert gate("Qwen/Qwen2.5-32B-Instruct", "Qwen2.5-1M Technical Report") is False
+    assert gate("Qwen/Qwen2.5-Math-7B",
+                "Qwen2.5-Math Technical Report: Toward Mathematical Expert Model") is True
+    assert gate("Qwen/Qwen2-57B-A14B", "Qwen2.5-Math Technical Report") is False
+    assert gate("deepseek-ai/DeepSeek-V3", "DeepSeek-V3 Technical Report") is True

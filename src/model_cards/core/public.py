@@ -31,7 +31,8 @@ SOURCE_EXCERPT_MIN_WORDS = 12
 SOURCE_EXCERPT_MIN_COMPACT_CHARS = 24
 _MIN_COMPACT_SCRIPT_CHARS = 12
 GUARDED_FIELDS = frozenset({
-    "identity.summary", "training_context.training_data", "training_context.adaptations",
+    "identity.summary", "identity.model_type",
+    "training_context.training_data", "training_context.adaptations",
     "evaluation.results_summary", "evaluation.human_evals", "evaluation.safety_evals",
 })
 _COMPACT_SCRIPT_RANGES = (

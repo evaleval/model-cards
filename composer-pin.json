@@ -1,11 +1,16 @@
 {
   "repository": "../auto-benchmarkcard",
-  "commit": "fd2dc11e86e4de16d3438734813397a06a5517e1",
+  "commit": "b0bfe1f3e5a3c16963a707fbbb5413fb5d15334b",
   "interfaces": [
     "auto_benchmarkcard.tools.composer.docstructure.build_index",
     "auto_benchmarkcard.tools.composer.evidence.normalize_ws",
     "auto_benchmarkcard.tools.composer.evidence.verify_quote",
     "auto_benchmarkcard.tools.composer.field_spec.CardSchema"
   ],
-  "policy": "The bridge refuses a different commit unless the caller explicitly allows it. The composer is used as a library (CardSchema, extraction, Stage B, validator); no benchmark schema or orchestration code is copied."
+  "policy": "The bridge refuses a different commit unless the caller explicitly allows it. The composer is used as a library (CardSchema, extraction, Stage B, validator); no benchmark schema or orchestration code is copied.",
+  "interface_sha256": {
+    "src/auto_benchmarkcard/tools/composer/docstructure.py": "acddcfe5511b649cf77beb7a1f1a1c8039e1137e1c51eacf8e796f9dd2633909",
+    "src/auto_benchmarkcard/tools/composer/evidence.py": "0fdaaddf9ef61abcfa7970c73ebae507640dbdf464f7f55ed7efbff3d309f9de",
+    "src/auto_benchmarkcard/tools/composer/field_spec.py": "30d14f180e115fb09a9b4ad9130d7bac7f0117b519355f44c91e04899d467885"
+  }
 }

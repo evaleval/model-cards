@@ -2,7 +2,7 @@
 
 One place decides which model answers, on which provider, with which decoding
 parameters, so the CLI, the batch runner and the probe cannot drift apart. The pin is
-recorded in vault/llm_config.md; a provider change is a user decision, not a default.
+recorded with the run; a provider change is a user decision, not a default.
 
 Environment overrides (all optional, the defaults below are the recorded pin):
   MODELCARDS_OPENROUTER_MODEL   OpenRouter checkpoint slug

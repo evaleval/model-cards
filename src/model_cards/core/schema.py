@@ -1,7 +1,9 @@
 """The public Model Card contract, as data.
 
-The published contract is exactly seven sections and 33 fields
-(`schema/model-card.schema.json` in the public repository). The card the pipeline
+The published contract is eight sections and 34 fields
+(`schema/model-card.schema.json` in the public repository): the seven sections and 33
+fields agreed in July, plus `risks.possible_risks` added on 2026-09-06 so the AI Risk
+Atlas material the benchmark cards carry has a place on model cards too. The card the pipeline
 carries internally adds one private section, `provenance_and_quality`, which holds the
 generation-time ledger summary and never leaves through the public export.
 
@@ -60,10 +62,10 @@ CARD_FIELD_PATHS: tuple[str, ...] = tuple(
 FIELD_PATHS = CARD_FIELD_PATHS
 FIELD_PATH_SET = frozenset(CARD_FIELD_PATHS)
 
-if len(PUBLIC_FIELD_PATHS) != 33:  # pragma: no cover - import-time invariant
-    raise RuntimeError("the public contract must contain exactly 33 fields")
-if len(PUBLIC_SECTIONS) != 7:  # pragma: no cover - import-time invariant
-    raise RuntimeError("the public contract must contain exactly 7 sections")
+if len(PUBLIC_FIELD_PATHS) != 34:  # pragma: no cover - import-time invariant
+    raise RuntimeError("the public contract must contain exactly 34 fields")
+if len(PUBLIC_SECTIONS) != 8:  # pragma: no cover - import-time invariant
+    raise RuntimeError("the public contract must contain exactly 8 sections")
 
 
 _INDEXED_PATH_RE = re.compile(

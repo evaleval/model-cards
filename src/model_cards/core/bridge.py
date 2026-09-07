@@ -8,6 +8,7 @@ erase the project boundary this package is meant to establish.
 from __future__ import annotations
 
 import json
+import hashlib
 import importlib.util
 import subprocess
 import sys
@@ -87,7 +88,6 @@ class ComposerBridge:
 
 
 def _package_root() -> Path:
-    """The repository root, which is where composer-pin.json lives."""
     return Path(__file__).resolve().parents[3]
 
 
@@ -125,31 +125,41 @@ def _interface_source_paths(pin: dict[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
-def _require_clean_interfaces(repository: Path, paths: tuple[str, ...]) -> None:
-    try:
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repository),
-                "status",
-                "--porcelain=v1",
-                "--untracked-files=all",
-                "--",
-                *paths,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
+def _interface_digest(repository: Path, paths: tuple[str, ...]) -> dict[str, str]:
+    digests: dict[str, str] = {}
+    for path in paths:
+        target = repository / path
+        try:
+            digests[path] = hashlib.sha256(target.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise ComposerBridgeError(
+                f"cannot read pinned composer interface: {target}"
+            ) from exc
+    return digests
+
+
+def _require_pinned_interface_bytes(repository: Path, pin: dict[str, Any],
+                                    paths: tuple[str, ...]) -> None:
+    """The imported interface files must be the bytes the pin recorded.
+
+    This used to shell out to `git status` once per target. `git status` refreshes and
+    rewrites .git/index, so under a concurrent batch the calls raced and six of the 247
+    targets on 2026-09-05 died on a drift report for a tree that was clean before and
+    after the run. Hashing the files is race-free, needs no subprocess, and pins the
+    bytes rather than their agreement with whatever HEAD happens to be.
+    """
+
+    expected = pin.get("interface_sha256")
+    if not isinstance(expected, dict) or not expected:
+        raise ComposerBridgeError(
+            "composer pin must record interface_sha256 for its declared interfaces"
         )
-    except (OSError, subprocess.CalledProcessError) as exc:
+    found = _interface_digest(repository, paths)
+    drifted = sorted(path for path in paths if found.get(path) != expected.get(path))
+    if drifted:
         raise ComposerBridgeError(
-            f"cannot verify pinned composer interface bytes: {repository}"
-        ) from exc
-    if result.stdout.strip():
-        raise ComposerBridgeError(
-            "pinned composer interface files have staged, unstaged, or untracked drift: "
-            + ", ".join(paths)
+            "pinned composer interface files do not match the recorded bytes: "
+            + ", ".join(drifted)
         )
 
 
@@ -225,7 +235,7 @@ def load_composer_bridge(*, allow_unpinned: bool = False) -> ComposerBridge:
             f"composer revision drift: expected {pin['commit']}, found {commit}"
         )
     if not allow_unpinned:
-        _require_clean_interfaces(repository, _interface_source_paths(pin))
+        _require_pinned_interface_bytes(repository, pin, _interface_source_paths(pin))
 
     source_root = repository / "src"
     if not source_root.is_dir():

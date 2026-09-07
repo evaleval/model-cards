@@ -14,11 +14,13 @@ Failure classes pinned here:
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
 from model_cards.core import compose_llm as CL
+from model_cards.core import spans as SP
 from model_cards.core.review import load_artifact, save_artifact
 from model_cards.core.records import VerifierAction
 
@@ -545,7 +547,7 @@ def test_a_card_round_trips_through_export_validate_and_render(tmp_path):
     """Failure class: export_round_trip_break. The card the pipeline writes has to survive
     save, load, the published schema, the source-excerpt guard and both renderers."""
     from model_cards.core.public import export_public, validate_public_card
-    from model_cards.public_markdown import render_public_markdown
+    from model_cards.core.public_markdown import render_public_markdown
     from model_cards.core.render import render_html, render_markdown
 
     root = _write_bundle(tmp_path / "bundles")
@@ -557,7 +559,7 @@ def test_a_card_round_trips_through_export_validate_and_render(tmp_path):
     projection = export_public(reloaded, reviewed=True)
     validate_public_card(projection)
     assert set(projection) == {"identity", "lineage", "specifications", "training_context",
-                               "access_and_adoption", "evaluation", "links"}
+                               "access_and_adoption", "evaluation", "links", "risks"}
     assert projection["identity"]["model_id"] == MODEL
 
     payload = json.dumps(projection, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
@@ -791,3 +793,132 @@ def test_a_family_name_has_to_be_one_the_sources_use(tmp_path):
     hf_path.write_text(json.dumps(hf))
     art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
     assert art.card["lineage"]["model_family"] == "Not specified"
+
+
+def test_structured_pointers_resolve_in_the_file_they_name(tmp_path):
+    """Failure class: structured_pointer_into_a_derived_wrapper. The config-backed
+    anchors were written as /config/architectures and /config/max_position_embeddings,
+    paths into the composer's internal view, not into the config.json they cite. The
+    values were right and the click-through was dead: 409 spans over the 247-card batch
+    of 2026-09-05 pointed at a key the named file does not have."""
+    root = _write_bundle(tmp_path / "bundles")
+    art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
+    files = {f.source_uri: f for f in art.source_bundle.files}
+
+    checked = 0
+    for binding in art.bindings:
+        for span in binding.evidence:
+            pointer = span.structured_pointer
+            source = files.get(span.source_uri)
+            if not pointer or source is None or source.content is None:
+                continue
+            document = json.loads(source.content)
+            assert SP.resolve_pointer(document, pointer) == span.structured_fragment, (
+                f"{binding.field_path}: {pointer} does not resolve in {source.name}"
+            )
+            checked += 1
+    assert checked >= 3
+
+    arch = next(b for b in art.bindings
+                if b.field_path == "specifications.architecture_type")
+    assert arch.evidence[0].structured_pointer == "/architectures"
+    ctx = next(b for b in art.bindings if b.field_path == "specifications.context_length")
+    assert ctx.evidence[0].structured_pointer == "/max_position_embeddings"
+
+
+def test_a_pointer_that_misses_the_file_is_refused_at_construction(tmp_path):
+    """Failure class: structured_pointer_into_a_derived_wrapper. The guard lives where
+    the span is built, so no caller can mint an anchor that does not resolve."""
+    root = _write_bundle(tmp_path / "bundles")
+    art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
+    config = next(f for f in art.source_bundle.files if f.name == "config.json")
+
+    with pytest.raises(SP.CompositionError, match="does not resolve"):
+        SP._structured_evidence(art.source_bundle, config, "/config/architectures",
+                                json.loads(config.content)["architectures"])
+    with pytest.raises(SP.CompositionError, match="different value"):
+        SP._structured_evidence(art.source_bundle, config, "/architectures", ["Wrong"])
+
+
+class _FamilyRescopingLLM(_ScriptedLLM):
+    """Stage A finds a family-scope post-training sentence; Stage B writes it as a fact
+    about this checkpoint, which is what the writer did on Qwen3-8B-Base."""
+
+    def __init__(self, phrasing):
+        super().__init__()
+        self.phrasing = phrasing
+
+    def generate(self, prompt, response_format=None):
+        if "SOURCE TEXT (research paper)" in prompt:
+            self.prompts.append(prompt)
+            return json.dumps({"evidence": [
+                {"field": "training_context.adaptations",
+                 "quote": "OLMo 2 models are post-trained with supervised finetuning, DPO and RLVR.",
+                 "referent": "family:olmo-2", "claim_role": "primary_result"},
+            ]})
+        return super().generate(prompt, response_format)
+
+    def generate_with_meta(self, prompt, response_format=None, max_completion_tokens=None):
+        reply, stop = super().generate_with_meta(prompt, response_format, max_completion_tokens)
+        if "specifications, training_context" in prompt:
+            out = json.loads(reply)
+            ids = [line[3:line.index("]")] for line in prompt.splitlines()
+                   if line.startswith("- [E") and "training_context.adaptations" in line]
+            out["training_context"]["adaptations"] = self.phrasing
+            out["training_context"]["provenance"]["adaptations"] = {
+                "source": "docling", "evidence": "q", "evidence_ids": ids}
+            reply = json.dumps(out)
+        return reply, stop
+
+
+def test_a_family_statement_written_as_this_checkpoint_is_withheld(tmp_path, monkeypatch):
+    """Failure class: family_statement_written_as_the_checkpoint. The gates let a family
+    statement onto training_context.adaptations of a base checkpoint, at relation family,
+    and the ledger said so. The writer then opened the sentence with "This checkpoint is",
+    so the public card asserted of Qwen3-8B-Base that it was "produced through the
+    Strong-to-Weak Distillation pipeline", a post-training stage its siblings went through
+    and it did not (2026-09-06). The FactReasoner pass scored the sentence 0.9998
+    supported, because the source says exactly that about the family; NLI cannot see
+    the referent. Family-scope prose has to read as family-scope prose."""
+    monkeypatch.setattr(sys.modules[__name__], "PAPER",
+                        PAPER + " OLMo 2 models are post-trained with supervised finetuning, DPO and RLVR.")
+    root = _write_bundle(tmp_path / "bundles")
+
+    art = CL.compose_model_card_llm(
+        f"{MODEL}@{REV}", root,
+        _FamilyRescopingLLM("This checkpoint is post-trained with supervised finetuning, DPO and RLVR."),
+        allow_unpinned=True)
+    assert art.card["training_context"]["adaptations"] == "Not specified"
+    withheld = [b for b in art.bindings if b.field_path == "training_context.adaptations"
+                and b.verifier_action == VerifierAction.WITHHOLD]
+    assert [b.verifier_reason for b in withheld] == ["family_statement_written_as_the_checkpoint"]
+    assert withheld[0].relation_to_target.value == "family"
+    assert withheld[0].proposed_value.startswith("This checkpoint")
+
+    # the same statement phrased at family scope is allowed, still at relation family
+    art = CL.compose_model_card_llm(
+        f"{MODEL}@{REV}", root,
+        _FamilyRescopingLLM("The OLMo 2 family is post-trained with supervised finetuning, DPO and RLVR."),
+        allow_unpinned=True)
+    assert art.card["training_context"]["adaptations"].startswith("The OLMo 2 family")
+    accepted = next(b for b in art.bindings if b.field_path == "training_context.adaptations"
+                    and b.verifier_action == VerifierAction.ACCEPT)
+    assert accepted.relation_to_target.value == "family"
+
+
+def test_a_final_claim_contradiction_flags_the_field_instead_of_withholding_it(tmp_path, monkeypatch):
+    """Failure class: nli_contradiction_on_a_true_fragment. The first roster with the pass
+    on (2026-09-06) produced two contradictions and both were false: "Mixture-of-Experts
+    (MoE) language model" on DeepSeek-V3-Base at p_true 0.05 and "A Transformer-style
+    dense autoregressive language model" on OLMo-2-7B at 0.16. A noun-phrase atom
+    scored by NLI is not a reason to lose a value its quote supports; the field stays and
+    is flagged where a reader looks."""
+    root = _write_bundle(tmp_path / "bundles")
+    monkeypatch.setattr(CL, "_run_final_claim_pass", lambda card, bindings, bundle, model_id: {
+        "status": "ok", "reason": "test", "claims_built": 1, "atoms": [],
+        "contradicted_fields": ["identity.model_type"]})
+    art = CL.compose_model_card_llm(f"{MODEL}@{REV}", root, _ScriptedLLM(), allow_unpinned=True)
+    assert art.card["identity"]["model_type"] == "An instruction-free base language model."
+    assert "identity.model_type (final-claim pass contradiction)" in \
+        art.card["provenance_and_quality"]["flagged_fields"]
+    assert not any(b.verifier_reason == "final_claim_pass_contradiction" for b in art.bindings)

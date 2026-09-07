@@ -28,6 +28,7 @@ import json
 import logging
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -90,8 +91,43 @@ def distinctive_name_tokens(model_id: str) -> set:
     return out
 
 
+_DIGIT_RE = re.compile(r"\d")
+_VERSION_TOKEN_RE = re.compile(r"\d+(?:\.\d+)*")
+_SIZE_TOKEN_RE_SRC = re.compile(r"\d+(?:\.\d+)?[bm]")
+
+
+def name_discriminators(model_id: str) -> set:
+    """The family-plus-version forms that name THIS checkpoint, not its whole family.
+
+    "gemma 3" for gemma-3-4b-pt, "llama 3.1" and "llama 3" for Llama-3.1-8B (the herd
+    paper introduces it under the shorter form). Empty when the repo name has no version
+    next to its family token, in which case the family token has to carry the weight.
+    """
+
+    name = model_id.rsplit("/", 1)[-1].lower()
+    parts = [p for p in _NAME_SPLIT_RE.split(name) if p]
+    families = distinctive_name_tokens(model_id)
+    out: set = set()
+    for index, part in enumerate(parts[:-1]):
+        if part not in families:
+            continue
+        nxt = parts[index + 1]
+        forms = set()
+        if _VERSION_TOKEN_RE.fullmatch(nxt) or _SIZE_TOKEN_RE_SRC.fullmatch(nxt):
+            forms.add(nxt)
+            if "." in nxt:
+                forms.add(nxt.split(".", 1)[0])
+        for form in forms:
+            out |= {f"{part} {form}", f"{part}-{form}", f"{part}{form}"}
+    return out
+
+
 def _token_present(tok: str, text: str) -> bool:
     return bool(re.search(r"(?<![a-z0-9])" + re.escape(tok) + r"(?![a-z0-9])", text))
+
+
+PAPER_FETCH_RETRIES = 3
+PAPER_FETCH_BACKOFF_S = 4.0
 
 
 def paper_binding_tier(model_id: str, title: str, abstract: str,
@@ -108,7 +144,16 @@ def paper_binding_tier(model_id: str, title: str, abstract: str,
     if repo_name and repo_name in low_abs.replace(" ", "-"):
         return "introduces_target"
     if tokens and all(_token_present(tok, text) for tok in tokens):
-        return "introduces_target"
+        # A bare family token is not identification. The IndicGenBench abstract reads
+        # "we evaluate ... mt5, gemma, bloom and llama", and that single word "gemma"
+        # made a benchmark paper the technical report of google/gemma-3-4b-pt and
+        # meta-llama/Llama-3.1-8B (seen 2026-09-05). When the family token carries no
+        # version of its own, the paper has to name the version too.
+        if any(_DIGIT_RE.search(tok) for tok in tokens):
+            return "introduces_target"
+        discriminators = name_discriminators(model_id)
+        if not discriminators or any(form in text for form in discriminators):
+            return "introduces_target"
     family_tokens = set(tokens)
     for base in base_model_ids or []:
         if isinstance(base, str) and "/" in base:
@@ -116,6 +161,240 @@ def paper_binding_tier(model_id: str, title: str, abstract: str,
     if any(_token_present(tok, text) for tok in family_tokens):
         return "family_reference"
     return "unrelated_tag"
+
+
+# The paper search, ported from the benchmark resolver (tools/eee/paper_resolver:
+# _search_openalex, _search_semantic_scholar and their normalizers). It runs only when
+# the repo's own arXiv ids and its base model's produced no paper that introduces this
+# checkpoint, because 63 of the 103 flagship targets of 2026-09-06 have a real report
+# that no tag points to. Nothing it returns reaches a card without the same title gate
+# the tags pass, plus the two rules below, which a tag does not need:
+#   the family token must stand alone in the TITLE ("Yi: Open Foundation Models" yes,
+#   "LLaMA-Adapter" no, because there the family name is part of another artifact's name);
+#   a generation stated in the title must be this checkpoint's ("Llama 2: Open Foundation
+#   and Fine-Tuned Chat Models" is not the Llama 3.2 report).
+PAPER_SEARCH_QUERIES = 3
+PAPER_SEARCH_CANDIDATES = 6
+_TITLE_TOKEN_RE_CACHE: Dict[str, Any] = {}
+
+
+def paper_search_enabled() -> bool:
+    """Off unless MODELCARDS_PAPER_SEARCH is set, so a collect never reaches OpenAlex or
+    Semantic Scholar by accident."""
+    return os.environ.get("MODELCARDS_PAPER_SEARCH", "").strip() not in ("", "0", "false", "no")
+
+
+def search_queries_for_model(model_id: str, base_model_ids: Optional[list] = None) -> list:
+    """The queries the search runs, most specific first: the family and its generation,
+    the way a report titles itself."""
+    from .model_frame import family_name
+
+    queries: list = []
+    fam = family_name(model_id)
+    if fam:
+        queries.append(f"{fam} technical report")
+        queries.append(f"{fam} language model")
+    for base in base_model_ids or []:
+        if not isinstance(base, str) or "/" not in base:
+            continue
+        bfam = family_name(base)
+        if bfam and bfam.lower() != (fam or "").lower():
+            queries.append(f"{bfam} technical report")
+    seen, unique = set(), []
+    for q in queries:
+        if q.lower() not in seen:
+            seen.add(q.lower())
+            unique.append(q)
+    return unique[:PAPER_SEARCH_QUERIES]
+
+
+# What may stand in front of a family token in a title. Anything else is part of another
+# model's name: "Code Llama" is not the Llama report, and "Lawyer LLaMA" is not either.
+# Determiners and announcement verbs only. A preposition in front of the family name is
+# the signature of a paper ABOUT the model rather than its report: "Model Inversion
+# Attacks on Llama 3: Extracting PII from Large Language Models" was tiered
+# introduces_target for meta-llama/Meta-Llama-3-8B in the live check of 2026-09-07,
+# because its abstract names the checkpoint.
+_TITLE_LEAD_WORDS = frozenset({"the", "a", "an", "introducing", "presenting", "announcing"})
+# token, then optionally the generation it carries ("-3.1", " 3", ".5", "-V3"), then the
+# name has to END: the next character may not continue it. "DeepSeek-V3 Technical Report"
+# ends; "Llama-3.1-FoundationAI-SecurityLLM-Reasoning-8B Technical Report" does not, and
+# it was tiered introduces_target for meta-llama/Llama-3.2-3B in the live check of
+# 2026-09-07. A size is not a generation ("Mistral 7B").
+_TITLE_VERSION = r"(?:[.\-\s]?v?(\d+(?:\.\d+)*)(?![bm\d]))?"
+
+
+def _title_name_match(title_low: str, token: str, name_tokens: Optional[set] = None):
+    """The match of a family token standing on its own in a title, or None.
+
+    A hyphenated continuation after the generation names a different member of the family
+    ("Qwen2.5-1M Technical Report" is not Qwen2.5-32B-Instruct's) unless the checkpoint's
+    own name carries that same word ("Qwen2.5-Math Technical Report" is Qwen2.5-Math-7B's).
+    """
+    for m in re.finditer(re.escape(token) + _TITLE_VERSION, title_low):
+        before = title_low[:m.start()]
+        if re.search(r"[a-z0-9-]$", before):
+            continue
+        lead = re.findall(r"[a-z]+", before)
+        if lead and lead[-1] not in _TITLE_LEAD_WORDS:
+            continue
+        rest = title_low[m.end():]
+        if re.match(r"[a-z0-9]", rest):
+            continue
+        continuation = re.match(r"-([a-z0-9]+)", rest)
+        if continuation and continuation.group(1) not in (name_tokens or set()):
+            continue
+        return m
+    return None
+
+
+def family_generation(model_id: str, token: str) -> Optional[str]:
+    """The generation the repo name puts next to its family token: "3.1" of
+    Meta-Llama-3.1-8B, "2.5" of qwen2.5-0.5b-sft-mdpo, "3" of DeepSeek-V3, None for
+    Mistral-7B-v0.3 and gemma-7b, whose names carry a size and a point release but no
+    generation. family_version answers for the name as a whole and stops at the first
+    name token, which is "meta" on a meta-llama repo."""
+    toks = [t.strip(".") for t in re.split(r"[^a-z0-9.]+", model_id.rsplit("/", 1)[-1].lower())
+            if t.strip(".")]
+    glued = re.search(r"(\d+)$", token)
+    for index, tok in enumerate(toks):
+        if not tok.startswith(token):
+            continue
+        rest = tok[len(token):]
+        if rest:
+            if not re.fullmatch(r"\.?\d+(?:\.\d+)*", rest):
+                continue
+            return ".".join(p for p in (glued.group(1) if glued else "", rest.lstrip("."))
+                            if p) or None
+        if index + 1 < len(toks):
+            nxt = toks[index + 1]
+            m = re.fullmatch(r"v?(\d+(?:\.\d+)*)", nxt)
+            if m and not _SIZE_RE.match(nxt):
+                return m.group(1)
+        return glued.group(1) if glued else None
+    return None
+
+
+def _version_parts(version: Optional[str]) -> list:
+    return [p for p in (version or "").split(".") if p]
+
+
+def _title_generation(title_low: str, token: str) -> Optional[str]:
+    """The generation a title states right after a family token: "3" in "The Llama 3 Herd
+    of Models". A size ("Mistral 7B") is not a generation."""
+    m = _title_name_match(title_low, token)
+    return m.group(1) if m else None
+
+
+def head_family_token(model_id: str) -> Optional[str]:
+    """The token that can name the family in a title: "qwen2" of qwen2.5-0.5b-sft-mdpo,
+    "llama" of Llama_3.2_3b_Kermes_v2.1 and of Meta-Llama-3.1-8B. A tail token names the
+    method or the merge ("mDPO: Conditional Preference Optimization" is not the technical
+    report of a Qwen fine-tune), and a leading vendor token is not the family either:
+    with "meta" as the family of Meta-Llama-3.1-8B, a survey titled "Evolution of meta's
+    llama models" was bound to it in the live check of 2026-09-07.
+
+    The family token is the one the repo name puts its generation next to; failing that,
+    the first distinctive token.
+    """
+    distinctive = distinctive_name_tokens(model_id)
+    parts = [t for t in _NAME_SPLIT_RE.split(model_id.rsplit("/", 1)[-1].lower()) if t]
+    for index, tok in enumerate(parts[:-1]):
+        nxt = parts[index + 1]
+        if tok in distinctive and (_VERSION_TOKEN_RE.fullmatch(nxt)
+                                   or _SIZE_TOKEN_RE_SRC.fullmatch(nxt)):
+            return tok
+    for tok in parts:
+        if tok in distinctive:
+            return tok
+    return None
+
+
+def search_title_gate(model_id: str, title: str, base_model_ids: Optional[list] = None) -> bool:
+    """Whether a searched paper's title may be bound to this checkpoint at all."""
+    title_low = (title or "").lower()
+    if not title_low:
+        return False
+    families = set()
+    for owner in [model_id, *[b for b in (base_model_ids or []) if isinstance(b, str) and "/" in b]]:
+        token = head_family_token(owner)
+        if token:
+            families.add((owner, token))
+    for owner, token in families:
+        # the family token has to name the title's own subject: standing on its own,
+        # not inside another model's name ("LLaMA-Adapter", "Qwen-VL", "Code Llama",
+        # "Llama-3.1-FoundationAI-SecurityLLM-8B"), and not behind another name word.
+        own_tokens = {t for t in _NAME_SPLIT_RE.split(owner.rsplit("/", 1)[-1].lower()) if t}
+        match = _title_name_match(title_low, token, own_tokens)
+        if match is None:
+            continue
+        # the generation may be glued to the token ("qwen2") and continue after it
+        # (".5"), and both halves are one version
+        glued = re.search(r"(\d+)$", token)
+        stated = _version_parts(".".join(filter(None, [glued.group(1) if glued else "",
+                                                       match.group(1) or ""])))
+        mine = _version_parts(family_generation(owner, token))
+        # the generation the title states must be this checkpoint's, or an earlier part
+        # of it: "The Llama 3 Herd of Models" for Llama-3.2, never "Llama 2" and never
+        # the later "Qwen2.5" report for a Qwen2 checkpoint. A title that states one for
+        # a checkpoint whose name states none is a different generation of it.
+        if stated and (not mine or mine[:len(stated)] != stated):
+            continue
+        # and the mirror: a checkpoint whose name carries a generation needs the title to
+        # say which one. "LLaMA: Open and Efficient Foundation Language Models" is not
+        # meta-llama/Llama-3.1-8B's report, and the v1 Gemma paper is not gemma-3's.
+        if mine and not stated:
+            continue
+        return True
+    return False
+
+
+def search_paper_candidates(model_id: str, base_model_ids: Optional[list] = None,
+                            search_fns=None) -> list:
+    """arXiv candidates from OpenAlex and Semantic Scholar, title-gated before any fetch.
+
+    Returns [{"arxiv_id", "origin", "title", "query"}], best first, at most
+    PAPER_SEARCH_CANDIDATES. search_fns is [(origin, search, normalize)]; tests inject it.
+    """
+    if search_fns is None:
+        from auto_benchmarkcard.tools.eee.paper_resolver import (
+            _normalize_openalex_paper, _normalize_s2_paper, _search_openalex,
+            _search_semantic_scholar,
+        )
+        search_fns = [("openalex_search", _search_openalex, _normalize_openalex_paper),
+                      ("s2_search", _search_semantic_scholar, _normalize_s2_paper)]
+    out: list = []
+    seen: set = set()
+    # sources outer, queries inner: Semantic Scholar without a key sleeps a second per
+    # request and answers 429 under load, and a collect that walks both sources for every
+    # query ran past its 900 s timeout on the first two targets of the 2026-09-07
+    # re-collect. The second source is only asked when the first found nothing.
+    for origin, search, normalize in search_fns:
+        for query in search_queries_for_model(model_id, base_model_ids):
+            try:
+                results = search(query) or []
+            except Exception as exc:  # a search must never lose a bundle
+                logger.warning("paper search %s failed for %r: %s", origin, query, exc)
+                continue
+            for raw in results:
+                try:
+                    paper = normalize(raw) or {}
+                except Exception:
+                    continue
+                arxiv_id = str(paper.get("arxiv_id") or "").strip()
+                m = re.match(r"^(\d{4}\.\d{4,5})(?:v\d+)?$", arxiv_id)
+                if not m or m.group(1) in seen:
+                    continue
+                if not search_title_gate(model_id, paper.get("title") or "", base_model_ids):
+                    continue
+                seen.add(m.group(1))
+                out.append({"arxiv_id": m.group(1), "origin": origin,
+                            "title": paper.get("title") or "", "query": query})
+                if len(out) >= PAPER_SEARCH_CANDIDATES:
+                    return out
+        if out:
+            break
+    return out
 
 
 _VERSION_RE = re.compile(r"^v?(\d+(?:\.\d+)?)$")
@@ -275,6 +554,9 @@ def readme_html_candidates(model_id: str, hf_meta: Dict[str, Any], limit: int = 
     return out
 
 
+_SHARD_RE = re.compile(r"model-\d+-of-\d+\.safetensors")
+
+
 def safetensors_bytes(model_id: str, revision: str) -> Optional[int]:
     """Total bytes of the revision's *.safetensors files, for specifications.model_size.
     The Hub only returns file sizes when they are asked for, so this is one extra call.
@@ -286,13 +568,27 @@ def safetensors_bytes(model_id: str, revision: str) -> Optional[int]:
     except Exception as exc:
         logger.info("no file metadata for %s@%s: %s", model_id, revision[:12], str(exc)[:120])
         return None
-    total = 0
+    shards: dict[str, int] = {}
+    single: dict[str, int] = {}
+    other: dict[str, int] = {}
     for sib in getattr(info, "siblings", None) or []:
         name = getattr(sib, "rfilename", "") or ""
         size = getattr(sib, "size", None)
-        if name.endswith(".safetensors") and isinstance(size, int):
-            total += size
-    return total or None
+        if not name.endswith(".safetensors") or not isinstance(size, int):
+            continue
+        base = name.rsplit("/", 1)[-1]
+        if _SHARD_RE.fullmatch(base):
+            shards[name] = size
+        elif base == "model.safetensors":
+            single[name] = size
+        else:
+            other[name] = size
+    # A repo often ships the SAME weights twice: mistralai/Mistral-7B-v0.3 carries
+    # consolidated.safetensors next to model-0000n-of-00003.safetensors, and summing both
+    # published 27.0 GiB for a 7B model in BF16, exactly double (seen 2026-09-05). One
+    # packaging is the model; pick it, never add two complete copies together.
+    group = shards or single or other
+    return sum(group.values()) or None
 
 
 def arxiv_id_from_hf(hf_meta: Dict[str, Any]) -> Optional[str]:
@@ -308,7 +604,8 @@ def arxiv_id_from_hf(hf_meta: Dict[str, Any]) -> Optional[str]:
 def collect_model_bundle(target: str, out_dir: str | Path, *, hf_metadata=None,
                          paper_meta=None, docling=None, github=None, html=None,
                          eee_datastore: Optional[str] = None,
-                         allow_network: bool = True) -> Dict[str, Any]:
+                         allow_network: bool = True,
+                         paper_search: Optional[bool] = None, search_fns=None) -> Dict[str, Any]:
     """Write the bundle for target under out_dir/<slug>/ and return a manifest dict.
 
     The five fetchers default to the composer's own tools (hf_model_metadata, the
@@ -384,10 +681,23 @@ def collect_model_bundle(target: str, out_dir: str | Path, *, hf_metadata=None,
     def _evaluate(arxiv_id: str, origin: str, via_base: Optional[str] = None) -> Dict[str, Any]:
         url = f"https://arxiv.org/abs/{arxiv_id}"
         meta = paper_meta(url) or {}
+        # arXiv rate-limits a concurrent collect; a failed fetch has no title, and an
+        # empty title tiered as unrelated_tag silently dropped the paper channel from
+        # 126 of 247 bundles (2026-09-06). Retry with a pause, and when it still fails
+        # say so instead of pretending the paper was read.
+        attempt = 0
+        while meta.get("fetch_error") and attempt < PAPER_FETCH_RETRIES:
+            attempt += 1
+            time.sleep(PAPER_FETCH_BACKOFF_S * (2 ** (attempt - 1)))
+            meta = paper_meta(url) or {}
+        if meta.get("fetch_error"):
+            return {"arxiv_id": arxiv_id, "from": origin, "tier": "fetch_failed",
+                    "paper_url": url, "paper_title": "", "fetch_error": True,
+                    **({"via_base_model": via_base} if via_base else {})}
         tier = paper_binding_tier(model_id, meta.get("title", ""), meta.get("abstract", ""), bases)
         row: Dict[str, Any] = {"arxiv_id": arxiv_id, "from": origin, "tier": tier,
                                "paper_url": url, "paper_title": meta.get("title", ""),
-                               "fetch_error": bool(meta.get("fetch_error"))}
+                               "fetch_error": False}
         if via_base:
             row["via_base_model"] = via_base
         return row
@@ -397,8 +707,8 @@ def collect_model_bundle(target: str, out_dir: str | Path, *, hf_metadata=None,
         tried.append(_evaluate(cand["arxiv_id"], cand["from"]))
         if tried[-1]["tier"] == "introduces_target":
             break
+    seen_ids = {r["arxiv_id"] for r in tried if "arxiv_id" in r}
     if not any(r["tier"] == "introduces_target" for r in tried):
-        seen_ids = {r["arxiv_id"] for r in tried}
         for base_id in bases:
             try:
                 base_meta = hf_metadata(base_id, "main") or {}
@@ -415,6 +725,29 @@ def collect_model_bundle(target: str, out_dir: str | Path, *, hf_metadata=None,
             if any(r.get("tier") == "introduces_target" for r in tried):
                 break
 
+    # third source: the literature search, on the same title gate plus the two rules a
+    # search hit has to pass that a tag does not (search_title_gate). It runs only when
+    # nothing the repo itself points at introduces this checkpoint.
+    if paper_search is None:
+        paper_search = paper_search_enabled()
+    if paper_search and not any(r.get("tier") == "introduces_target" for r in tried):
+        for cand in search_paper_candidates(model_id, bases, search_fns=search_fns):
+            if cand["arxiv_id"] in seen_ids:
+                continue
+            seen_ids.add(cand["arxiv_id"])
+            row = _evaluate(cand["arxiv_id"], cand["origin"])
+            row["search_query"] = cand["query"]
+            row["search_title"] = cand["title"]
+            if row["tier"] in ("introduces_target", "family_reference") \
+                    and not search_title_gate(model_id, row.get("paper_title") or "", bases):
+                # the search result's own title passed the gate; the paper arXiv actually
+                # holds is a different one, so it is not this checkpoint's
+                row["search_gate"] = "arxiv_title_rejected"
+                row["tier"] = "unrelated_tag"
+            tried.append(row)
+            if row["tier"] == "introduces_target":
+                break
+
     usable = [r for r in tried if r.get("tier") in ("introduces_target", "family_reference")]
     usable.sort(key=lambda r: 0 if r["tier"] == "introduces_target" else 1)
     arxiv_id = None
@@ -428,8 +761,16 @@ def collect_model_bundle(target: str, out_dir: str | Path, *, hf_metadata=None,
             binding["via_base_model"] = best["via_base_model"]
         sidecar.update({"resolved_url": best["paper_url"], "resolved_from": origin,
                         "paper_title": best["paper_title"], "binding": binding})
-    elif tried:
+    elif tried and all(r.get("tier") == "fetch_failed" for r in tried if "arxiv_id" in r):
         first = tried[0]
+        sidecar["binding"] = {"tier": "fetch_failed", "verdict": "unresolved",
+                              "paper_url": first.get("paper_url"),
+                              "reason": "paper metadata could not be fetched; re-collect to resolve",
+                              "fetch_error": True}
+        sidecar["resolved_from"] = first.get("from")
+        sidecar["paper_title"] = ""
+    elif tried:
+        first = next((r for r in tried if r.get("tier") != "fetch_failed"), tried[0])
         sidecar["binding"] = {"tier": first.get("tier", "unrelated_tag"), "verdict": "dropped",
                               "paper_url": first.get("paper_url"),
                               "reason": "no family token in title or abstract",

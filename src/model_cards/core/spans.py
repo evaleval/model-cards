@@ -13,7 +13,7 @@ import json
 from typing import Any, Iterable
 
 from .bridge import ComposerBridge
-from .records import EvidenceSpan, SourceBundle, SourceFile
+from .records import EvidenceSpan, SourceBundle, SourceFile, structured_document
 
 
 class CompositionError(RuntimeError):
@@ -32,12 +32,60 @@ def _bounded_context(normalized: str, start: int, end: int, cap: int = 180) -> t
     return normalized[max(0, start - cap):start], normalized[end:end + cap]
 
 
+def resolve_pointer(document: Any, pointer: str) -> Any:
+    """Resolve an RFC 6901 JSON Pointer, raising KeyError if it does not exist."""
+
+    if pointer in ("", "/"):
+        return document
+    if not pointer.startswith("/"):
+        raise KeyError(pointer)
+    current = document
+    for raw in pointer.lstrip("/").split("/"):
+        token = raw.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, list):
+            if not token.isdigit() or int(token) >= len(current):
+                raise KeyError(pointer)
+            current = current[int(token)]
+        elif isinstance(current, dict):
+            if token not in current:
+                raise KeyError(pointer)
+            current = current[token]
+        else:
+            raise KeyError(pointer)
+    return current
+
+
 def _structured_evidence(
     bundle: SourceBundle,
     source: SourceFile,
     pointer: str,
     fragment: Any,
 ) -> EvidenceSpan:
+    """Structured evidence whose pointer resolves in the file it names.
+
+    A pointer written against an internal wrapper view rather than the stored file
+    ("/config/architectures" for a config.json whose own root holds "architectures")
+    yields a correct value with an anchor that no reader can follow. Click-through is
+    the point of the pointer, so the anchor is resolved here, against the frozen bytes,
+    before the span exists.
+    """
+
+    if source.content is None:
+        raise CompositionError(f"source content is unavailable: {source.name}")
+    try:
+        document = structured_document(source.name, source.content)
+    except ValueError as exc:
+        raise CompositionError(str(exc)) from exc
+    try:
+        found = resolve_pointer(document, pointer)
+    except KeyError as exc:
+        raise CompositionError(
+            f"structured pointer {pointer} does not resolve in {source.name}"
+        ) from exc
+    if found != fragment:
+        raise CompositionError(
+            f"structured pointer {pointer} in {source.name} resolves to a different value"
+        )
     return EvidenceSpan(
         source_uri=source.source_uri,
         source_revision=bundle.target.resolved_revision,

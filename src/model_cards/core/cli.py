@@ -336,7 +336,7 @@ def _cmd_collect(args: argparse.Namespace) -> int:
 
 
 def _pinned_llm():
-    """The pinned serving route (route.py, recorded in vault/llm_config.md); env pins win."""
+    """The pinned serving route (route.py, recorded with the run); env pins win."""
     from .route import build_llm, load_env
 
     load_env()
@@ -546,7 +546,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
         import hashlib
 
         from .public import export_public
-        from ..public_markdown import render_public_markdown
+        from .public_markdown import render_public_markdown
 
         projection = export_public(artifact, reviewed=not args.generation_time)
         payload = _json(projection, indent=2) + "\n"

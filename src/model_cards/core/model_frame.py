@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 _SIZE_TOKEN_RE = re.compile(r"^\d+(?:\.\d+)?[bm]$", re.IGNORECASE)
 _DATE_TOKEN_RE = re.compile(r"^(?:\d{4}|\d{6}|\d{8}|\d{2}\d{2})$")
-_STAGE_TOKENS = {"instruct", "chat", "it", "sft", "dpo", "rl", "rlhf", "rlvr", "base", "hf",
+_STAGE_TOKENS = {"instruct", "chat", "it", "sft", "dpo", "rl", "rlhf", "rlvr", "base", "pt", "hf",
                  "preview", "think", "thinking", "reasoning", "gguf", "awq", "gptq", "fp8",
                  "int4", "int8", "bnb", "4bit", "8bit", "instruct-v2", "v0.1", "v0.2"}
 _DERIVATIVE_TOKENS = {"instruct", "chat", "it", "sft", "dpo", "rl", "rlhf", "rlvr", "think",
@@ -109,7 +109,12 @@ def _target_node(model_id: str, revision: str, hf_meta: Dict[str, Any]) -> Dict[
     fam = family_name(model_id)
     tokens = _name_tokens(repo_name)
     sizes = [t for t in tokens if _SIZE_TOKEN_RE.match(t) or re.fullmatch(r"\d+x\d+[bm]", t, re.IGNORECASE)]
-    stages = [t for t in tokens if t.lower() in _DERIVATIVE_TOKENS]
+    # every stage token in the name, not only the post-training ones. "base" and "pt" are
+    # stages too, and leaving them out built the SIBLING's name as the target's own alias:
+    # Qwen3-8B-Base got alias "Qwen3-8B", so the exact-equality guard in
+    # table_scores._label_matches matched the post-trained sibling's column truthfully and
+    # 42 of the 57 rows on the base card belonged to Qwen3-8B (seen 2026-09-05).
+    stages = [t for t in tokens if t.lower() in _STAGE_TOKENS]
     for size in sizes:
         suffix = " ".join([size] + stages)
         hyphen_fam = fam.replace(" ", "-")
@@ -236,6 +241,30 @@ def _llm_prompt(target_name: str, family: str, excerpts: List[Tuple[str, str]]) 
     return "\n\n".join(parts)
 
 
+_STAGE_PAIR_SUFFIXES = ("Instruct", "instruct", "it", "IT", "Chat", "chat", "Base", "base", "pt", "PT",
+                        "SFT", "DPO", "Thinking")
+
+
+def _literal_stage_siblings(target_name: str, texts: List[str]) -> List[str]:
+    """Names of the form <target>-<stage> that occur literally in the sources, and, for a
+    target whose own name ends in a stage token, the bare name without it."""
+    found: List[str] = []
+    joined = "\n".join(texts)
+    low = joined.lower()
+    for suffix in _STAGE_PAIR_SUFFIXES:
+        candidate = f"{target_name}-{suffix}"
+        if candidate.lower() in low and candidate not in found:
+            found.append(candidate)
+    for suffix in _STAGE_PAIR_SUFFIXES:
+        tail = f"-{suffix}"
+        if target_name.lower().endswith(tail.lower()):
+            bare = target_name[: -len(tail)]
+            if bare and re.search(r"(?<![A-Za-z0-9-])" + re.escape(bare) + r"(?![A-Za-z0-9-])", joined, re.IGNORECASE) \
+                    and bare not in found:
+                found.append(bare)
+    return found
+
+
 def build_model_frame(model_id: str, revision: str, hf_meta: Dict[str, Any], *,
                       doc_index=None, paper_text: str = "", github_text: str = "",
                       eee: Optional[Dict[str, Any]] = None, paper_tier: str = "none",
@@ -283,6 +312,16 @@ def build_model_frame(model_id: str, revision: str, hf_meta: Dict[str, Any], *,
     counts["siblings_llm"] = counts["comparisons_llm"] = counts["family_aliases_llm"] = 0
     readme = hf_meta.get("readme_markdown") or ""
     presence = [t for t in (readme, paper_text, github_text) if t]
+    # The other member of the target's base/post-trained pair, when the sources name it
+    # literally: "<target>-Instruct" on a base card, "<target>-Base" on an instruct card.
+    # Structural, no LLM, and it is what lets the gates know which stage a sentence about
+    # "the instruction-tuned models" belongs to on a checkpoint whose name says nothing.
+    counts["stage_siblings_literal"] = 0
+    for name in _literal_stage_siblings(target["name"], presence):
+        node = {"id": "sibling:" + _slug(name), "type": "sibling", "name": name, "aliases": [],
+                "description": "The other member of the base/post-trained pair, named literally in the sources."}
+        if frame_mod._add_node(nodes, index, node):
+            counts["stage_siblings_literal"] += 1
     if llm_handler is not None and presence:
         try:
             excerpts: List[Tuple[str, str]] = [("Model card README", readme[:frame_mod.HEAD_CHARS])]

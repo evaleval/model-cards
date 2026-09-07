@@ -244,3 +244,18 @@ def test_the_screen_runner_caps_its_searches_and_its_spend():
     assert "temperature=0" in screen
     assert "if spent >= args.max_cost_usd" in screen
     assert "no pricing entry" in screen
+
+
+def test_the_judge_sees_the_structured_sources_it_needs(tmp_path):
+    """Failure class: judge_blind_to_structured_sources. The first screen of 2026-09-06
+    held text sources only, so 121 values read from config.json and the Hub API
+    (release_date, precision, num_parameters, architecture_type, context_length) were
+    judged unsupported; a reader of the JSON confirms each in one look."""
+    from model_cards.core.eval import judge as J
+
+    assert "config.json" not in J.JUDGE_SOURCE_SKIP
+    assert "model_info.json" not in J.JUDGE_SOURCE_SKIP
+    assert "extras.json" not in J.JUDGE_SOURCE_SKIP
+    assert {"eee.json", "risk-atlas.json"} <= J.JUDGE_SOURCE_SKIP
+    assert "risks.possible_risks" in J.JUDGE_SKIP
+    assert J.JUDGE_PROMPT_VERSION == "model-card-judge-v2"

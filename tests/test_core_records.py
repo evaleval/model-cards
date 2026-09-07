@@ -77,8 +77,8 @@ def binding(**overrides: object) -> BindingRecord:
 
 
 def test_schema_v5_has_exactly_the_canonical_38_paths_and_fresh_blank_card() -> None:
-    assert len(CARD_FIELD_PATHS) == 38
-    assert len(set(CARD_FIELD_PATHS)) == 38
+    assert len(CARD_FIELD_PATHS) == 39
+    assert len(set(CARD_FIELD_PATHS)) == 39
     assert CARD_FIELD_PATHS[0] == "identity.model_id"
     assert CARD_FIELD_PATHS[-1] == "provenance_and_quality.card_info"
     assert {
