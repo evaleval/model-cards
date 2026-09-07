@@ -240,3 +240,43 @@ class RisksSectionTests(unittest.TestCase):
         self.assertIn("## Risks", text)
         self.assertNotIn("### Possible Risks", text)
         self.assertIn("`risks.possible_risks`", text)
+
+
+class RisksSectionWordingTests(unittest.TestCase):
+    """Failure class: section_says_empty_then_shows_a_table. The risks section has one
+    field, and that field renders as its own table, so the generic field table was always
+    empty and every card opened the section with "no specified fields are available" and
+    then listed its risks (seen on 347 published cards, 2026-09-08). The section now
+    says what the risks are, and says plainly when none was selected."""
+
+    def test_a_risks_table_is_not_preceded_by_an_empty_section_line(self) -> None:
+        card = blank_publication_card()
+        card["identity"]["model_id"] = "org/model"
+        card["risks"]["possible_risks"] = [
+            {"category": "Jailbreaking", "description": "Prompts that bypass safety.", "url": None}
+        ]
+        text = render_public_markdown(card, json_filename="org--model.json", json_sha256="0" * 64)
+        risks = text[text.index("## Risks"):text.index("\n---")]
+        self.assertNotIn("No specified fields", risks)
+        self.assertIn("taxonomy mapping, not statements found in the sources", risks)
+        self.assertIn("| Jailbreaking |", risks)
+
+    def test_absent_risks_say_so_in_their_own_words(self) -> None:
+        card = blank_publication_card()
+        card["identity"]["model_id"] = "org/model"
+        card["risks"]["possible_risks"] = "Not specified"
+        text = render_public_markdown(card, json_filename="org--model.json", json_sha256="0" * 64)
+        risks = text[text.index("## Risks"):text.index("\n---")]
+        self.assertIn("No AI Risk Atlas entry was selected for this checkpoint", risks)
+        self.assertNotIn("No specified fields", risks)
+
+    def test_a_scores_only_evaluation_section_has_the_same_shape(self) -> None:
+        card = blank_publication_card()
+        card["identity"]["model_id"] = "org/model"
+        card["evaluation"]["benchmark_scores"] = [
+            {"benchmark": "MMLU", "metric": "accuracy", "score": "71.3", "setting": "5-shot"}
+        ]
+        text = render_public_markdown(card, json_filename="org--model.json", json_sha256="0" * 64)
+        evaluation = text[text.index("## Evaluation"):text.index("## Links")]
+        self.assertNotIn("No specified fields", evaluation)
+        self.assertIn("### Benchmark Scores", evaluation)

@@ -51,8 +51,6 @@ SHA-256: `74dfd52066910b0be3819471af6e5b3009ff6ac6d972579b72f312d21c573a4d`
 
 ## Evaluation
 
-_No specified fields are available in the publication data._
-
 ### Benchmark Scores
 
 | Benchmark | Metric | Score | Setting | Split |
@@ -100,9 +98,9 @@ _No specified fields are available in the publication data._
 
 ## Risks
 
-_No specified fields are available in the publication data._
-
 ### Possible Risks
+
+_Entries of the IBM AI Risk Atlas selected from what this card's own fields say. They are a taxonomy mapping, not statements found in the sources._
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |

@@ -72,9 +72,9 @@ SHA-256: `dfb04b7232c07f371675679e58a5170b6927f3c1278681015821be4c4d630a38`
 
 ## Risks
 
-_No specified fields are available in the publication data._
-
 ### Possible Risks
+
+_Entries of the IBM AI Risk Atlas selected from what this card's own fields say. They are a taxonomy mapping, not statements found in the sources._
 
 | Risk | Why it applies here | Description |
 | --- | --- | --- |

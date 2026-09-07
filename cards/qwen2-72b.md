@@ -50,8 +50,6 @@ SHA-256: `ec5ebbacddb1b6393a5158bc1fb9f56fa393f13bf720820ef1f01849e2429c7c`
 
 ## Evaluation
 
-_No specified fields are available in the publication data._
-
 ### Benchmark Scores
 
 | Benchmark | Metric | Score | Setting | Split |
@@ -93,7 +91,7 @@ _No specified fields are available in the publication data._
 
 ## Risks
 
-_No specified fields are available in the publication data._
+_No AI Risk Atlas entry was selected for this checkpoint._
 
 ---
 

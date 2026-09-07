@@ -183,13 +183,26 @@ def _render_benchmark_scores(value: Any) -> list[str]:
     return rendered
 
 
+# What the risks section is has to be said on the card itself: a reader who sees
+# "no specified fields" followed by a table of risks reads a contradiction, and a reader
+# who sees only the table takes the risks for statements the sources make. They are
+# neither. They are entries of a fixed taxonomy, chosen from what the card's own fields say.
+_RISKS_NOTE = (
+    "_Entries of the IBM AI Risk Atlas selected from what this card's own fields say. "
+    "They are a taxonomy mapping, not statements found in the sources._"
+)
+_RISKS_NONE = "_No AI Risk Atlas entry was selected for this checkpoint._"
+
+
 def _render_possible_risks(value: Any) -> list[str]:
     if value == NOT_SPECIFIED:
-        return []
+        return [_RISKS_NONE]
     if value == NOT_APPLICABLE:
         return ["### Possible Risks", "", "Not applicable."]
     rendered = [
         "### Possible Risks",
+        "",
+        _RISKS_NOTE,
         "",
         "| Risk | Why it applies here | Description |",
         "| --- | --- | --- |",
@@ -282,16 +295,18 @@ def render_public_markdown(
 
     for section in SECTION_FIELDS:
         lines.extend(["", f"## {_SECTION_TITLES[section]}", ""])
-        lines.extend(_render_field_table(_section_rows(section, card[section])))
+        rows = _section_rows(section, card[section])
+        # the two fields with their own tables: a section whose only content is one of
+        # them must not open with "no specified fields" and then show a table
+        extra: list[str] = []
         if section == "evaluation":
-            benchmark_scores = card[section].get("benchmark_scores", NOT_SPECIFIED)
-            benchmark_lines = _render_benchmark_scores(benchmark_scores)
-            if benchmark_lines:
-                lines.extend(["", *benchmark_lines])
+            extra = _render_benchmark_scores(card[section].get("benchmark_scores", NOT_SPECIFIED))
         if section == "risks":
-            risk_lines = _render_possible_risks(card[section].get("possible_risks", NOT_SPECIFIED))
-            if risk_lines:
-                lines.extend(["", *risk_lines])
+            extra = _render_possible_risks(card[section].get("possible_risks", NOT_SPECIFIED))
+        if rows or not extra:
+            lines.extend(_render_field_table(rows))
+        if extra:
+            lines.extend(["", *extra] if rows else extra)
 
     unavailable = _unavailable_fields(card)
     lines.extend(["", "---", ""])

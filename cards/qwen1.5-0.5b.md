@@ -81,7 +81,7 @@ SHA-256: `a1ed48cf29a93a0c71e84167ade2b8bc71e697d66aca03ea0365c636112a480d`
 
 ## Risks
 
-_No specified fields are available in the publication data._
+_No AI Risk Atlas entry was selected for this checkpoint._
 
 ---
 
