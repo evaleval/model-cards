@@ -12,7 +12,7 @@ published.
 
 ## The public contract
 
-Exactly seven sections and 33 fields, closed:
+Exactly eight sections and 34 fields, closed:
 
 | Section | Fields |
 | --- | --- |
@@ -23,6 +23,13 @@ Exactly seven sections and 33 fields, closed:
 | `access_and_adoption` | `access_type`, `downloads`, `likes` |
 | `evaluation` | `results_summary`, `benchmark_scores`, `human_evals`, `safety_evals` |
 | `links` | `model_card`, `system_card`, `tech_report`, `code_repository`, `citation` |
+| `risks` | `possible_risks` |
+
+`risks.possible_risks` holds entries of the IBM AI Risk Atlas, selected for this
+checkpoint from what the card itself says and bound to the frozen copy of the taxonomy in
+the source bundle: every row carries the JSON pointer to its entry, so a reader can see
+the definition the label came from. It is a taxonomy selection, not a source quotation,
+and it is the one field the faithfulness judge does not grade.
 
 `schema/model-card.schema.json` is the contract and `src/model_cards/publication_contract.py`
 is its single definition in code; the generator imports it rather than restating it. A
@@ -51,7 +58,9 @@ commit unless the caller asks for it, so a card can always say which composer wr
 ## Running it
 
 ```sh
-pip install -e '.[generate]'
+pip install -e '.[generate]'   # the generator extra pins the composer commit in
+                               # composer-pin.json, whose branch is not on the public
+                               # remote yet; the publication surface installs without it
 
 # free: freeze the sources for an exact revision
 modelcards collect 'allenai/OLMo-2-1124-7B@7df9a82518afdecae4e8c026b27adccc8c1f0032' \
@@ -84,14 +93,20 @@ log, per card, so what a run cost is a read and not an estimate.
 
 ## The cards here
 
-`cards/` holds twelve generated candidates: six flagship base and instruct pairs across
-five developers, regenerated from a pipeline run rather than hand-edited. They are
-candidates. None has been human-reviewed, and none is an official model card.
+`cards/` holds 256 generated candidates over 113 developers, from a seeded draw of the
+Hugging Face models that appear in public evaluation records, plus a roster of twelve
+flagship base and instruct pairs. They come from two pipeline runs and are not
+hand-edited. They are candidates: none has been human-reviewed, and none is an official
+model card.
 
-Four of them (`llama-3.1-8b*`, `gemma-3-4b-*`) carry no `architecture_type` and no
-`context_length`, because those repositories are gated: the Hub returns the README to an
-unauthorized token and 403 on `config.json`. The card records the absence rather than
-filling it from prose, which is the behaviour this project exists to have.
+They carry 1,006 benchmark score rows read out of the tables of READMEs and reports, 212
+of the 256 carry AI Risk Atlas entries, and 48 carry a technical report the pipeline was
+able to bind to the checkpoint rather than to its family.
+
+41 of them carry no `architecture_type`, most of them because the repository is gated: the
+Hub returns the README to an unauthorized token and 403 on `config.json`. The card records
+the absence rather than filling it from prose, which is the behaviour this project exists
+to have.
 
 ## Evaluation
 
@@ -110,7 +125,30 @@ changes when its question does:
 `evaluation/` holds the human annotation schemas and the paired-audit tooling. Human
 labels come from people.
 
+## What the pipeline does beyond reading the README
+
+- **The paper.** A repository's arXiv tag is often the base model's, sometimes another
+  paper entirely. Every candidate the repo offers goes through a title gate that decides
+  whether the paper introduces this checkpoint, references its family, or is unrelated,
+  and an unrelated paper is dropped unread. When neither the repo nor its declared base
+  points at a paper, OpenAlex and Semantic Scholar are searched, and a searched title has
+  to pass a stricter rule still: the family name must be the title's own subject and the
+  generation it states must be this checkpoint's, so "Code Llama", "LLaMA-Adapter",
+  "Llama 2" and a paper about attacks on Llama 3 are all refused for a Llama 3.2
+  checkpoint.
+- **The tables.** Benchmark scores are read deterministically from the cell that is the
+  target's own, in both table orientations, with the metric and the evaluation setting
+  taken from the table itself and never guessed. A column label is matched by token role,
+  so the developer's own shorthand ("Gemma PT 9B", "Gemma 2 IT 9B") is read, while a
+  sibling's column, a quantized re-upload's column and the other stage's table are not.
+- **A second opinion on the prose.** With `MODELCARDS_FACTCHECK=1` the finished card runs
+  through FactReasoner, which decomposes each prose value into atomic claims and scores
+  them against the frozen sources with an NLI model. A contradiction flags the field in
+  `provenance_and_quality.flagged_fields`; it does not silently remove it, because the
+  entailment model is referent-blind and two of its first contradictions were false.
+
 ## Status
 
 This is a working generator and a set of candidates, not a released corpus. The
-faithfulness judge and the screen have not been run on these twelve cards.
+faithfulness judge runs on a seeded stratified sample of it; the human annotation round
+has not happened yet, and human labels are what would turn candidates into a corpus.

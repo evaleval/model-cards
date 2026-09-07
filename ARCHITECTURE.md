@@ -4,10 +4,10 @@ One target, `model_id@revision`, becomes one card. Every stage below either prod
 value with a source and an entity, or refuses one and says why.
 
 ```
-collect  ->  frame  ->  Stage A  ->  gates  ->  EAV  ->  Stage B  ->  checks  ->  export
-             (who is        (verbatim   (what a      (audit)  (write from   (leaf,      (33 fields,
-              who)           quotes)     field may             accepted      excerpt,    Markdown,
-                                         take)                 evidence)     factuality) inspector)
+collect -> frame -> Stage A -> gates -> EAV -> Stage B -> checks -> risks -> export
+           (who is    (verbatim  (what a    (audit) (write from  (leaf,     (atlas) (34 fields,
+            who)       quotes)    field may          accepted     excerpt,           Markdown,
+                                  take)              evidence)    factuality)        inspector)
 ```
 
 ## collect
@@ -24,6 +24,17 @@ BibTeX in its README, and from the links in its prose, and each is put through a
 gate that asks whether the paper introduces this model, refers to its family, or is
 unrelated. An unrelated tag is dropped unread. Every candidate that was tried stays in
 the manifest with its verdict.
+
+When the repository and its declared base point at no paper at all, which is true of most
+flagship checkpoints on the Hub, OpenAlex and Semantic Scholar are searched for one. A
+searched hit passes the same title gate plus two rules a tag does not need, because a tag
+is a claim by the developer and a search result is a guess by an index: the family name
+must be the title's own subject, with nothing continuing the name after it and nothing but
+a determiner in front of it, and a generation stated in the title must be this
+checkpoint's own. That is what separates "The Llama 3 Herd of Models" from "Code Llama",
+"LLaMA-Adapter", "Llama 2", "Llama-3.1-FoundationAI-SecurityLLM-Reasoning-8B" and "Model
+Inversion Attacks on Llama 3", all of which an index will offer for a Llama 3.2
+checkpoint. A fetch that fails is recorded as a failure, never as an unrelated paper.
 
 A gated repository degrades to what it will serve, usually the README alone, and the
 manifest names each absent channel with a reason. Paper text is cached per arXiv id, so a
@@ -98,9 +109,23 @@ validator repair loop keeps it inside the contract.
   source, or twenty-four characters in a script that does not delimit words with spaces,
   is withheld. It is a copy, not a synthesis.
 - **final claim** a FactReasoner pass over the prose fields against the frozen bundle,
-  non-blocking, contradiction withholds. It needs token logprobs, and it records that it
-  did not run, and why, when the serving route has none. A validation step that is quietly
-  absent reads exactly like one that passed.
+  non-blocking. It decomposes each value into atomic claims and scores them with an NLI
+  model, and a contradiction FLAGS the field in `provenance_and_quality.flagged_fields`
+  rather than removing it: the entailment model is referent-blind, and the first two
+  contradictions it reported were both false. It needs token logprobs, and it records that
+  it did not run, and why, when the serving route has none. A validation step that is
+  quietly absent reads exactly like one that passed.
+
+## risks
+
+The finished card, not the sources, is what the risk stage reads. The card's own use-case
+fields go to the Risk Atlas Nexus detector, which proposes candidate entries of the IBM AI
+Risk Atlas; the proposal is nondeterministic, so it is drawn three times and the union is
+taken. A structured selection call then keeps at most five, each with a justification, and
+every kept row binds to its entry in the frozen copy of the taxonomy that travels in the
+source bundle, by JSON pointer. A risk is therefore a selection from a fixed vocabulary
+with a traceable definition, not a sentence about the model, and the faithfulness judge
+does not grade it.
 
 ## ledger and export
 
@@ -109,7 +134,7 @@ the value, the claim entity, the relation, the benchmark scope, the evidence spa
 origin, the verifier action and the reason. The card is the projection of the accepted
 bindings and nothing else, which the artifact validator enforces in both directions.
 
-The export is the 33 public fields, validated against the published schema, with the
+The export is the 34 public fields, validated against the published schema, with the
 Markdown companion carrying the SHA-256 of the exact JSON bytes, plus a static HTML
 inspector where every field links to its span.
 
