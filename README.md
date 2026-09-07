@@ -10,6 +10,22 @@ value here therefore carries what it was taken from and what that source was tal
 about, and a value whose entity cannot be established is refused and recorded rather than
 published.
 
+![The pipeline: a selected model release, multi-source collection, scoped-evidence binding, evidence-limited composition, and the card with its binding ledger](assets/model-card-pipeline.png)
+
+1. **Selected model release.** One `model_id@revision`, never a branch.
+2. **Multi-source collection.** The Hub snapshot at that commit, the paper behind a
+   title gate, the developer's repository and pages, the public evaluation records; all
+   frozen with hashes (`collect`).
+3. **Scoped-evidence binding.** Verbatim quotes, each resolved to the entity it is about
+   and admitted or refused per field (`frame`, Stage A, the gates, EAV).
+4. **Evidence-limited composition.** The writer sees accepted evidence only; the leaf
+   check and the excerpt guard run on what it wrote, FactReasoner does too when it is
+   enabled, and the risk stage maps the finished card onto the AI Risk Atlas (Stage B,
+   checks, risks).
+
+What comes out is the card and, beside it, the ledger of every accepted and every refused
+value with its reason. [ARCHITECTURE.md](ARCHITECTURE.md) walks through each stage.
+
 ## The public contract
 
 Exactly eight sections and 34 fields, closed:
@@ -27,9 +43,10 @@ Exactly eight sections and 34 fields, closed:
 
 `risks.possible_risks` holds entries of the IBM AI Risk Atlas, selected for this
 checkpoint from what the card itself says and bound to the frozen copy of the taxonomy in
-the source bundle: every row carries the JSON pointer to its entry, so a reader can see
-the definition the label came from. It is a taxonomy selection, not a source quotation,
-and it is the one field the faithfulness judge does not grade.
+the source bundle: the binding ledger records, for every row, the JSON pointer to its
+entry, so the definition a label came from is one lookup away. It is a taxonomy selection, not a source quotation,
+the Markdown says so above the table, and it is the one field the faithfulness judge does
+not grade.
 
 `schema/model-card.schema.json` is the contract and `src/model_cards/publication_contract.py`
 is its single definition in code; the generator imports it rather than restating it. A
@@ -58,9 +75,13 @@ commit unless the caller asks for it, so a card can always say which composer wr
 ## Running it
 
 ```sh
-pip install -e '.[generate]'   # the generator extra pins the composer commit in
-                               # composer-pin.json, whose branch is not on the public
-                               # remote yet; the publication surface installs without it
+pip install -e .               # the publication surface: contract, validator, Markdown
+pip install -e '.[generate]'   # plus the generator and the modelcards command, which
+                               # need the composer at the commit in composer-pin.json;
+                               # that branch of auto-benchmarkcard is not on the public
+                               # remote yet, so this extra does not resolve today and
+                               # the pin is the record of what ran
+pip install -e '.[eval]'       # plus the Anthropic client for the paid judge and screen
 
 # free: freeze the sources for an exact revision
 modelcards collect 'allenai/OLMo-2-1124-7B@7df9a82518afdecae4e8c026b27adccc8c1f0032' \
@@ -88,25 +109,30 @@ click through is a set of assertions.
 
 Serving is configured from the environment (`src/model_cards/core/route.py`) and probed
 before spending with `scripts/probe_route.py`. Every call runs with a server-enforced JSON
-schema, a temperature of 0 and a per-stage token cap, and every call is written to a usage
-log, per card, so what a run cost is a read and not an estimate.
+schema, a temperature of 0 and a per-stage token cap, and every composer call is written
+to a usage log, per card, so what a run cost is a read and not an estimate. FactReasoner,
+when enabled, calls its own route through its own client and is accounted for separately.
 
 ## The cards here
 
-`cards/` holds 256 generated candidates over 113 developers, from a seeded draw of the
-Hugging Face models that appear in public evaluation records, plus a roster of twelve
-flagship base and instruct pairs. They come from two pipeline runs and are not
-hand-edited. They are candidates: none has been human-reviewed, and none is an official
-model card.
+`cards/` holds 426 generated candidates over 170 developers, from two seeded draws of
+the Hugging Face models that appear in public evaluation records, plus a roster of twelve
+flagship base and instruct pairs. They come from three pipeline runs on one code state
+and are not hand-edited. They are candidates: none has been human-reviewed, and none is
+an official model card.
 
-They carry 1,006 benchmark score rows read out of the tables of READMEs and reports, 212
-of the 256 carry AI Risk Atlas entries, and 48 carry a technical report the pipeline was
+They carry 1,368 benchmark score rows read out of the tables of READMEs and reports, 347
+of the 426 carry AI Risk Atlas entries, and 59 carry a technical report the pipeline was
 able to bind to the checkpoint rather than to its family.
 
-41 of them carry no `architecture_type`, most of them because the repository is gated: the
+51 of them carry no `architecture_type`, most of them because the repository is gated: the
 Hub returns the README to an unauthorized token and 403 on `config.json`. The card records
 the absence rather than filling it from prose, which is the behaviour this project exists
 to have.
+
+Every card is a JSON file and a Markdown companion named after the model. The Markdown
+is generated from the exact JSON bytes and carries their SHA-256, so the two can be
+checked against each other; the JSON is the contract, the Markdown is for reading.
 
 ## Evaluation
 
@@ -122,8 +148,13 @@ changes when its question does:
   resolver, because a probe built on the resolver can only confirm it agrees with itself;
 - **sample** a seeded stratified draw over stage, source richness and provenance.
 
-`evaluation/` holds the human annotation schemas and the paired-audit tooling. Human
-labels come from people.
+`scripts/audit_sweep.py` re-checks a finished run without importing the generator: every
+quote against the frozen bytes at its recorded offset, every structured pointer against
+the file it names, every card against the contract. It exits non-zero on any problem, so a
+run that passes it did not grade itself.
+
+`evaluation/` holds the human annotation schemas. There is no packet builder and no
+annotation in this repository; human labels come from people.
 
 ## What the pipeline does beyond reading the README
 
@@ -149,6 +180,7 @@ labels come from people.
 
 ## Status
 
-This is a working generator and a set of candidates, not a released corpus. The
-faithfulness judge runs on a seeded stratified sample of it; the human annotation round
-has not happened yet, and human labels are what would turn candidates into a corpus.
+This is a working generator and a set of candidates, not a released corpus. The judge
+and the screen are instruments here, not results: no judge output is in this repository,
+and the human annotation round has not happened yet. Human labels are what would turn
+candidates into a corpus.

@@ -120,7 +120,7 @@ validator repair loop keeps it inside the contract.
 
 The finished card, not the sources, is what the risk stage reads. The card's own use-case
 fields go to the Risk Atlas Nexus detector, which proposes candidate entries of the IBM AI
-Risk Atlas; the proposal is nondeterministic, so it is drawn three times and the union is
+Risk Atlas; the proposal is nondeterministic, so it is drawn up to three times and the union is
 taken. A structured selection call then keeps at most five, each with a justification, and
 every kept row binds to its entry in the frozen copy of the taxonomy that travels in the
 source bundle, by JSON pointer. A risk is therefore a selection from a fixed vocabulary

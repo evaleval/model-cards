@@ -28,7 +28,7 @@ class PublicationValidationError(ValueError):
 
 
 def load_publication_schema() -> dict[str, Any]:
-    """Load a fresh copy of the seven-section schema shipped in the package."""
+    """Load a fresh copy of the eight-section schema shipped in the package."""
 
     resource = files("model_cards").joinpath("resources", "model-card.schema.json")
     value = json.loads(resource.read_text(encoding="utf-8"))
@@ -69,7 +69,7 @@ def _raise_validation(error: ValidationError, *, prefix: str = "card") -> None:
 
 
 def validate_publication_card(card: Mapping[str, Any]) -> None:
-    """Validate one seven-section public Model Card."""
+    """Validate one eight-section public Model Card."""
 
     errors = sorted(
         _CARD_VALIDATOR.iter_errors(card),
@@ -149,7 +149,7 @@ def blank_publication_card(
     include_unknown_fields: bool = False,
     fill: Any = NOT_SPECIFIED,
 ) -> dict[str, dict[str, Any]]:
-    """Return a fresh publication card with all seven sections.
+    """Return a fresh publication card with all eight sections.
 
     Fields are omitted by default so unknown data does not create a wall of
     placeholders.  ``include_unknown_fields=True`` creates the fully expanded

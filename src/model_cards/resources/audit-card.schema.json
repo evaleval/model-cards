@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:evaleval:model-cards:local-audit-card:v1",
   "title": "Local Model Card audit contract",
-  "description": "Private evidence-pipeline contract for generated Model Card audit artifacts; this is not the seven-section publication schema.",
+  "description": "Private evidence-pipeline contract for generated Model Card audit artifacts; this is not the eight-section publication schema.",
   "$comment": "Source bodies, evidence text, prompts, provider traces, review history, and local paths remain outside the public card. Application validators enforce cross-reference and privacy rules.",
   "x-model-card": {
     "contract_version": "1",

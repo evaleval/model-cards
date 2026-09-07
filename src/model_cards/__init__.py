@@ -2,7 +2,7 @@
 
 The package has two halves that stay apart on purpose.
 
-The publication surface is what a reader of a card touches: the seven-section, 33-field
+The publication surface is what a reader of a card touches: the eight-section, 34-field
 contract, its JSON Schema, the deterministic Markdown renderer, the export guard that
 refuses to let a local path or a credential cross the boundary, and the Hugging Face
 source adapter that freezes a snapshot at an exact commit.
@@ -43,4 +43,4 @@ __all__ = [
     "validate_publication_card",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -10,16 +10,13 @@ withholding, and taxonomy risk-mapping orchestration.
 
 The resulting implementation has been rewritten around the `model_cards` package's
 neutral public contract, exact-revision source state, typed artifacts, fail-closed
-provider runtime, privacy boundary, and command-line interface. It does not require an
-Auto-BenchmarkCards checkout or import Auto-BenchmarkCards runtime modules.
+provider runtime, privacy boundary, and command-line interface. The publication surface
+(`model_cards`) stands alone. The generator (`model_cards.core`) imports the
+Auto-BenchmarkCards composer as a library at the commit recorded in `composer-pin.json`
+and refuses any other commit unless asked to.
 
 The adapted Auto-BenchmarkCards material and this repository are Copyright (c) 2026
 EvalEval and are used under the MIT License included in [LICENSE](LICENSE).
 
 Optional and development dependencies remain subject to their own licenses; their
 source code is not vendored by this repository.
-
-PDF text extraction uses
-[pypdf 6.4.0](https://github.com/py-pdf/pypdf/tree/6.4.0), Copyright (c)
-2006-2008 Mathieu Fenniak and contributors, under the BSD 3-Clause License. The
-dependency is installed from its published package and is not vendored here.
