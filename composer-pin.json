@@ -1,6 +1,6 @@
 {
   "repository": "../auto-benchmarkcard",
-  "commit": "b0bfe1f3e5a3c16963a707fbbb5413fb5d15334b",
+  "commit": "2ec1423d0911c0060b259b431d6aa1675e743abb",
   "interfaces": [
     "auto_benchmarkcard.tools.composer.docstructure.build_index",
     "auto_benchmarkcard.tools.composer.evidence.normalize_ws",

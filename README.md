@@ -77,10 +77,8 @@ commit unless the caller asks for it, so a card can always say which composer wr
 ```sh
 pip install -e .               # the publication surface: contract, validator, Markdown
 pip install -e '.[generate]'   # plus the generator and the modelcards command, which
-                               # need the composer at the commit in composer-pin.json;
-                               # that branch of auto-benchmarkcard is not on the public
-                               # remote yet, so this extra does not resolve today and
-                               # the pin is the record of what ran
+                               # need the composer at the commit in composer-pin.json
+                               # (branch composer-library of evaleval/auto-benchmarkcard)
 pip install -e '.[eval]'       # plus the Anthropic client for the paid judge and screen
 
 # free: freeze the sources for an exact revision
