@@ -69,16 +69,16 @@ words of a source is withheld rather than published.
 - `hf_adapter`, `source_bundle` the frozen snapshot of a repository at an exact commit
 
 **`model_cards.core`**, the generator. It reads the Auto-BenchmarkCard composer as a
-library, at the commit recorded in `composer-pin.json`; the bridge refuses a different
-commit unless the caller asks for it, so a card can always say which composer wrote it.
+library, at the commit recorded in `composer-pin.json`. The bridge verifies the
+composer Python actually imports, using its Git checkout or pip's recorded VCS commit,
+then checks the declared interface hashes. It refuses drift unless the caller explicitly
+allows it; missing revision provenance is always an error.
 
 ## Running it
 
 ```sh
 pip install -e .               # the publication surface: contract, validator, Markdown
-pip install -e '.[generate]'   # plus the generator and the modelcards command, which
-                               # need the composer at the commit in composer-pin.json
-                               # (branch composer-library of evaleval/auto-benchmarkcard)
+pip install -e '.[generate]'   # installs the generator's composer at the pinned Git commit
 pip install -e '.[eval]'       # plus the Anthropic client for the paid judge and screen
 
 # free: freeze the sources for an exact revision
@@ -99,6 +99,23 @@ modelcards inspect runs/olmo/olmo.json --format html --out olmo.html
 modelcards batch targets.txt --phase both --bundle-dir bundles --out runs/batch \
     --concurrency 5 --resume
 ```
+
+The generation extra installs the composer directly from GitHub; no sibling checkout
+is required. Non-editable installs (`pip install '.[generate]'`) work the same way. The
+wheel carries the pin, and both its dependency requirement and that packaged copy are
+built from the root `composer-pin.json` included in the source distribution. To update
+the composer, update that one file (commit and interface hashes), then rebuild.
+
+For composer development, install the intended Git checkout with
+`pip install -e /path/to/auto-benchmarkcard` and keep it at the recorded commit. An importable composer
+always takes precedence over an adjacent checkout. The dependency-light bridge can also
+read a sibling `../auto-benchmarkcard` checkout when no composer is installed. Copying
+package files or installing an untracked archive loses revision provenance and is refused.
+
+Set credentials in the environment, a `.env` in the current working directory, or a file
+selected by `MODELCARDS_ENV_FILE`. After installing, `python scripts/check_installation.py`
+checks the pin and interface imports offline; add `--generator` to check all generator
+imports without making model calls.
 
 `modelcards inspect --format html` writes a self-contained, script-free page where every
 field links to the exact span it came from, with the relation and the reason beside it,

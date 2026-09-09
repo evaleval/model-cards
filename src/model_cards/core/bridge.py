@@ -1,4 +1,4 @@
-"""Narrow, revision-pinned bridge to the adjacent Benchmark Card composer.
+"""Narrow, revision-pinned bridge to an installed or source Benchmark Card composer.
 
 Only exact-span normalization/verification and deterministic document structure
 are reused. Importing the benchmark-specific schema or orchestration here would
@@ -10,6 +10,10 @@ from __future__ import annotations
 import json
 import hashlib
 import importlib.util
+import importlib.metadata
+import importlib.resources
+import re
+import threading
 import subprocess
 import sys
 import types
@@ -24,7 +28,8 @@ class ComposerBridgeError(RuntimeError):
 
 @dataclass(frozen=True)
 class ComposerBridge:
-    repository: Path
+    repository: Path | None
+    source_root: Path
     commit: str
     normalize_ws: Callable[[str], str]
     verify_quote: Callable[[str, str], int | None]
@@ -92,12 +97,16 @@ def _package_root() -> Path:
 
 
 def _read_pin(package_root: Path) -> dict[str, Any]:
+    # Source/editable installs read the tracked canonical file. Wheels contain a
+    # build-time copy; setup.py also derives the VCS requirement from this file.
     pin_path = package_root / "composer-pin.json"
+    if not (package_root / "src/model_cards/core/bridge.py").is_file():
+        pin_path = importlib.resources.files("model_cards").joinpath("resources/composer-pin.json")
     try:
         data = json.loads(pin_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ComposerBridgeError(f"cannot read composer pin: {pin_path}") from exc
-    if not isinstance(data.get("commit"), str) or len(data["commit"]) != 40:
+    if not isinstance(data, dict) or not re.fullmatch(r"[0-9a-f]{40}", str(data.get("commit", ""))):
         raise ComposerBridgeError("composer pin must contain a 40-character commit")
     return data
 
@@ -125,10 +134,10 @@ def _interface_source_paths(pin: dict[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
-def _interface_digest(repository: Path, paths: tuple[str, ...]) -> dict[str, str]:
+def _interface_digest(source_root: Path, paths: tuple[str, ...]) -> dict[str, str]:
     digests: dict[str, str] = {}
     for path in paths:
-        target = repository / path
+        target = source_root / path.removeprefix("src/")
         try:
             digests[path] = hashlib.sha256(target.read_bytes()).hexdigest()
         except OSError as exc:
@@ -138,7 +147,7 @@ def _interface_digest(repository: Path, paths: tuple[str, ...]) -> dict[str, str
     return digests
 
 
-def _require_pinned_interface_bytes(repository: Path, pin: dict[str, Any],
+def _require_pinned_interface_bytes(source_root: Path, pin: dict[str, Any],
                                     paths: tuple[str, ...]) -> None:
     """The imported interface files must be the bytes the pin recorded.
 
@@ -154,7 +163,7 @@ def _require_pinned_interface_bytes(repository: Path, pin: dict[str, Any],
         raise ComposerBridgeError(
             "composer pin must record interface_sha256 for its declared interfaces"
         )
-    found = _interface_digest(repository, paths)
+    found = _interface_digest(source_root, paths)
     drifted = sorted(path for path in paths if found.get(path) != expected.get(path))
     if drifted:
         raise ComposerBridgeError(
@@ -224,22 +233,108 @@ def _load_pinned_primitives(source_root: Path) -> tuple[Any, Any, Any]:
     return evidence.normalize_ws, evidence.verify_quote, docstructure.build_index
 
 
+def _source_checkout(source_root: Path) -> Path | None:
+    """Recognize the project's src layout without borrowing a parent repo's HEAD."""
+    repository = source_root.parent
+    if source_root.name == "src" and (repository / ".git").exists():
+        return repository
+    return None
+
+
+def _installed_revision(source_root: Path, pin: dict[str, Any]) -> str:
+    """Only pip's VCS provenance can identify a non-editable installed revision."""
+    try:
+        distribution = importlib.metadata.distribution("auto-benchmarkcard")
+        installed_init = Path(distribution.locate_file("auto_benchmarkcard/__init__.py")).resolve()
+        if installed_init != source_root / "auto_benchmarkcard/__init__.py":
+            raise ComposerBridgeError("composer distribution does not own the importable package")
+        data = json.loads(distribution.read_text("direct_url.json") or "null")
+    except (importlib.metadata.PackageNotFoundError, OSError, ValueError) as exc:
+        raise ComposerBridgeError("cannot read installed composer VCS provenance") from exc
+    if not isinstance(data, dict):
+        raise ComposerBridgeError("installed composer is missing direct_url.json VCS provenance")
+    vcs = data.get("vcs_info", {})
+    commit = vcs.get("commit_id") if isinstance(vcs, dict) else None
+    if (not isinstance(vcs, dict) or vcs.get("vcs") != "git"
+            or not re.fullmatch(r"[0-9a-f]{40}", str(commit or ""))):
+        raise ComposerBridgeError("installed composer needs a full Git commit in VCS provenance")
+    expected_url = pin.get("repository_url")
+    actual_url = data.get("url")
+    if (not isinstance(expected_url, str) or not isinstance(actual_url, str)
+            or actual_url.removesuffix("/").removesuffix(".git")
+            != expected_url.removesuffix("/").removesuffix(".git")):
+        raise ComposerBridgeError("installed composer VCS repository does not match the pin")
+    return commit
+
+
+def _require_same_import_source(source_root: Path) -> None:
+    """Do not validate one checkout while the generator executes another."""
+    package = source_root / "auto_benchmarkcard"
+    for name, module in tuple(sys.modules.items()):
+        if name != "auto_benchmarkcard" and not name.startswith("auto_benchmarkcard."):
+            continue
+        if module is None:
+            continue
+        locations = list(getattr(module, "__path__", ()))
+        origin = getattr(module, "__file__", None)
+        if origin:
+            locations.append(origin)
+        if not locations or any(not Path(path).resolve().is_relative_to(package) for path in locations):
+            raise ComposerBridgeError(f"loaded composer module uses a different source: {name}")
+
+
+def _resolve_composer_source(package_root: Path, pin: dict[str, Any]) -> tuple[Path, Path | None, str]:
+    try:
+        spec = importlib.util.find_spec("auto_benchmarkcard")
+    except (ImportError, ValueError) as exc:
+        raise ComposerBridgeError("cannot resolve the importable composer package") from exc
+    if spec is not None:
+        if not spec.origin:
+            raise ComposerBridgeError("composer must be a regular Python package")
+        source_root = Path(spec.origin).resolve().parent.parent
+        repository = _source_checkout(source_root)
+        commit = _head(repository) if repository else _installed_revision(source_root, pin)
+    else:
+        # Keep the dependency-light bridge usable in a source checkout. Installed
+        # wheels must get their composer through the documented generate extra.
+        if not (package_root / "src/model_cards/core/bridge.py").is_file():
+            raise ComposerBridgeError("composer is not installed; install evaleval-model-cards[generate]")
+        repository = (package_root / pin["repository"]).resolve()
+        source_root = repository / "src"
+        if _source_checkout(source_root) != repository:
+            raise ComposerBridgeError(f"composer source checkout is missing: {repository}")
+        commit = _head(repository)
+    if not (source_root / "auto_benchmarkcard/__init__.py").is_file():
+        raise ComposerBridgeError(f"composer source directory is missing: {source_root}")
+    _require_same_import_source(source_root)
+    return source_root, repository, commit
+
+
+_PRIMITIVE_IMPORT_LOCK = threading.RLock()
+
+
 def load_composer_bridge(*, allow_unpinned: bool = False) -> ComposerBridge:
-    """Load the three declared primitives after checking the adjacent Git pin."""
+    """Verify the actual import source using Git or pip VCS provenance and hashes.
+
+    An importable package takes precedence over the optional adjacent checkout.
+    Missing or ambiguous provenance fails even in allow_unpinned mode: artifacts
+    must still record a known revision. The override permits revision/byte drift.
+    """
+    with _PRIMITIVE_IMPORT_LOCK:
+        return _load_composer_bridge(allow_unpinned=allow_unpinned)
+
+
+def _load_composer_bridge(*, allow_unpinned: bool) -> ComposerBridge:
     package_root = _package_root()
     pin = _read_pin(package_root)
-    repository = (package_root / pin["repository"]).resolve()
-    commit = _head(repository)
+    source_root, repository, commit = _resolve_composer_source(package_root, pin)
     if commit != pin["commit"] and not allow_unpinned:
         raise ComposerBridgeError(
             f"composer revision drift: expected {pin['commit']}, found {commit}"
         )
     if not allow_unpinned:
-        _require_pinned_interface_bytes(repository, pin, _interface_source_paths(pin))
+        _require_pinned_interface_bytes(source_root, pin, _interface_source_paths(pin))
 
-    source_root = repository / "src"
-    if not source_root.is_dir():
-        raise ComposerBridgeError(f"composer source directory is missing: {source_root}")
     try:
         normalize_ws, verify_quote, build_index = _load_pinned_primitives(source_root)
     except Exception as exc:  # import failures must not silently replace the shared logic
@@ -247,6 +342,7 @@ def load_composer_bridge(*, allow_unpinned: bool = False) -> ComposerBridge:
 
     return ComposerBridge(
         repository=repository,
+        source_root=source_root,
         commit=commit,
         normalize_ws=normalize_ws,
         verify_quote=verify_quote,

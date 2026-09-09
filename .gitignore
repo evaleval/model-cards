@@ -24,12 +24,15 @@ data/
 outputs/
 paper/
 runs/
+bundles/
 sources/
 temp/
 tmp/
 
 # Private research inputs and execution material never enter the public tree.
 **/source_bundle/
+**/tool_output/
+**/bundle-manifest.json
 **/source-bundle/
 **/source_bundles/
 **/source-bundles/
@@ -47,6 +50,9 @@ tmp/
 **/attachments/
 **/.claude/
 **/.codex/
+**/.agents/
+**/.codex_work/
+**/memory/
 **/CLAUDE.md
 **/CODEX.md
 **/AGENTS.md

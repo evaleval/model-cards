@@ -168,7 +168,10 @@ def run_batch(targets: Iterable[str], *, phase: str, bundle_dir: str | Path,
     bundle_root = Path(bundle_dir)
     out_root = Path(out_dir)
     out_root.mkdir(parents=True, exist_ok=True)
-    package_root = Path(__file__).resolve().parents[2]
+    package_source_root = Path(__file__).resolve().parents[2]
+    package_root = package_source_root.parent
+    from .bridge import load_composer_bridge
+    composer_commit = load_composer_bridge().commit
 
     ledger = _Ledger(run_cap)
     results: Dict[str, Dict[str, Any]] = {}
@@ -197,10 +200,10 @@ def run_batch(targets: Iterable[str], *, phase: str, bundle_dir: str | Path,
         command = [sys.executable, "-m", "model_cards.core", *args]
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(
-            [str(package_root / "src"), env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
+            [str(package_source_root), env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
         try:
             done = subprocess.run(command, env=env, capture_output=True, text=True,
-                                  timeout=timeout, cwd=str(package_root))
+                                  timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             raise TimeoutError(f"{args[0]} exceeded {timeout}s and was killed") from exc
         if done.returncode != 0:
@@ -310,8 +313,8 @@ def run_batch(targets: Iterable[str], *, phase: str, bundle_dir: str | Path,
         "run_id": datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
         "phase": phase, "targets": len(targets), "concurrency": workers, "resume": resume,
         "bundle_dir": str(bundle_root), "out_dir": str(out_root),
-        "pipeline_commit": _git_head(package_root),
-        "composer_commit": _git_head((package_root / "../auto-benchmarkcard").resolve()),
+        "pipeline_commit": _git_head(package_root) if (package_root / ".git").exists() else None,
+        "composer_commit": composer_commit,
         "route": effective_route(), "observed_providers": providers,
         "prompts_sha256": prompts_fingerprint(),
         "caps": {"per_card_usd": per_card_cap, "per_run_usd": run_cap,

@@ -42,22 +42,10 @@ ROUTE: Dict[str, Any] = {
 }
 
 
-def _composer_repo() -> Path:
-    """The adjacent auto-benchmarkcard checkout, from the composer pin (no absolute paths)."""
-    import json
-
-    root = Path(__file__).resolve().parents[2]
-    try:
-        rel = json.loads((root / "composer-pin.json").read_text(encoding="utf-8"))["repository"]
-    except (OSError, ValueError, KeyError):
-        rel = "../auto-benchmarkcard"
-    return (root / rel).resolve()
-
-
 def load_env(path: Optional[str | Path] = None) -> bool:
     """Load credentials from a dotenv file into os.environ without overwriting what is
     already set. Returns whether a file was read. Nothing is printed."""
-    candidate = Path(path or os.environ.get("MODELCARDS_ENV_FILE") or (_composer_repo() / ".env"))
+    candidate = Path(path or os.environ.get("MODELCARDS_ENV_FILE") or (Path.cwd() / ".env"))
     if not candidate.is_file():
         return False
     for line in candidate.read_text(encoding="utf-8").splitlines():

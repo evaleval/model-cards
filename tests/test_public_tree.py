@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 
 
@@ -8,7 +9,12 @@ class PublicTreeTests(unittest.TestCase):
     FORBIDDEN_COMPONENTS = {
         ".claude",
         ".codex",
+        ".agents",
+        ".codex_work",
         "attachments",
+        "bundles",
+        "memory",
+        "tool_output",
         "official-source-bundle",
         "official-source-bundles",
         "official_source_bundle",
@@ -33,6 +39,7 @@ class PublicTreeTests(unittest.TestCase):
         "provider-result.json",
         "source-bundle.json",
         "source_bundle.json",
+        "bundle-manifest.json",
     }
 
     def _git(self, *arguments: str) -> subprocess.CompletedProcess[str]:
@@ -44,22 +51,29 @@ class PublicTreeTests(unittest.TestCase):
             capture_output=True,
         )
 
-    def test_public_file_set_excludes_private_research_material(self):
-        if not (self.ROOT / ".git").is_dir():
-            self.skipTest("tracked-file check requires a Git checkout")
-        result = self._git("ls-files", "--cached", "--others", "--exclude-standard")
+    def _require_checkout(self):
+        result = self._git("rev-parse", "--show-toplevel")
         self.assertEqual(result.returncode, 0, result.stderr)
-        paths = [Path(line) for line in result.stdout.splitlines() if line]
+        self.assertEqual(Path(result.stdout.strip()).resolve(), self.ROOT.resolve())
+
+    def test_public_file_set_excludes_private_research_material(self):
+        self._require_checkout()
+        result = self._git("ls-files", "-z", "--cached", "--others", "--exclude-standard")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        paths = [Path(name) for name in result.stdout.split("\0") if name]
         for path in paths:
             with self.subTest(path=path):
                 self.assertTrue(self.FORBIDDEN_COMPONENTS.isdisjoint(path.parts))
                 self.assertNotIn(path.name, self.FORBIDDEN_NAMES)
+                self.assertFalse(path.name == ".env" or (
+                    path.name.startswith(".env.") and path.name != ".env.example"
+                ), path)
+                self.assertNotEqual(path.suffix.lower(), ".jsonl", path)
                 if path.suffix.lower() == ".pdf":
                     self.assertEqual(path.as_posix(), "assets/model-card-pipeline.pdf")
 
     def test_gitignore_covers_private_boundary(self):
-        if not (self.ROOT / ".git").is_dir():
-            self.skipTest("gitignore check requires a Git checkout")
+        self._require_checkout()
         should_ignore = (
             "source_bundle/source-bundle.json",
             "nested/source-bundles/source.json",
@@ -75,6 +89,15 @@ class PublicTreeTests(unittest.TestCase):
             "nested/AGENTS.md",
             "nested/family-risk-authorizations.json",
             "assets/unreviewed.pdf",
+            "bundles/example/tool_output/hf/example.json",
+            "bundles/example/tool_output/docling/paper.json",
+            "bundles/example/bundle-manifest.json",
+            "custom-output/example/tool_output/hf/example.json",
+            "custom-output/example/bundle-manifest.json",
+            "runs/example/usage.jsonl",
+            ".env.production",
+            ".agents/session.json",
+            "memory/notes.md",
         )
         for path in should_ignore:
             with self.subTest(path=path):
@@ -88,6 +111,37 @@ class PublicTreeTests(unittest.TestCase):
             "assets/model-card-pipeline.pdf",
         )
         self.assertEqual(allowed.returncode, 1)
+
+    def test_privacy_checks_run_in_a_linked_worktree_and_reject_forced_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repo"
+            repository.mkdir()
+            (repository / ".gitignore").write_bytes((self.ROOT / ".gitignore").read_bytes())
+
+            def git(*args):
+                return subprocess.run(
+                    ["git", "-C", str(repository), *args],
+                    check=True, capture_output=True, text=True,
+                )
+
+            git("init", "-q")
+            git("add", ".gitignore")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.org",
+                "-c", "commit.gpgsign=false", "commit", "-qm", "fixture")
+            worktree = Path(temporary) / "worktree"
+            git("worktree", "add", "--detach", str(worktree))
+            self.assertTrue((worktree / ".git").is_file())
+            checker = PublicTreeTests()
+            checker.ROOT = worktree
+            checker.test_public_file_set_excludes_private_research_material()
+            checker.test_gitignore_covers_private_boundary()
+            private = worktree / "bundles" / "example" / "bundle-manifest.json"
+            private.parent.mkdir(parents=True)
+            private.write_text("{}", encoding="utf-8")
+            subprocess.run(["git", "-C", str(worktree), "add", "-f", str(private)],
+                           check=True, capture_output=True)
+            with self.assertRaises(AssertionError):
+                checker.test_public_file_set_excludes_private_research_material()
 
     def test_cards_directory_contains_only_canonical_json_markdown_pairs(self):
         """The corpus grew from a twelve-card roster to a full run, so the invariant is

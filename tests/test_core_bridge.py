@@ -31,13 +31,11 @@ def test_the_pin_check_is_race_free_under_concurrency():
     raced on it and six of the 247 targets on 2026-09-05 died reporting drift in a tree
     that was clean before and after the run. Hashing the declared interface files needs
     no subprocess and no index."""
-    import json
     from concurrent.futures import ThreadPoolExecutor
-    from pathlib import Path
 
     from model_cards.core import bridge as B
 
-    pin = json.loads((Path(B.__file__).resolve().parents[3] / "composer-pin.json").read_text())
+    pin = B._read_pin(B._package_root())
     assert isinstance(pin.get("interface_sha256"), dict) and pin["interface_sha256"]
 
     with ThreadPoolExecutor(max_workers=8) as pool:
@@ -46,12 +44,12 @@ def test_the_pin_check_is_race_free_under_concurrency():
     assert all(b.normalize_ws("a  b") == "a b" for b in loaded)
 
     # and no git subprocess is involved in the byte check itself
-    repository = Path(B._package_root() / pin["repository"]).resolve()
+    source_root = loaded[0].source_root
     paths = B._interface_source_paths(pin)
-    B._require_pinned_interface_bytes(repository, pin, paths)
+    B._require_pinned_interface_bytes(source_root, pin, paths)
     tampered = {**pin, "interface_sha256": {**pin["interface_sha256"], paths[0]: "0" * 64}}
     try:
-        B._require_pinned_interface_bytes(repository, tampered, paths)
+        B._require_pinned_interface_bytes(source_root, tampered, paths)
     except B.ComposerBridgeError as exc:
         assert paths[0] in str(exc)
     else:

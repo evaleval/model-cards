@@ -1,6 +1,6 @@
 {
   "repository": "../auto-benchmarkcard",
-  "commit": "2ec1423d0911c0060b259b431d6aa1675e743abb",
+  "commit": "94c7713d1df00730d8c43a35e618de35cf0589bd",
   "interfaces": [
     "auto_benchmarkcard.tools.composer.docstructure.build_index",
     "auto_benchmarkcard.tools.composer.evidence.normalize_ws",
@@ -12,5 +12,6 @@
     "src/auto_benchmarkcard/tools/composer/docstructure.py": "acddcfe5511b649cf77beb7a1f1a1c8039e1137e1c51eacf8e796f9dd2633909",
     "src/auto_benchmarkcard/tools/composer/evidence.py": "0fdaaddf9ef61abcfa7970c73ebae507640dbdf464f7f55ed7efbff3d309f9de",
     "src/auto_benchmarkcard/tools/composer/field_spec.py": "30d14f180e115fb09a9b4ad9130d7bac7f0117b519355f44c91e04899d467885"
-  }
+  },
+  "repository_url": "https://github.com/evaleval/auto-benchmarkcard.git"
 }
